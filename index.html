@@ -544,6 +544,25 @@
                 return { key, ...m }; 
             }); 
             
+            const tableBody = rows.length > 0 ? (
+                rows.map(r => (
+                    <tr key={r.key}>
+                        <td>{r.key}</td>
+                        <td>{r.toplam}</td>
+                        <td>{r.count2025}</td>
+                        <td>{r.avgDays} gün</td>
+                        <td>{r.overdue}</td>
+                        <td>{r.tescile}</td>
+                        <td>{r.iade}</td>
+                        <td>{r.totalWaiting}</td>
+                    </tr>
+                ))
+            ) : (
+                <tr>
+                    <td colSpan={8} style={{textAlign:'center', color:'#6b7280'}}>Veri bulunamadı.</td>
+                </tr>
+            );
+
             return ( 
                 <div className="chart-card" style={{ position:'relative', minWidth:'auto', flex:'1 1 auto' }} ref={summaryTableRef}> 
                     {groupKeys.length>0 && <button className="zoom-btn" title="Büyüt" onClick={onZoom}>🔍</button>} 
@@ -556,18 +575,7 @@
                                 </tr> 
                             </thead> 
                             <tbody> 
-                                {rows.length>0 ? rows.map(r=><tr key={r.key}> 
-                                    <td>{r.key}</td> 
-                                    <td>{r.toplam}</td> 
-                                    <td>{r.count2025}</td> 
-                                    <td>{r.avgDays} gün</td> 
-                                    <td>{r.overdue}</td> 
-                                    <td>{r.tescile}</td> 
-                                    <td>{r.iade}</td> 
-                                    <td>{r.totalWaiting}</td> 
-                                </tr>) : ( 
-                                    <tr><td colSpan={8} style={{textAlign:'center',color:'#6b7280'}}>Veri bulunamadı.</td></tr> 
-                                )} 
+                               {tableBody}
                             </tbody> 
                         </table> 
                     </div> 
@@ -697,6 +705,19 @@
                 } catch(err) { console.error("Excel export error:", err); alert("Excel indirirken hata oluştu."); } 
             }; 
             if(!rows) return null; 
+
+            const tableBody = rows.length > 0 ? (
+                rows.map((row,i) => (
+                    <tr key={i}>
+                        {ALLOWED_COLS.map(col => <td key={col} className={`col-${col.replace(/\s+/g, '-')}`}>{row[col]}</td>)}
+                    </tr>
+                ))
+            ) : (
+                <tr>
+                    <td colSpan={ALLOWED_COLS.length} style={{textAlign:'center',color:'#6b7280'}}>Kayıt bulunamadı.</td>
+                </tr>
+            );
+
             return (
                 <div className="datatable-container"> 
                     <div className="datatable-header"> 
@@ -709,8 +730,7 @@
                                 <tr>{ALLOWED_COLS.map(col => <th key={col}>{col.toLocaleUpperCase('tr-TR')}</th>)}</tr> 
                             </thead> 
                             <tbody> 
-                                {rows.map((row,i)=><tr key={i}>{ALLOWED_COLS.map(col => <td key={col} className={`col-${col.replace(/\s+/g, '-')}`}>{row[col]}</td>)}</tr>)} 
-                                {rows.length===0&&<tr><td colSpan={ALLOWED_COLS.length} style={{textAlign:'center',color:'#6b7280'}}>Kayıt bulunamadı.</td></tr>} 
+                               {tableBody}
                             </tbody> 
                         </table> 
                     </div> 
@@ -720,7 +740,39 @@
         
         const ZoomedChart = ({ chartData }) => { const canvasRef = useRef(null); const chartRef = useRef(null); useEffect(() => { if (canvasRef.current && chartData) { if (chartRef.current) chartRef.current.destroy(); const labels = Object.keys(chartData); const data = Object.values(chartData); chartRef.current = new Chart(canvasRef.current, { type:'bar', data:{ labels, datasets:[{ label:'Toplam İşlem Sayısı', data, backgroundColor: labels.map((_,i)=>`hsl(${i*360/labels.length},70%,60%)`) }] }, options:{ responsive:true, plugins:{ legend:{ display:false }, datalabels: { anchor: 'end', align: 'top', color: '#444', font: { weight: 'bold', size: 14 } } }, scales:{ y:{ beginAtZero:true } }, maintainAspectRatio:false } }); } }, [chartData]); return <div style={{width:'80vw', height:'70vh'}}><canvas ref={canvasRef}></canvas></div>; };
         const ZoomedSummary = ({ data, selectedIl }) => { return <SummaryTable data={data} selectedIl={selectedIl} onZoom={() => {}} />; };
-        const ZoomedWaitingList = ({ data }) => { return ( <div style={{minWidth: '400px'}}> <div style={{maxHeight:'70vh', overflowY:'auto'}}> <table className="zoomed-waiting-list-table"> <thead> <tr> <th style={{position:'sticky', top:0, background: '#fff'}}>Personel</th> <th style={{textAlign: 'right', position:'sticky', top:0, background: '#fff'}}>Bekleyen İşlem</th> </tr> </thead> <tbody> {data.length > 0 ? data.map(item => ( <tr key={item.name}> <td style={{width:'80%'}}>{item.name}</td> <td style={{width:'20%', textAlign: 'right'}}>{item.count}</td> </tr> )) : <tr><td colSpan="2" style={{textAlign:'center', color:'#6b7280'}}>Bekleyen işlem yok.</td></tr>} </tbody> </table> </div> </div> ) };
+        
+        const ZoomedWaitingList = ({ data }) => {
+            const tableContent = data.length > 0 ? (
+                data.map(item => (
+                    <tr key={item.name}>
+                        <td style={{width:'80%'}}>{item.name}</td>
+                        <td style={{width:'20%', textAlign: 'right'}}>{item.count}</td>
+                    </tr>
+                ))
+            ) : (
+                <tr>
+                    <td colSpan="2" style={{textAlign:'center', color:'#6b7280'}}>Bekleyen işlem yok.</td>
+                </tr>
+            );
+
+            return (
+                <div style={{minWidth: '400px'}}>
+                    <div style={{maxHeight:'70vh', overflowY:'auto'}}>
+                        <table className="zoomed-waiting-list-table">
+                            <thead>
+                                <tr>
+                                    <th style={{position:'sticky', top:0, background: '#fff'}}>Personel</th>
+                                    <th style={{textAlign: 'right', position:'sticky', top:0, background: '#fff'}}>Bekleyen İşlem</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {tableContent}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            );
+        };
 
         function AIReportGenerator({ data, ilOptions, personnelOptions, selectedIl }) {
             const [reportType, setReportType] = useState('il');
