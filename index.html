@@ -1,0 +1,1119 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8" />
+    <title>MEGSİS İŞ TAKİP by Gökhan Elgül</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/showdown@2.1.0/dist/showdown.min.js"></script>
+
+    <style>
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            margin: 0;
+            padding: 0;
+            background: #f8fafc;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 20px auto;
+            background: rgba(255,255,255,0.85);
+            border-radius: 12px;
+            box-shadow: 0 2px 12px #0001;
+            padding: 20px;
+            min-height: 80vh;
+            display: flex;
+            flex-direction: column;
+        }
+        .header-center {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .header-center h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: #064e3b;
+            margin: 0;
+        }
+        .header-center h2 {
+            font-size: 0.9rem;
+            font-weight: 400;
+            color: #475569;
+            margin: 4px 0 0;
+            font-style: italic;
+        }
+        .landing-container {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+            border-radius: 12px;
+        }
+        .upload-box {
+            position: relative;
+            z-index: 1;
+            border: 2px dashed #94a3b8;
+            border-radius: 12px;
+            padding: 40px 60px;
+            cursor: pointer;
+            transition: background-color 0.2s ease-in-out, border-color 0.2s ease-in-out;
+        }
+        .upload-box:hover {
+            background-color: #e2e8f0;
+            border-color: #0284c7;
+        }
+        .upload-box .upload-icon {
+            font-size: 4rem;
+            color: #0284c7;
+            margin-bottom: 10px;
+        }
+        .upload-box .upload-text {
+            font-size: 1.2rem;
+            color: #334155;
+            font-weight: 500;
+        }
+        .upload-box .upload-subtext {
+            color: #64748b;
+            font-size: 0.9rem;
+        }
+        .dashboard {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+        .card {
+            background: #f1f5f9;
+            border-radius: 12px;
+            padding: 12px;
+            box-shadow: 0 1px 4px #0001;
+            transition: transform 0.2s, box-shadow 0.2s;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            justify-content: flex-start;
+            min-height: 120px;
+        }
+        .card:hover {
+            transform: scale(1.02);
+            box-shadow: 0 4px 12px #0002;
+        }
+        .card h3 { margin: 0; font-size: 1.1rem; color: #334155; }
+        .card .value { font-size: 1.5rem; color: #1d4ed8; font-weight: bold; margin-top: 4px; }
+        .card .subtext { font-size: 0.85rem; color: #475569; margin-top: 2px; }
+        .card .chart-container { position: relative; display: flex; justify-content: center; align-items: center; margin-top: 6px; width: 100%; height: 80px; }
+        .card canvas { width: 100% !important; height: 100% !important; }
+        .controls {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 12px;
+            flex-wrap: wrap;
+            background-color: #f8fafc;
+            padding: 12px;
+            border-radius: 8px;
+            border: 1px solid #e2e8f0;
+        }
+        .control-group { display: flex; flex-direction: column; }
+        .control-group label { font-size: 0.85rem; margin-bottom: 4px; color: #334155; }
+        .control-group select,
+        .control-group input,
+        .control-group button {
+            min-width: 140px; padding: 6px 10px; border-radius: 4px;
+            border: 1px solid #d1d5db; background: #fff; cursor: pointer; font-size: 0.9rem;
+        }
+        .error-message { color: #b91c1c; margin-top: 8px; font-size: 0.9rem; }
+        
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.5); display: flex; justify-content: center;
+            align-items: center; z-index: 2000;
+        }
+        .modal {
+            background: #fff; border-radius: 8px; padding: 0;
+            max-width: 90vw; width: auto; max-height: 90vh;
+            display: flex; flex-direction: column; box-shadow: 0 4px 20px #0003;
+        }
+        .modal-header {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 15px 20px; border-bottom: 1px solid #e5e7eb;
+        }
+        .modal-header h3 { margin: 0; font-size: 1.2rem; }
+        .modal-header .close-btn { background: transparent; border: none; font-size: 1.5rem; cursor: pointer; padding: 0; line-height: 1; }
+        .modal-content { padding: 20px; overflow-y: auto; }
+        .modal-footer {
+            margin-top: auto; padding: 15px 20px; border-top: 1px solid #e5e7eb;
+            display: flex; gap: 10px; justify-content: flex-end; background-color: #f9fafb;
+            border-bottom-left-radius: 8px; border-bottom-right-radius: 8px;
+        }
+        .download-btn {
+            background-color: #1d4ed8; color: white; border: none; padding: 8px 15px;
+            border-radius: 5px; cursor: pointer; font-size: 0.9rem;
+        }
+        .excel-download-btn { background-color: #4CAF50; }
+        .table-wrapper { position: relative; overflow-x: auto; max-height: 60vh; border-radius: 8px; border: 1px solid #e5e7eb; }
+        .datatable-container { margin-top: 24px; }
+        .datatable-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; padding: 0 5px; }
+        .datatable-header h3 { margin: 0; font-size: 1.2rem; color: #334155; }
+        table { border-collapse: collapse; width: 100%; font-size: 0.9rem; }
+        .datatable-container table { min-width: 1800px; }
+        th, td { padding: 10px 14px; border-bottom: 1px solid #e5e7eb; text-align: left; vertical-align: middle; }
+        th { background: #f9fafb; position: sticky; top: 0; z-index: 3; font-size: 0.85rem; white-space: nowrap; }
+        tr:nth-child(even) td { background: #fafafa; }
+        tr:hover td { background: #eef2f7; }
+        th:first-child, td:first-child { position: sticky; left: 0; background: inherit; z-index: 2; }
+        .col-zemin, .col-personel, .col-kurum-ad, .col-başvuran, .col-tescil-talep-bilgisi, .col-başvuru-açıklama { white-space: normal; word-break: break-word; }
+        .charts-below { display: flex; gap: 24px; margin-top: 20px; flex-wrap: nowrap; overflow-x: auto; }
+        .chart-card {
+            background: #f1f5f9; border-radius: 12px; padding: 14px 16px;
+            min-width: 350px; flex: 1; box-shadow: 0 1px 4px #0001;
+            display: flex; flex-direction: column; height: auto; position: relative;
+        }
+        .chart-card .chart-wrapper { height: 150px; width: 100%; margin-bottom: 10px; }
+        .chart-card canvas { width: 100% !important; height: 100% !important; }
+        .chart-title { font-size: 1rem; color: #334155; margin-bottom: 8px; }
+        .zoom-btn {
+            position: absolute; top: 10px; right: 10px; background: transparent;
+            border: none; font-size: 1.2rem; cursor: pointer; color: #334155;
+        }
+        .warning-table-container { margin-top: 24px; padding: 16px; border-radius: 12px; border: 2px solid #ef4444; background: #fef2f2; }
+        .warning-table-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+        .warning-table-header h3 { margin: 0; color: #991b1b; }
+        .warning-table-header .button-group { display: flex; gap: 10px; }
+        .warning-table-container table { table-layout: auto; }
+        .warning-table-container .col-personel { width: 25%; min-width: 180px; }
+        .warning-table-container .col-zemin { width: 40%; }
+        
+        .export-btn {
+            background-color: #4CAF50; color: white; border: none; padding: 8px 12px;
+            border-radius: 4px; cursor: pointer; font-size: 0.9rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.24);
+            transition: background-color 0.3s ease;
+        }
+        .export-btn:hover { background-color: #388E3C; }
+        .personnel-waiting-list {
+            margin-top: 15px; border-top: 1px solid #e2e8f0; padding-top: 10px;
+            max-height: 150px; overflow-y: auto; position: relative;
+        }
+        .personnel-waiting-list h4 { margin: 0 0 8px 0; font-size: 0.9rem; color: #475569; }
+        .personnel-waiting-list table { width: 100%; }
+        .personnel-waiting-list td { padding: 4px 6px; border-bottom: 1px solid #f1f5f9; }
+        .personnel-waiting-list td:last-child { text-align: right; font-weight: bold; color: #1e40af; }
+        .zoomed-waiting-list-table thead th {
+            position: sticky; top: -1px; 
+            background-color: #ffffff; z-index: 1;
+        }
+        .filter-list { display: flex; flex-direction: column; gap: 5px; }
+        .filter-item label {
+            display: block; padding: 8px; border-radius: 4px; cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .filter-item input { margin-right: 10px; }
+        .filter-item label:hover { background-color: #f1f5f9; }
+        
+        /* AI Reporter Styles */
+        .ai-reporter-container {
+            margin-top: 24px;
+            padding: 20px;
+            border-radius: 12px;
+            background-color: #f0f9ff;
+            border: 1px solid #bae6fd;
+        }
+        .ai-reporter-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+        .ai-reporter-header h3 {
+            margin: 0;
+            color: #0c4a6e;
+            font-size: 1.3rem;
+        }
+        .ai-reporter-controls {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .ai-reporter-controls .control-group {
+            min-width: 200px;
+        }
+        .ai-reporter-actions {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        .ai-reporter-actions button {
+            background-color: #0ea5e9;
+            color: white;
+            padding: 8px 16px;
+            font-weight: 500;
+        }
+        .ai-reporter-actions button.pdf-export {
+            background-color: #db2777;
+        }
+        .ai-reporter-actions button:disabled {
+            background-color: #9ca3af;
+            cursor: not-allowed;
+        }
+        .ai-report-display {
+            margin-top: 16px;
+            padding: 20px;
+            border-radius: 8px;
+            background-color: #ffffff;
+            border: 1px solid #e2e8f0;
+            color: #334155;
+            min-height: 100px;
+            font-family: 'Segoe UI', sans-serif;
+            line-height: 1.7;
+        }
+        .ai-report-display h1, .ai-report-display h2, .ai-report-display h3 {
+            color: #1e3a8a;
+            margin-top: 1.2em;
+            margin-bottom: 0.6em;
+            border-bottom: 1px solid #e2e8f0;
+            padding-bottom: 4px;
+        }
+        .ai-report-display h1 { font-size: 1.5em; }
+        .ai-report-display h2 { font-size: 1.3em; }
+        .ai-report-display h3 { font-size: 1.1em; }
+        .ai-report-display p { margin-bottom: 1em; }
+        .ai-report-display ul { padding-left: 20px; margin-bottom: 1em; }
+        .ai-report-display li { margin-bottom: 0.5em; }
+        .ai-report-display strong { color: #1e40af; }
+
+
+        @media (max-width: 600px) {
+            .dashboard { grid-template-columns: 1fr; }
+            .charts-below { flex-direction: column; overflow-x: visible; }
+            .ai-reporter-controls {
+                flex-direction: column;
+                align-items: stretch;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+        Chart.register(ChartDataLabels);
+
+        const PROVINCES = ["Adana","Adıyaman","Afyonkarahisar","Ağrı","Amasya","Ankara","Antalya","Artvin","Aydın","Balıkesir","Bilecik","Bingöl","Bitlis","Bolu","Burdur","Bursa","Çanakkale","Çankırı","Çorum","Denizli","Diyarbakır","Edirne","Elazığ","Erzincan","Erzurum","Eskişehir","Gaziantep","Giresun","Gümüşhane","Hakkari","Hatay","Isparta","Mersin","İstanbul","İzmir","Kars","Kastamonu","Kayseri","Kırklareli","Kırşehir","Kocaeli","Konya","Kütahya","Malatya","Manisa","Kahramanmaraş","Mardin","Muğla","Muş","Nevşehir","Niğde","Ordu","Rize","Sakarya","Samsun","Siirt","Sinop","Sivas","Tekirdağ","Tokat","Trabzon","Tunceli","Şanlıurfa","Uşak","Van","Yozgat","Zonguldak","Aksaray","Bayburt","Karaman","Kırıkkale","Batman","Şırnak","Bartın","Ardahan","Iğdır","Yalova","Karabük","Kilis","Osmaniye","Düzce"];
+        const ALLOWED_COLS = ["kurum ad","ilçe","başvuru tarihi","fen kayıt tarihi","fen kayıt no","başvuru no","başvuran","işlem","zemin","görevli personel","tescil talep bilgisi","başvuru durumu","başvuru açıklama","iade"];
+        const HEADER_KEYWORDS = {"kurum ad":["kurum","ad"],"ilçe":["ilçe", "ad"],"başvuru tarihi":["başvuru","tarih"],"fen kayıt tarihi":["fen","kayıt","tarih"],"fen kayıt no":["fen","kayıt","no"],"başvuru no":["başvuru","no"],"başvuran":["başvuran"],"işlem":["işlem"],"zemin":["zemin"],"görevli personel":["görevli","personel"],"tescil talep bilgisi":["tescil","talep","bilgi"],"başvuru durumu":["başvuru","durum"],"başvuru açıklama":["başvuru","açıklama"],"iade":["iade"]};
+        
+        function normalizeHeader(header) { if (!header) return ""; let s; try { s = header.normalize('NFD').replace(/[\u0300-\u036f]/g, ''); } catch (e) { s = String(header); } s = s.trim().toLocaleLowerCase('tr').replace(/\s+/g, ' '); s = s.replace(/ı/g, 'i').replace(/İ/g, 'i'); return s; }
+        function splitPersonel(text) { if (text == null) return []; const str = typeof text === 'string' ? text : String(text); return str.split(/[,;–-]/g).map(s => { let part = s.trim(); const arrowIdx = part.indexOf('=>'); if (arrowIdx !== -1) part = part.slice(0, arrowIdx).trim(); return part; }).filter(Boolean); }
+        function formatDate(val) { if (!val) return ""; if (typeof val === 'number') { const date = XLSX.SSF.parse_date_code(val); if (!date) return ""; return `${date.y}-${String(date.m).padStart(2,'0')}-${String(date.d).padStart(2,'0')}`; } if (typeof val === 'string') { let match = val.match(/^(\d{4}-\d{2}-\d{2})/); if (match) return match[1]; match = val.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})/); if (match) { const day = String(match[1]).padStart(2, '0'); const month = String(match[2]).padStart(2, '0'); const year = match[3]; return `${year}-${month}-${day}`; } const part = val.split(" ")[0]; const m2 = part.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})/); if (m2) { const day = String(m2[1]).padStart(2, '0'); const month = String(m2[2]).padStart(2, '0'); const year = m2[3]; return `${year}-${month}-${day}`; } return part; } return val; }
+        function formatFenKayitNo(val) { if (val == null) return ""; if (typeof val === 'number') return val; if (typeof val === 'string') { const num = parseInt(val.replace(/\D/g,''),10); if (!isNaN(num)) return num; return val; } return val; }
+        function detectProvinceAndDistrict(rawKurumAd) { if (!rawKurumAd) return {province: null, district: null}; const normRaw = normalizeHeader(rawKurumAd); let province = null, district = null; for (let p of PROVINCES) { if (normRaw.includes(normalizeHeader(p))) { province = p; let idx = normRaw.indexOf(normalizeHeader(p)); let after = normRaw.substring(idx + normalizeHeader(p).length).trim(); if (after.length > 0) { after = after.replace(/belediyesi|belediye|ilce|ilçe|merkez|buyuksehir|tapu mudurlugu|kadastro mudurlugu/gi, '').trim(); if (after.length > 0) district = after.split(' ')[0].replace(/[^a-zA-ZçğıöşüÇĞİÖŞÜ\s]/g, ''); } break; } } return {province, district}; }
+        
+        function readExcelPromise(file) {
+            return new Promise((resolve, reject) => {
+                if (!file) { reject(new Error("Dosya yüklenmedi veya geçersiz dosya.")); return; }
+                const validTypes = ['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet','application/vnd.ms-excel'];
+                if (!validTypes.includes(file.type) && !file.name.match(/\.xlsx?$|\.xls?$/i)) { reject(new Error("Lütfen .xls veya .xlsx uzantılı bir dosya seçin.")); return; }
+                const reader = new FileReader();
+                reader.onload = e => {
+                    try {
+                        const data = new Uint8Array(e.target.result);
+                        const workbook = XLSX.read(data, { type: 'array' });
+                        const ws = workbook.Sheets[workbook.SheetNames[0]];
+                        let json = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true });
+                        if (!json.length) { resolve([]); return; }
+                        const rawHeaders = json[0].map(h => h == null ? "" : String(h));
+                        const headersNorm = rawHeaders.map(h => normalizeHeader(h));
+                        const colIndexes = {};
+                        ALLOWED_COLS.forEach(col => { colIndexes[col] = -1; });
+                        headersNorm.forEach((hNorm, idx) => { for (const canonical of ALLOWED_COLS) { const keywords = HEADER_KEYWORDS[canonical] || []; const allMatch = keywords.every(k => normalizeHeader(k) && hNorm.includes(normalizeHeader(k))); if (allMatch && colIndexes[canonical] === -1) { colIndexes[canonical] = idx; break; } } });
+                        const allKurumAd = json.slice(1).map(row => { const idx = colIndexes["kurum ad"]; return idx >= 0 ? String(row[idx] || "") : ""; });
+                        let provincesInFile = new Set();
+                        for (let kurum of allKurumAd) { const {province} = detectProvinceAndDistrict(kurum); if (province) provincesInFile.add(province); }
+                        let singleProvince = (provincesInFile.size === 1) ? Array.from(provincesInFile)[0] : null;
+                        const rows = json.slice(1).map(row => {
+                            const obj = {};
+                            ALLOWED_COLS.forEach(col => {
+                                const idx = colIndexes[col];
+                                let val = idx >= 0 ? row[idx] : null;
+                                if (col==='başvuru tarihi' || col==='fen kayıt tarihi') obj[col]=formatDate(val);
+                                else if(col==='fen kayıt no'||col==='başvuru no') obj[col]=formatFenKayitNo(val);
+                                else obj[col]=val??"";
+                            });
+                            let kurumAd = String(obj['kurum ad']||'').trim();
+                            const {province, district} = detectProvinceAndDistrict(kurumAd);
+                            if (singleProvince) {
+                                obj._province = singleProvince;
+                                obj._district = district || "";
+                            } else {
+                                obj._province = province || null;
+                                obj._district = district || "";
+                            }
+                            return obj;
+                        });
+                        resolve(rows);
+                    } catch(err) { console.error("readExcelPromise hata:", err); reject(new Error("Dosya okunurken hata oluştu.")); }
+                };
+                reader.onerror = () => reject(new Error("Dosya okunamadı."));
+                try { reader.readAsArrayBuffer(file); } catch(err) { reject(new Error("Dosya okunurken beklenmedik hata oluştu.")); }
+            });
+        }
+
+        function calcMetrics(arr) {
+            const today = new Date();
+            const threeMonthsAgo = new Date();
+            threeMonthsAgo.setMonth(today.getMonth() - 3);
+
+            let toplam = arr.length, count2025 = 0, totalDays = 0, countDays = 0, overdue = 0;
+            let yearCounts = {}, tescile = 0, iade = 0;
+
+            arr.forEach(d => {
+                const bStr = d['başvuru tarihi'];
+                const fStr = d['fen kayıt tarihi'];
+                const fenKayitNo = d['fen kayıt no'];
+
+                if (bStr) {
+                    const bd = new Date(bStr);
+                    if (!isNaN(bd.getTime())) {
+                        if (bd.getFullYear() === 2025) count2025++;
+                        if (bd >= threeMonthsAgo && fStr) {
+                            const fd = new Date(fStr);
+                            if (!isNaN(fd.getTime()) && fd.getFullYear() > 1900) {
+                                const diff = (fd - bd) / (1000 * 60 * 60 * 24);
+                                if (!isNaN(diff) && diff >= 0) {
+                                    totalDays += diff;
+                                    countDays++;
+                                }
+                            }
+                        }
+                    }
+                }
+                const status = String(d['başvuru durumu'] || '').toLocaleLowerCase('tr');
+                const excluded = status.includes('eksiklikten iade edildi') || status.includes('tescile gönderildi');
+                
+                if (fStr && !excluded) {
+                    const fd = new Date(fStr);
+                    const hasValidFenKayitNo = fenKayitNo != null && fenKayitNo != 0;
+                    if (!isNaN(fd.getTime()) && fd.getFullYear() > 1900 && hasValidFenKayitNo) {
+                         const diff = (today - fd) / (1000 * 60 * 60 * 24);
+                         if (diff >= 10) {
+                              overdue++;
+                         }
+                    }
+                }
+                
+                if(bStr && !excluded) {
+                    const bd = new Date(bStr);
+                    if (!isNaN(bd.getTime()) && bd.getFullYear() > 1900) {
+                        const y = bd.getFullYear();
+                        yearCounts[y] = (yearCounts[y] || 0) + 1;
+                    }
+                }
+
+                if (status.includes('tescile gönderildi')) tescile++;
+                if (status.includes('eksiklikten iade edildi')) iade++;
+            });
+
+            const avgDays = countDays > 0 ? Math.round(totalDays / countDays) : 0;
+            const totalWaiting = Object.values(yearCounts).reduce((a, b) => a + b, 0);
+            return { toplam, count2025, avgDays, overdue, yearCounts, tescile, iade, totalWaiting };
+        }
+        
+        function Dashboard({ data, filtered, sortField, selectedPersonel }) { 
+            const baseArr = (selectedPersonel.length > 0 || filtered.length > 0) ? filtered : data; 
+            const metrics = calcMetrics(baseArr); 
+            const sumRef = useRef(), overdueRef = useRef(), yearRef = useRef(); 
+            const sumChartRef = useRef(null), overdueChartRef = useRef(null), yearChartRef = useRef(null); 
+            
+            useEffect(() => { 
+                try { 
+                    if (sumRef.current) { if (sumChartRef.current) sumChartRef.current.destroy(); sumChartRef.current = new Chart(sumRef.current, { type:'pie', data:{ labels:['Tümü'], datasets:[{ data:[metrics.toplam], backgroundColor:['hsl(0,70%,60%)'] }] }, options:{ responsive:true, plugins:{ legend:{ display:false } }, maintainAspectRatio:false } }); } 
+                    if (overdueRef.current) { if (overdueChartRef.current) overdueChartRef.current.destroy(); overdueChartRef.current = new Chart(overdueRef.current, { type:'pie', data:{ labels:['10+ Gün Bekleyen'], datasets:[{ data:[metrics.overdue], backgroundColor:['#f87171'] }] }, options:{ responsive:true, plugins:{ legend:{ display:false } }, maintainAspectRatio:false } }); } 
+                    if (yearRef.current) { if (yearChartRef.current) yearChartRef.current.destroy(); const years = Object.keys(metrics.yearCounts).sort(); const labels = years.map(y=>`${y}: ${metrics.yearCounts[y]}`); const dataVals = years.map(y=>metrics.yearCounts[y]); yearChartRef.current = new Chart(yearRef.current, { type:'pie', data:{ labels, datasets:[{ data:dataVals, backgroundColor: years.map((_,i)=>`hsl(${i*360/years.length},70%,60%)`) }] }, options:{ responsive:true, plugins:{ legend:{ position:'bottom', labels:{ boxWidth:12, padding:8 } }, tooltip:{ enabled:true } }, maintainAspectRatio:false } }); } 
+                } catch(err) { console.error("Dashboard chart error:", err); } 
+            }, [metrics]); 
+            
+            const yearLegend = Object.keys(metrics.yearCounts).sort().map((y,i)=>{ const color=`hsl(${i*360/Object.keys(metrics.yearCounts).length},70%,60%)`; return (<div key={y} style={{display:'flex',alignItems:'center',marginTop:'4px'}}><span style={{width:'12px',height:'12px',backgroundColor:color,display:'inline-block',marginRight:'6px',borderRadius:'2px'}}></span><span style={{fontSize:'0.85rem',color:'#334155'}}>{y}: {metrics.yearCounts[y]}</span></div>);}); 
+            
+            return (
+                <div className="dashboard"> 
+                    <div className="card"><h3>Toplam İşlem</h3><span className="value">{metrics.toplam}</span><div className="subtext">2025 Başvuru: {metrics.count2025}</div><div className="chart-container"><canvas ref={sumRef}></canvas></div></div> 
+                    <div className="card"><h3>F.K. Ort. Süre (Son 3 Ay)</h3><span className="value">{metrics.avgDays} gün</span></div> 
+                    <div className="card"><h3>10+ Gün Bekleyen</h3><span className="value">{metrics.overdue}</span><div className="chart-container"><canvas ref={overdueRef}></canvas></div></div> 
+                    <div className="card"><h3>Yıla Göre Bekleyen</h3><div className="chart-container"><canvas ref={yearRef}></canvas></div>{yearLegend}</div> 
+                    <div className="card"><h3>Tescile Giden/İade</h3><span className="value">{metrics.tescile}/{metrics.iade}</span></div> 
+                </div>
+            ); 
+        }
+        
+        function ChartsBelow({ data, onZoom, personnelChartCardRef }) { 
+            const barRef = useRef(); 
+            const barChartRef = useRef(null); 
+            const [personnelStats, setPersonnelStats] = useState({ totals: {}, waiting: {} }); 
+            
+            useEffect(() => { 
+                if (!data || data.length === 0) { setPersonnelStats({ totals: {}, waiting: {} }); return; } 
+                const totalsMap = {}; const waitingMap = {}; 
+                data.forEach(r => { 
+                    const personnel = splitPersonel(r['görevli personel']); 
+                    if (personnel.length === 0) return; 
+                    personnel.forEach(p => { if (p) totalsMap[p] = (totalsMap[p] || 0) + 1; }); 
+                    const status = String(r['başvuru durumu'] || '').toLocaleLowerCase('tr'); 
+                    const isClosed = status.includes('eksiklikten iade edildi') || status.includes('tescile gönderildi'); 
+                    if (!isClosed) { personnel.forEach(p => { if (p) waitingMap[p] = (waitingMap[p] || 0) + 1; }); } 
+                }); 
+                setPersonnelStats({ totals: totalsMap, waiting: waitingMap }); 
+            }, [data]); 
+            
+            useEffect(() => { 
+                try { 
+                    if (barRef.current) { 
+                        const labels = Object.keys(personnelStats.totals); 
+                        const dataValues = Object.values(personnelStats.totals); 
+                        if (barChartRef.current) barChartRef.current.destroy(); 
+                        barChartRef.current = new Chart(barRef.current, { 
+                            type:'bar', 
+                            data:{ labels, datasets:[{ label:'Toplam İşlem Sayısı', data:dataValues, backgroundColor: labels.map((_,i)=>`hsl(${i*360/labels.length},70%,60%)`) }] }, 
+                            options:{ responsive:true, plugins:{ legend:{ display:false }, datalabels: { anchor: 'end', align: 'top', color: '#444', font: { weight: 'bold' } } }, scales:{ y:{ beginAtZero:true } }, maintainAspectRatio:false } 
+                        }); 
+                    } 
+                } catch(err) { console.error("ChartsBelow chart error:", err); } 
+            }, [personnelStats.totals]); 
+            
+            const waitingList = Object.entries(personnelStats.waiting).map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count); 
+            
+            if (!data || data.length===0) return null; 
+            
+            const waitingListContent = waitingList.length > 0 ? (
+                waitingList.map(item => (
+                    <tr key={item.name}>
+                        <td>{item.name}</td>
+                        <td>{item.count}</td>
+                    </tr>
+                ))
+            ) : (
+                <tr>
+                    <td colSpan="2" style={{textAlign: 'center', color: '#6b7280'}}>Bekleyen işlem yok.</td>
+                </tr>
+            );
+
+            return ( 
+                <div className="chart-card" ref={personnelChartCardRef}> 
+                    <button className="zoom-btn" title="Büyüt" onClick={() => onZoom({type: 'chart', data: personnelStats.totals })}>🔍</button> 
+                    <div className="chart-title">Personel İşlem Dağılımı (Toplam)</div> 
+                    <div className="chart-wrapper"><canvas ref={barRef}></canvas></div> 
+                    <div className="personnel-waiting-list"> 
+                        <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}> 
+                            <h4>Bekleyen İşlem Sayıları</h4> 
+                           <button className="zoom-btn" style={{position: 'static', fontSize: '1rem'}} title="Büyüt" onClick={() => onZoom({type: 'waitingList', data: waitingList })}>🔍</button> 
+                        </div> 
+                        <table> 
+                            <tbody> 
+                                {waitingListContent}
+                            </tbody> 
+                        </table> 
+                    </div> 
+                </div> 
+            ); 
+        }
+        
+        function SummaryTable({ data, selectedIl, onZoom, summaryTableRef }) { 
+            const groupArr = {}; 
+            data.forEach(row => { 
+                if (!row._province) return; 
+                const groupKey = row._province; 
+                if (!groupArr[groupKey]) groupArr[groupKey] = []; 
+                groupArr[groupKey].push(row); 
+            }); 
+            const groupKeys = selectedIl && selectedIl.length > 0 ? Object.keys(groupArr).filter(gk => selectedIl.includes(gk)) : Object.keys(groupArr); 
+            const rows = groupKeys.map(key => { 
+                const arr = groupArr[key]; 
+                const m = calcMetrics(arr); 
+                return { key, ...m }; 
+            }); 
+            
+            return ( 
+                <div className="chart-card" style={{ position:'relative', minWidth:'auto', flex:'1 1 auto' }} ref={summaryTableRef}> 
+                    {groupKeys.length>0 && <button className="zoom-btn" title="Büyüt" onClick={onZoom}>🔍</button>} 
+                    <div className="chart-title">Özet Tablo</div> 
+                    <div style={{overflowX:'auto',background:'#f1f5f9',borderRadius:'12px',padding:'12px',minWidth:'600px'}}> 
+                        <table className="summary-table"> 
+                            <thead> 
+                                <tr> 
+                                    <th>İl</th><th>Toplam İşlem</th><th>2025 Başvuru</th><th>F.K. Ort. Süre</th><th>10+ Gün</th><th>Tescile Giden</th><th>İade</th><th>Toplam Bekleyen</th> 
+                                </tr> 
+                            </thead> 
+                            <tbody> 
+                                {rows.length>0 ? rows.map(r=><tr key={r.key}> 
+                                    <td>{r.key}</td> 
+                                    <td>{r.toplam}</td> 
+                                    <td>{r.count2025}</td> 
+                                    <td>{r.avgDays} gün</td> 
+                                    <td>{r.overdue}</td> 
+                                    <td>{r.tescile}</td> 
+                                    <td>{r.iade}</td> 
+                                    <td>{r.totalWaiting}</td> 
+                                </tr>) : ( 
+                                    <tr><td colSpan={8} style={{textAlign:'center',color:'#6b7280'}}>Veri bulunamadı.</td></tr> 
+                                )} 
+                            </tbody> 
+                        </table> 
+                    </div> 
+                </div> 
+            ); 
+        }
+        
+        function WarningTable({ data }) { 
+            const [warningRows, setWarningRows] = useState([]); 
+            useEffect(() => { 
+                const today = new Date(); 
+                const groupedTasks = {}; 
+                data.forEach(task => { 
+                    const fStr = task['fen kayıt tarihi']; 
+                    if (fStr) { 
+                        const fenKayitDate = new Date(fStr); 
+                        if (!isNaN(fenKayitDate) && fenKayitDate.getFullYear() > 1900) { 
+                            const diffDays = (today - fenKayitDate) / (1000 * 60 * 60 * 24); 
+                            const status = String(task['başvuru durumu']||'').toLocaleLowerCase('tr'); 
+                            const isClosed = status.includes('eksiklikten iade edildi') || status.includes('tescile gönderildi'); 
+                            const fenKayitNo = task['fen kayıt no']; 
+                            const hasValidFenKayitNo = fenKayitNo != null && fenKayitNo != 0; 
+                            if (diffDays >= 10 && !isClosed && hasValidFenKayitNo) { 
+                                if (!groupedTasks[fenKayitNo]) { 
+                                    groupedTasks[fenKayitNo] = { 
+                                        fenKayitNo: fenKayitNo, 
+                                        il: task._province || '', 
+                                        ilce: task['ilçe'] || '', 
+                                        zemin: task['zemin'] || '', 
+                                        beklemeSuresi: Math.floor(diffDays), 
+                                        personnel: splitPersonel(task['görevli personel']) 
+                                    }; 
+                                } 
+                            } 
+                        } 
+                    } 
+                }); 
+                const finalRows = Object.values(groupedTasks).sort((a, b) => b.beklemeSuresi - a.beklemeSuresi); 
+                setWarningRows(finalRows); 
+            }, [data]); 
+            const handleExportWarningExcel = () => { 
+                const dataToExport = warningRows.map(row => ({ 
+                    'Personel': row.personnel.join("\n"), 
+                    'Fen Kayıt No': row.fenKayitNo, 
+                    'İl': row.il, 
+                    'İlçe': row.ilce, 
+                    'Zemin': row.zemin, 
+                    'Bekleme Süresi (Gün)': row.beklemeSuresi 
+                })); 
+                const ws = XLSX.utils.json_to_sheet(dataToExport); 
+                const range = XLSX.utils.decode_range(ws['!ref']); 
+                for (let R = range.s.r + 1; R <= range.e.r; ++R) { 
+                    const cell_address = { c: 0, r: R }; 
+                    const cell_ref = XLSX.utils.encode_cell(cell_address); 
+                    if (ws[cell_ref]) { 
+                        if (!ws[cell_ref].s) ws[cell_ref].s = {}; 
+                        ws[cell_ref].s.alignment = { wrapText: true }; 
+                    } 
+                } 
+                ws['!cols'] = [ { wch: 30 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 40 }, { wch: 20 } ]; 
+                const wb = XLSX.utils.book_new(); 
+                XLSX.utils.book_append_sheet(wb, ws, 'Uyari Raporu'); 
+                XLSX.writeFile(wb, 'uyari_raporu.xlsx'); 
+            }; 
+            if (warningRows.length === 0) { return null; } 
+            return ( 
+                <div className="warning-table-container"> 
+                    <div className="warning-table-header"> 
+                        <h3>10 Günden Fazla Bekleyen İşlemler (Uyarı)</h3> 
+                        <div className="button-group"> 
+                            <button onClick={handleExportWarningExcel} className="export-btn" title="Excel olarak indir">Excel İndir</button> 
+                        </div> 
+                    </div> 
+                    <div className="table-wrapper" style={{maxHeight: '300px'}}> 
+                        <table> 
+                            <thead> 
+                                <tr> 
+                                    <th className="col-personel">Personel</th> 
+                                    <th className="col-fen-kayit-no">Fen Kayıt No</th> 
+                                    <th className="col-il">İl</th> 
+                                    <th className="col-ilce">İlçe</th> 
+                                    <th className="col-zemin">Zemin</th> 
+                                    <th className="col-bekleme-süresi-gün">Bekleme Süresi (Gün)</th> 
+                                </tr> 
+                            </thead> 
+                            <tbody> 
+                                {warningRows.map((row) => ( 
+                                    <tr key={row.fenKayitNo}> 
+                                        <td className="col-personel">
+                                            {row.personnel.map((p, i) => (
+                                                <React.Fragment key={i}>
+                                                    {p}
+                                                    {i < row.personnel.length - 1 && <br />}
+                                                </React.Fragment>
+                                            ))}
+                                        </td>
+                                        <td className="col-fen-kayit-no">{row.fenKayitNo}</td> 
+                                        <td className="col-il">{row.il}</td> 
+                                        <td className="col-ilce">{row.ilce}</td> 
+                                        <td className="col-zemin">{row.zemin}</td> 
+                                        <td className="col-bekleme-süresi-gün">{row.beklemeSuresi}</td> 
+                                    </tr> 
+                                ))} 
+                            </tbody> 
+                        </table> 
+                    </div> 
+                </div> 
+            ); 
+        }
+        
+        function DataTable({ data, sortField }) { 
+            let rows = [...(data||[])]; 
+            if(sortField==='iade edilen'){ rows=rows.filter(d=>String(d['başvuru durumu']||'').toLocaleLowerCase('tr').includes('eksiklikten iade edildi')); } 
+            else if(sortField){ 
+                rows.sort((a,b)=>{ 
+                    const x=a[sortField]||'', y=b[sortField]||''; 
+                    if(sortField.includes('tarih')){ const dx=new Date(x), dy=new Date(y); if(!isNaN(dx)&&!isNaN(dy)) return dx-dy; } 
+                    return x<y?-1:x>y?1:0; 
+                }); 
+            } 
+            const exportToExcel=()=>{ 
+                try { 
+                    const ws=XLSX.utils.json_to_sheet(rows.map(r=>{ const obj={}; ALLOWED_COLS.forEach(col => { obj[col.toLocaleUpperCase('tr-TR')] = r[col]; }); return obj; })); 
+                    const wb=XLSX.utils.book_new(); 
+                    XLSX.utils.book_append_sheet(wb,ws,'Tum_Islemler'); 
+                    XLSX.writeFile(wb,'tum_islemler.xlsx'); 
+                } catch(err) { console.error("Excel export error:", err); alert("Excel indirirken hata oluştu."); } 
+            }; 
+            if(!rows) return null; 
+            return (
+                <div className="datatable-container"> 
+                    <div className="datatable-header"> 
+                        <h3>Tüm İşlemler</h3> 
+                        <button className="export-btn" onClick={exportToExcel} title="Bu tabloyu Excel olarak indir">Excel İndir</button> 
+                    </div> 
+                    <div className="table-wrapper" style={{marginTop: 0}}> 
+                        <table> 
+                            <thead> 
+                                <tr>{ALLOWED_COLS.map(col => <th key={col}>{col.toLocaleUpperCase('tr-TR')}</th>)}</tr> 
+                            </thead> 
+                            <tbody> 
+                                {rows.map((row,i)=><tr key={i}>{ALLOWED_COLS.map(col => <td key={col} className={`col-${col.replace(/\s+/g, '-')}`}>{row[col]}</td>)}</tr>)} 
+                                {rows.length===0&&<tr><td colSpan={ALLOWED_COLS.length} style={{textAlign:'center',color:'#6b7280'}}>Kayıt bulunamadı.</td></tr>} 
+                            </tbody> 
+                        </table> 
+                    </div> 
+                </div>
+            ); 
+        }
+        
+        const ZoomedChart = ({ chartData }) => { const canvasRef = useRef(null); const chartRef = useRef(null); useEffect(() => { if (canvasRef.current && chartData) { if (chartRef.current) chartRef.current.destroy(); const labels = Object.keys(chartData); const data = Object.values(chartData); chartRef.current = new Chart(canvasRef.current, { type:'bar', data:{ labels, datasets:[{ label:'Toplam İşlem Sayısı', data, backgroundColor: labels.map((_,i)=>`hsl(${i*360/labels.length},70%,60%)`) }] }, options:{ responsive:true, plugins:{ legend:{ display:false }, datalabels: { anchor: 'end', align: 'top', color: '#444', font: { weight: 'bold', size: 14 } } }, scales:{ y:{ beginAtZero:true } }, maintainAspectRatio:false } }); } }, [chartData]); return <div style={{width:'80vw', height:'70vh'}}><canvas ref={canvasRef}></canvas></div>; };
+        const ZoomedSummary = ({ data, selectedIl }) => { return <SummaryTable data={data} selectedIl={selectedIl} onZoom={() => {}} />; };
+        const ZoomedWaitingList = ({ data }) => { return ( <div style={{minWidth: '400px'}}> <div style={{maxHeight:'70vh', overflowY:'auto'}}> <table className="zoomed-waiting-list-table"> <thead> <tr> <th style={{position:'sticky', top:0, background: '#fff'}}>Personel</th> <th style={{textAlign: 'right', position:'sticky', top:0, background: '#fff'}}>Bekleyen İşlem</th> </tr> </thead> <tbody> {data.length > 0 ? data.map(item => ( <tr key={item.name}> <td style={{width:'80%'}}>{item.name}</td> <td style={{width:'20%', textAlign: 'right'}}>{item.count}</td> </tr> )) : <tr><td colSpan="2" style={{textAlign:'center', color:'#6b7280'}}>Bekleyen işlem yok.</td></tr>} </tbody> </table> </div> </div> ) };
+
+        function AIReportGenerator({ data, ilOptions, personnelOptions, selectedIl }) {
+            const [reportType, setReportType] = useState('il');
+            const [selectedValue, setSelectedValue] = useState('');
+            const [isLoading, setIsLoading] = useState(false);
+            const [generatedReport, setGeneratedReport] = useState('');
+            const [reportHtml, setReportHtml] = useState('');
+            const reportDisplayRef = useRef(null);
+
+            const API_KEY = "AIzaSyAXPI6pT3qPGQ6JYQODz8mk-GZHV3t3oLA";
+            const markdownConverter = new showdown.Converter();
+
+            useEffect(() => {
+                setSelectedValue('');
+                setGeneratedReport('');
+                setReportHtml('');
+            }, [reportType]);
+
+            const handleGenerateReport = async () => {
+                const isComparative = reportType === 'karşılaştırmalı';
+                if (!isComparative && !selectedValue) {
+                    setGeneratedReport("Lütfen rapor için bir il veya personel seçin.");
+                    setReportHtml("<p>Lütfen rapor için bir il veya personel seçin.</p>");
+                    return;
+                }
+                if (isComparative && selectedIl.length < 2) {
+                     setGeneratedReport("Karşılaştırma için en az 2 il seçmelisiniz.");
+                    setReportHtml("<p>Karşılaştırma için en az 2 il seçmelisiniz. Lütfen üst menüdeki 'İl Filtresi' butonunu kullanın.</p>");
+                    return;
+                }
+
+                setIsLoading(true);
+                setGeneratedReport('');
+                setReportHtml('<p>Rapor oluşturuluyor, lütfen bekleyin...</p>');
+
+                const today = new Date();
+                const formattedDate = today.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' });
+                let dataSummary = `Rapor Tarihi: ${formattedDate}\n`;
+                let prompt;
+
+                if (isComparative) {
+                    dataSummary += `Rapor Kapsamı: Karşılaştırmalı İl Raporu - (${selectedIl.join(', ')})\n\n`;
+                    selectedIl.forEach(il => {
+                        const ilData = data.filter(d => d._province === il);
+                        const metrics = calcMetrics(ilData);
+                        dataSummary += `--- ${il} Verileri ---\n`;
+                        dataSummary += `- Toplam İşlem: ${metrics.toplam}\n- 10+ Gün Bekleyen: ${metrics.overdue}\n- Ort. F.K. Süresi: ${metrics.avgDays} gün\n- Yıllara Göre Bekleyen: ${JSON.stringify(metrics.yearCounts)}\n\n`;
+                    });
+                    
+                    prompt = `
+Sen, Tapu ve Kadastro Genel Müdürlüğü'nde çalışan uzman bir başmüfettişsin. Sana sunulan ve birden fazla ili içeren aşağıdaki özet verilere dayanarak, Türkçe dilinde, profesyonel ve resmi bir dille karşılaştırmalı bir performans raporu oluştur.
+
+ÖNEMLİ KURALLAR:
+1.  **Performans Metrikleri:** Analizini SADECE '10+ Gün Bekleyen', 'Ort. F.K. Süresi' ve 'Yıllara Göre Bekleyen' metriklerine dayandır. Bu metrikleri kullanarak illeri birbiriyle kıyasla.
+2.  **Format:** Raporu Markdown formatında, ana başlıklar (## Başlık) ve madde imleri (* Madde) kullanarak oluştur.
+
+RAPOR BÖLÜMLERİ:
+-   **Tarih:** Raporun en başına, sana verdiğim Rapor Tarihi'ni **Tarih: [gün ay yıl]** formatında ekle.
+-   **## 1. Karşılaştırmalı Genel Bakış:** Her ilin kritik performans metriklerini özetle ve genel bir tablo çiz.
+-   **## 2. Performans Liderleri:** Hangi ilin hangi metrikte (düşük bekleme süresi, az bekleyen işlem vb.) daha iyi performans gösterdiğini belirt ve nedenlerini yorumla.
+-   **## 3. Geliştirilmesi Gereken Alanlar:** Hangi ilin hangi metriklerde zorlandığını belirt ve potansiyel riskleri vurgula.
+
+Bu 3 bölüm dışında başka bir bölüm (özellikle öneriler veya tavsiyeler bölümü) KESİNLİKLE ekleme.
+
+**Analiz Edilecek Veri Özeti:**
+${dataSummary}
+                    `;
+
+                } else { // Single report
+                    let filteredData = [];
+                    if (reportType === 'il') {
+                        filteredData = data.filter(d => d._province === selectedValue);
+                    } else {
+                        filteredData = data.filter(d => splitPersonel(d['görevli personel']).includes(selectedValue));
+                    }
+                    const metrics = calcMetrics(filteredData);
+                    dataSummary += `Rapor Kapsamı: ${reportType === 'il' ? 'İl' : 'Personel'} - ${selectedValue}\n`;
+                    dataSummary += `- Toplam İşlem Sayısı: ${metrics.toplam}\n- 10 Günden Fazla Bekleyen İşlem Sayısı: ${metrics.overdue}\n- Ortalama Fen Kayıt Süresi (Son 3 Ay): ${metrics.avgDays} gün\n- Tescile Gönderilen İşlem Sayısı: ${metrics.tescile}\n- İade Edilen İşlem Sayısı: ${metrics.iade}\n- Yıllara Göre Bekleyen İşlem Sayıları: ${JSON.stringify(metrics.yearCounts)}`;
+
+                    prompt = `
+Sen, Tapu ve Kadastro Genel Müdürlüğü'nde çalışan uzman bir başmüfettişsin. Sana sunulan aşağıdaki özet verilere dayanarak, Türkçe dilinde, profesyonel ve resmi bir dille 3 bölümden oluşan bir performans raporu oluştur.
+
+ÖNEMLİ KURALLAR:
+1.  **İade Sayısı:** 'İade Edilen İşlem Sayısı' bir performans metriği değildir. Bu sayıyı olumlu veya olumsuz bir performans göstergesi olarak ASLA yorumlama. Sadece bilgi olarak not edebilirsin, ancak performansı etkilediğini belirtme.
+2.  **Performans Metrikleri:** Performans analizini ve yorumlarını SADECE şu metriklere dayandır: 'bekleyen işlem sayısı', 'fen kayıt süresi' ve '10 günden fazla bekleyen işlem sayısı'.
+3.  **Format:** Raporu Markdown formatında, ana başlıklar (## Başlık) ve madde imleri (* Madde) kullanarak oluştur.
+
+RAPOR BÖLÜMLERİ:
+-   **Tarih:** Raporun en başına, sana verdiğim Rapor Tarihi'ni **Tarih: [gün ay yıl]** formatında ekle.
+-   **## 1. Genel Durum Değerlendirmesi:** Verilerin genel bir özeti.
+-   **## 2. Olumlu Yönler:** Kritik performans metriklerine göre öne çıkan olumlu göstergeler.
+-   **## 3. Geliştirilmesi Gereken Alanlar ve Potansiyel Riskler:** Kritik performans metriklerindeki olumsuzluklar ve potansiyel riskler.
+
+Bu 3 bölüm dışında başka bir bölüm (özellikle öneriler veya tavsiyeler bölümü) KESİNLİKLE ekleme.
+
+**Analiz Edilecek Veri Özeti:**
+${dataSummary}
+                    `;
+                }
+
+                try {
+                    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${API_KEY}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
+                    });
+
+                    if (!response.ok) {
+                        const errorBody = await response.json();
+                        throw new Error(`API hatası: ${response.status} ${response.statusText} - ${JSON.stringify(errorBody)}`);
+                    }
+
+                    const result = await response.json();
+                    const reportText = result.candidates[0].content.parts[0].text;
+                    setGeneratedReport(reportText);
+                    setReportHtml(markdownConverter.makeHtml(reportText));
+
+                } catch (error) {
+                    console.error("Gemini API error:", error);
+                    const errorMsg = `Rapor oluşturulurken bir hata oluştu: ${error.message}. Lütfen API anahtarınızı veya internet bağlantınızı kontrol edin.`;
+                    setGeneratedReport(errorMsg);
+                    setReportHtml(`<p style="color: red;">${errorMsg}</p>`);
+                } finally {
+                    setIsLoading(false);
+                }
+            };
+            
+            const handleExportToPdf = () => {
+                const reportElement = reportDisplayRef.current;
+                if (!reportElement || !generatedReport) {
+                    console.error("Rapor verisi veya element bulunamadı.");
+                    return;
+                }
+                
+                const { jsPDF } = window.jspdf;
+                html2canvas(reportElement, { scale: 2 }).then(canvas => {
+                    const imgData = canvas.toDataURL('image/png');
+                    const pdf = new jsPDF('p', 'mm', 'a4');
+                    const pdfWidth = pdf.internal.pageSize.getWidth();
+                    const pdfHeight = pdf.internal.pageSize.getHeight();
+                    const canvasWidth = canvas.width;
+                    const canvasHeight = canvas.height;
+                    const ratio = canvasWidth / canvasHeight;
+                    const imgWidth = pdfWidth - 20; // 10mm margin on each side
+                    const imgHeight = imgWidth / ratio;
+                    
+                    let heightLeft = imgHeight;
+                    let position = 10; // top margin
+
+                    pdf.addImage(imgData, 'PNG', 10, position, imgWidth, imgHeight);
+                    heightLeft -= (pdfHeight - 20);
+
+                    while (heightLeft > 0) {
+                        position = heightLeft - imgHeight; 
+                        pdf.addPage();
+                        pdf.addImage(imgData, 'PNG', 10, position, imgWidth, imgHeight);
+                        heightLeft -= (pdfHeight - 20);
+                    }
+                    
+                    pdf.save("YapayZeka_Raporu.pdf");
+                });
+            };
+
+            const options = reportType === 'il' ? ilOptions : personnelOptions;
+            const isComparative = reportType === 'karşılaştırmalı';
+            const canGenerate = !isLoading && (isComparative ? selectedIl.length > 1 : !!selectedValue);
+
+            return (
+                <div className="ai-reporter-container">
+                    <div className="ai-reporter-header">
+                        <h3>Yapay Zeka Destekli Raporlama</h3>
+                    </div>
+                    <div className="ai-reporter-controls">
+                        <div className="control-group">
+                            <label>Rapor Türü</label>
+                            <select value={reportType} onChange={e => setReportType(e.target.value)}>
+                                <option value="il">İl Bazında</option>
+                                <option value="personel">Personel Bazında</option>
+                                <option value="karşılaştırmalı">Karşılaştırmalı İl Raporu</option>
+                            </select>
+                        </div>
+                        {!isComparative && (
+                            <div className="control-group">
+                                <label>{reportType === 'il' ? 'İl Seçin' : 'Personel Seçin'}</label>
+                                <select value={selectedValue} onChange={e => setSelectedValue(e.target.value)} disabled={options.length === 0}>
+                                    <option value="">-- Seçim Yapın --</option>
+                                    {options.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                                </select>
+                            </div>
+                        )}
+                        <div className="ai-reporter-actions">
+                             <button onClick={handleGenerateReport} disabled={!canGenerate}>
+                                {isLoading ? 'Oluşturuluyor...' : 'Rapor Oluştur'}
+                            </button>
+                            <button onClick={handleExportToPdf} className="pdf-export" disabled={isLoading || !generatedReport}>
+                                PDF Olarak İndir
+                            </button>
+                        </div>
+                    </div>
+                     {isComparative && <p style={{marginTop: '10px', color: '#0c4a6e'}}><i>Karşılaştırma yapılacak illeri üst menüdeki 'İl Filtresi' butonundan seçebilirsiniz. (En az 2 il seçilmelidir)</i></p>}
+                    <div className="ai-report-display" ref={reportDisplayRef} dangerouslySetInnerHTML={{ __html: reportHtml || '<p>Oluşturulan rapor burada görünecektir.</p>' }}>
+                    </div>
+                </div>
+            );
+        }
+
+        function App(){
+            const [data,setData]=useState([]);
+            const [loading,setLoading]=useState(false);
+            const [errorMsg,setErrorMsg]=useState("");
+            const [sortField,setSortField]=useState('');
+            const [selectedPersonel,setSelectedPersonel]=useState([]);
+            const [selectedIl,setSelectedIl]=useState([]);
+            const [showPersonelModal,setShowPersonelModal]=useState(false);
+            const [showIlModal,setShowIlModal]=useState(false);
+            const [zoomContent, setZoomContent] = useState(null);
+
+            const modalContentRef = useRef(null);
+            
+            const handleFile=async(e)=>{
+                const files=Array.from(e.target.files||[]);
+                if(!files.length) return;
+                setLoading(true); setErrorMsg("");
+                const newRows = await Promise.all(files.map(f => readExcelPromise(f).catch(err => {
+                    console.error('Excel okuma hatası:',err); 
+                    setErrorMsg(err.message);
+                    return [];
+                })));
+                setData(prevData => [...prevData, ...newRows.flat()]); 
+                e.target.value = null;
+                setLoading(false);
+            };
+            
+            const handleDownloadModalAsJpeg = () => {
+                const elementToCapture = modalContentRef.current;
+                if (elementToCapture) {
+                    setLoading(true);
+                    html2canvas(elementToCapture, {scale: 2, backgroundColor: '#ffffff'}).then(canvas => {
+                        const url = canvas.toDataURL('image/jpeg', 1.0);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = `${zoomContent.type}_gorunumu.jpg`;
+                        a.click();
+                    }).finally(() => setLoading(false));
+                }
+            };
+            
+            const handleExportWaitingListExcel = () => {
+                if (zoomContent && zoomContent.type === 'waitingList') {
+                    const dataToExport = zoomContent.data.map(i => ({'Personel': i.name, 'Bekleyen İşlem Sayısı': i.count}));
+                    const ws = XLSX.utils.json_to_sheet(dataToExport);
+                    ws['!cols'] = [{ wch: 30 }, { wch: 20 }];
+                    const wb = XLSX.utils.book_new();
+                    XLSX.utils.book_append_sheet(wb, ws, 'Bekleyen_Islemler');
+                    XLSX.writeFile(wb, 'bekleyen_islem_sayilari.xlsx');
+                }
+            };
+
+            const ilOptions = Array.from(new Set(data.map(d=>d._province).filter(p=>p))).sort((a,b)=>a.localeCompare(b,'tr'));
+            const personnelOptions = Array.from(new Set(data.flatMap(d=>splitPersonel(d['görevli personel'])))).sort((a,b)=>a.localeCompare(b,'tr'));
+            const sortOptions=[{label:'Sıralama Yok',value:''},{label:'Başvuru Tarihine Göre',value:'başvuru tarihi'},{label:'Fen Kayıt Tarihine Göre',value:'fen kayıt tarihi'},{label:'İade Edilen',value:'iade edilen'}];
+            const filteredData=(() => {
+                let arr=[...data];
+                if(selectedIl.length>0) arr=arr.filter(d=>selectedIl.includes(d._province));
+                if(selectedPersonel.length>0) arr=arr.filter(d=>{const ppl=splitPersonel(d['görevli personel']); return selectedPersonel.some(sp=>ppl.includes(sp));});
+                if(sortField==='iade edilen') arr=arr.filter(d=>String(d['başvuru durumu']||'').toLocaleLowerCase('tr').includes('eksiklikten iade edildi'));
+                return arr;
+            })();
+            
+            const LandingPage = ({onFileChange}) => (
+                <div className="landing-container">
+                    <label htmlFor="file-upload-landing" className="upload-box">
+                        <div className="upload-icon">📤</div>
+                        <div className="upload-text">Analiz için Excel Dosyası Seçin</div>
+                        <div className="upload-subtext">veya dosyayı buraya sürükleyip bırakın</div>
+                    </label>
+                    <input id="file-upload-landing" type="file" multiple onChange={onFileChange} accept=".xlsx, .xls" style={{display: 'none'}} />
+                </div>
+            );
+
+            return (<div className="container">
+                <div className="header-center">
+                    <h1>MEGSİS İŞ TAKİP</h1>
+                    <h2 style={{fontStyle: 'italic', fontSize: '0.9rem', color: '#64748b'}}>
+                        by Gökhan ELGÜL
+                    </h2>
+                </div>
+                
+                {data.length === 0 && !loading && !errorMsg && <LandingPage onFileChange={handleFile} />}
+                {loading && <p style={{textAlign:'center'}}>Yükleniyor...</p>}
+                {errorMsg && <p className="error-message">{errorMsg}</p>}
+                
+                {data.length > 0 && <>
+                    <div className="controls">
+                         <div className="control-group">
+                            <label>Dosya İşlemleri</label>
+                            <input type="file" multiple onChange={handleFile} accept=".xlsx, .xls" />
+                        </div>
+                        <div className="control-group">
+                            <label>Sıralama</label>
+                            <select value={sortField} onChange={e=>setSortField(e.target.value)}>
+                                {sortOptions.map(o=><option key={o.value} value={o.value}>{o.label}</option>)}
+                            </select>
+                        </div>
+                        <div className="control-group">
+                            <label>İl Filtresi</label>
+                            <button onClick={()=>setShowIlModal(true)}>{selectedIl.length ? `${selectedIl.length} il seçili` : 'İl Seç'}</button>
+                        </div>
+                        <div className="control-group">
+                            <label>Personel Filtresi</label>
+                            <button onClick={()=>setShowPersonelModal(true)}>{selectedPersonel.length ? `${selectedPersonel.length} personel seçili` : 'Personel Seç'}</button>
+                        </div>
+                         <div className="control-group">
+                            <label>Veri Yönetimi</label>
+                            <button onClick={() => { setData([]); setSelectedIl([]); setSelectedPersonel([]); }} style={{backgroundColor: '#ef4444', color: 'white'}}>Verileri Temizle</button>
+                        </div>
+                    </div>
+                    <Dashboard data={data} filtered={filteredData} sortField={sortField} selectedPersonel={selectedPersonel} />
+                    <div className="charts-below">
+                        <ChartsBelow data={filteredData} onZoom={setZoomContent} />
+                        <SummaryTable data={filteredData} selectedIl={selectedIl} onZoom={() => setZoomContent({type: 'summary'})} />
+                    </div>
+                    <WarningTable data={filteredData} />
+                    <DataTable data={filteredData} sortField={sortField} />
+                    <AIReportGenerator data={data} ilOptions={ilOptions} personnelOptions={personnelOptions} selectedIl={selectedIl} />
+                </>}
+                
+                {zoomContent && (
+                    <div className="modal-overlay" onClick={() => setZoomContent(null)}>
+                        <div className="modal" onClick={e => e.stopPropagation()}>
+                           <div className="modal-header">
+                                <h3>{
+                                    zoomContent.type === 'chart' ? 'Personel İşlem Dağılımı (Büyük Görünüm)' 
+                                    : zoomContent.type === 'summary' ? 'Özet Tablo (Büyük Görünüm)' 
+                                    : 'Bekleyen İşlem Sayıları'
+                                }</h3>
+                                <button className="close-btn" onClick={() => setZoomContent(null)}>×</button>
+                           </div>
+                           <div className="modal-content" ref={modalContentRef}>
+                                {zoomContent.type === 'chart' && <ZoomedChart chartData={zoomContent.data} />}
+                                {zoomContent.type === 'summary' && <ZoomedSummary data={filteredData} selectedIl={selectedIl} />}
+                                {zoomContent.type === 'waitingList' && <ZoomedWaitingList data={zoomContent.data} />}
+                           </div>
+                           <div className="modal-footer">
+                                {zoomContent.type === 'waitingList' ?
+                                    <button className="download-btn excel-download-btn" onClick={handleExportWaitingListExcel}>Excel İndir</button>
+                                    :
+                                    <button className="download-btn" onClick={handleDownloadModalAsJpeg}>JPEG İndir</button>
+                                }
+                           </div>
+                        </div>
+                    </div>
+                )}
+
+                {showIlModal && (
+                    <div className="modal-overlay" onClick={() => setShowIlModal(false)}>
+                        <div className="modal" onClick={e => e.stopPropagation()}>
+                            <div className="modal-header"><h3>İl Seç</h3><button className="close-btn" onClick={()=>setShowIlModal(false)}>×</button></div>
+                            <div className="modal-content">
+                                <div className="filter-list">
+                                    {ilOptions.map(il => <div className="filter-item" key={il}><label>
+                                        <input type="checkbox" checked={selectedIl.includes(il)} onChange={e=>{
+                                            if(e.target.checked) setSelectedIl([...selectedIl,il]);
+                                            else setSelectedIl(selectedIl.filter(p=>p!==il));
+                                        }}/> {il}
+                                    </label></div>)}
+                                </div>
+                            </div>
+                            <div className="modal-footer"><button className="download-btn" onClick={()=>{setSelectedIl([]); setShowIlModal(false);}}>Temizle & Kapat</button></div>
+                        </div>
+                    </div>
+                )}
+                {showPersonelModal && (
+                    <div className="modal-overlay" onClick={() => setShowPersonelModal(false)}>
+                        <div className="modal" onClick={e => e.stopPropagation()}>
+                             <div className="modal-header"><h3>Personel Seç</h3><button className="close-btn" onClick={()=>setShowPersonelModal(false)}>×</button></div>
+                             <div className="modal-content">
+                                <div className="filter-list">
+                                    {personnelOptions.map(p => <div className="filter-item" key={p}><label>
+                                        <input type="checkbox" checked={selectedPersonel.includes(p)} onChange={e=>{
+                                            if(e.target.checked) setSelectedPersonel([...selectedPersonel,p]);
+                                            else setSelectedPersonel(selectedPersonel.filter(sp=>sp!==p));
+                                        }}/> {p}
+                                    </label></div>)}
+                                </div>
+                            </div>
+                            <div className="modal-footer"><button className="download-btn" onClick={()=>{setSelectedPersonel([]); setShowPersonelModal(false);}}>Temizle & Kapat</button></div>
+                        </div>
+                    </div>
+                )}
+            </div>);
+        }
+        ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+    </script>
+</body>
+</html>
