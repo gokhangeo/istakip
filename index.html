@@ -408,7 +408,7 @@
                     const hasValidFenKayitNo = fenKayitNo != null && fenKayitNo != 0;
                     if (!isNaN(fd.getTime()) && fd.getFullYear() > 1900 && hasValidFenKayitNo) {
                          const diff = (today - fd) / (1000 * 60 * 60 * 24);
-                         if (diff >= 10) {
+                         if (diff >= 7) { // Değişiklik: 10 günden 7 güne indirildi
                               overdue++;
                          }
                     }
@@ -440,7 +440,7 @@
             useEffect(() => { 
                 try { 
                     if (sumRef.current) { if (sumChartRef.current) sumChartRef.current.destroy(); sumChartRef.current = new Chart(sumRef.current, { type:'pie', data:{ labels:['Tümü'], datasets:[{ data:[metrics.toplam], backgroundColor:['hsl(0,70%,60%)'] }] }, options:{ responsive:true, plugins:{ legend:{ display:false } }, maintainAspectRatio:false } }); } 
-                    if (overdueRef.current) { if (overdueChartRef.current) overdueChartRef.current.destroy(); overdueChartRef.current = new Chart(overdueRef.current, { type:'pie', data:{ labels:['10+ Gün Bekleyen'], datasets:[{ data:[metrics.overdue], backgroundColor:['#f87171'] }] }, options:{ responsive:true, plugins:{ legend:{ display:false } }, maintainAspectRatio:false } }); } 
+                    if (overdueRef.current) { if (overdueChartRef.current) overdueChartRef.current.destroy(); overdueChartRef.current = new Chart(overdueRef.current, { type:'pie', data:{ labels:['7+ Gün Bekleyen'], datasets:[{ data:[metrics.overdue], backgroundColor:['#f87171'] }] }, options:{ responsive:true, plugins:{ legend:{ display:false } }, maintainAspectRatio:false } }); } 
                     if (yearRef.current) { if (yearChartRef.current) yearChartRef.current.destroy(); const years = Object.keys(metrics.yearCounts).sort(); const labels = years.map(y=>`${y}: ${metrics.yearCounts[y]}`); const dataVals = years.map(y=>metrics.yearCounts[y]); yearChartRef.current = new Chart(yearRef.current, { type:'pie', data:{ labels, datasets:[{ data:dataVals, backgroundColor: years.map((_,i)=>`hsl(${i*360/years.length},70%,60%)`) }] }, options:{ responsive:true, plugins:{ legend:{ position:'bottom', labels:{ boxWidth:12, padding:8 } }, tooltip:{ enabled:true } }, maintainAspectRatio:false } }); } 
                 } catch(err) { console.error("Dashboard chart error:", err); } 
             }, [metrics]); 
@@ -451,7 +451,7 @@
                 <div className="dashboard"> 
                     <div className="card"><h3>Toplam İşlem</h3><span className="value">{metrics.toplam}</span><div className="subtext">2025 Başvuru: {metrics.count2025}</div><div className="chart-container"><canvas ref={sumRef}></canvas></div></div> 
                     <div className="card"><h3>F.K. Ort. Süre (Son 3 Ay)</h3><span className="value">{metrics.avgDays} gün</span></div> 
-                    <div className="card"><h3>10+ Gün Bekleyen</h3><span className="value">{metrics.overdue}</span><div className="chart-container"><canvas ref={overdueRef}></canvas></div></div> 
+                    <div className="card"><h3>7+ Gün Bekleyen</h3><span className="value">{metrics.overdue}</span><div className="chart-container"><canvas ref={overdueRef}></canvas></div></div> 
                     <div className="card"><h3>Yıla Göre Bekleyen</h3><div className="chart-container"><canvas ref={yearRef}></canvas></div>{yearLegend}</div> 
                     <div className="card"><h3>Tescile Giden/İade</h3><span className="value">{metrics.tescile}/{metrics.iade}</span></div> 
                 </div>
@@ -571,7 +571,7 @@
                         <table className="summary-table"> 
                             <thead> 
                                 <tr> 
-                                    <th>İl</th><th>Toplam İşlem</th><th>2025 Başvuru</th><th>F.K. Ort. Süre</th><th>10+ Gün</th><th>Tescile Giden</th><th>İade</th><th>Toplam Bekleyen</th> 
+                                    <th>İl</th><th>Toplam İşlem</th><th>2025 Başvuru</th><th>F.K. Ort. Süre</th><th>7+ Gün</th><th>Tescile Giden</th><th>İade</th><th>Toplam Bekleyen</th> 
                                 </tr> 
                             </thead> 
                             <tbody> 
@@ -598,7 +598,7 @@
                             const isClosed = status.includes('eksiklikten iade edildi') || status.includes('tescile gönderildi'); 
                             const fenKayitNo = task['fen kayıt no']; 
                             const hasValidFenKayitNo = fenKayitNo != null && fenKayitNo != 0; 
-                            if (diffDays >= 10 && !isClosed && hasValidFenKayitNo) { 
+                            if (diffDays >= 7 && !isClosed && hasValidFenKayitNo) { // Değişiklik: 10 günden 7 güne indirildi
                                 if (!groupedTasks[fenKayitNo]) { 
                                     groupedTasks[fenKayitNo] = { 
                                         fenKayitNo: fenKayitNo, 
@@ -644,7 +644,7 @@
             return ( 
                 <div className="warning-table-container"> 
                     <div className="warning-table-header"> 
-                        <h3>10 Günden Fazla Bekleyen İşlemler (Uyarı)</h3> 
+                        <h3>7 Günden Fazla Bekleyen İşlemler (Uyarı)</h3> 
                         <div className="button-group"> 
                             <button onClick={handleExportWarningExcel} className="export-btn" title="Excel olarak indir">Excel İndir</button> 
                         </div> 
@@ -819,14 +819,14 @@
                         const ilData = data.filter(d => d._province === il);
                         const metrics = calcMetrics(ilData);
                         dataSummary += `--- ${il} Verileri ---\n`;
-                        dataSummary += `- Toplam İşlem: ${metrics.toplam}\n- 10+ Gün Bekleyen: ${metrics.overdue}\n- Ort. F.K. Süresi: ${metrics.avgDays} gün\n- Yıllara Göre Bekleyen: ${JSON.stringify(metrics.yearCounts)}\n\n`;
+                        dataSummary += `- Toplam İşlem: ${metrics.toplam}\n- 7+ Gün Bekleyen: ${metrics.overdue}\n- Ort. F.K. Süresi: ${metrics.avgDays} gün\n- Yıllara Göre Bekleyen: ${JSON.stringify(metrics.yearCounts)}\n\n`;
                     });
                     
                     prompt = `
 Sen, Tapu ve Kadastro Genel Müdürlüğü'nde çalışan uzman bir başmüfettişsin. Sana sunulan ve birden fazla ili içeren aşağıdaki özet verilere dayanarak, Türkçe dilinde, profesyonel ve resmi bir dille karşılaştırmalı bir performans raporu oluştur.
 
 ÖNEMLİ KURALLAR:
-1.  **Performans Metrikleri:** Analizini SADECE '10+ Gün Bekleyen', 'Ort. F.K. Süresi' ve 'Yıllara Göre Bekleyen' metriklerine dayandır. Bu metrikleri kullanarak illeri birbiriyle kıyasla.
+1.  **Performans Metrikleri:** Analizini SADECE '7+ Gün Bekleyen', 'Ort. F.K. Süresi' ve 'Yıllara Göre Bekleyen' metriklerine dayandır. Bu metrikleri kullanarak illeri birbiriyle kıyasla.
 2.  **Format:** Raporu Markdown formatında, ana başlıklar (## Başlık) ve madde imleri (* Madde) kullanarak oluştur.
 
 RAPOR BÖLÜMLERİ:
@@ -850,14 +850,14 @@ ${dataSummary}
                     }
                     const metrics = calcMetrics(filteredData);
                     dataSummary += `Rapor Kapsamı: ${reportType === 'il' ? 'İl' : 'Personel'} - ${selectedValue}\n`;
-                    dataSummary += `- Toplam İşlem Sayısı: ${metrics.toplam}\n- 10 Günden Fazla Bekleyen İşlem Sayısı: ${metrics.overdue}\n- Ortalama Fen Kayıt Süresi (Son 3 Ay): ${metrics.avgDays} gün\n- Tescile Gönderilen İşlem Sayısı: ${metrics.tescile}\n- İade Edilen İşlem Sayısı: ${metrics.iade}\n- Yıllara Göre Bekleyen İşlem Sayıları: ${JSON.stringify(metrics.yearCounts)}`;
+                    dataSummary += `- Toplam İşlem Sayısı: ${metrics.toplam}\n- 7 Günden Fazla Bekleyen İşlem Sayısı: ${metrics.overdue}\n- Ortalama Fen Kayıt Süresi (Son 3 Ay): ${metrics.avgDays} gün\n- Tescile Gönderilen İşlem Sayısı: ${metrics.tescile}\n- İade Edilen İşlem Sayısı: ${metrics.iade}\n- Yıllara Göre Bekleyen İşlem Sayıları: ${JSON.stringify(metrics.yearCounts)}`;
 
                     prompt = `
 Sen, Tapu ve Kadastro Genel Müdürlüğü'nde çalışan uzman bir başmüfettişsin. Sana sunulan aşağıdaki özet verilere dayanarak, Türkçe dilinde, profesyonel ve resmi bir dille 3 bölümden oluşan bir performans raporu oluştur.
 
 ÖNEMLİ KURALLAR:
 1.  **İade Sayısı:** 'İade Edilen İşlem Sayısı' bir performans metriği değildir. Bu sayıyı olumlu veya olumsuz bir performans göstergesi olarak ASLA yorumlama. Sadece bilgi olarak not edebilirsin, ancak performansı etkilediğini belirtme.
-2.  **Performans Metrikleri:** Performans analizini ve yorumlarını SADECE şu metriklere dayandır: 'bekleyen işlem sayısı', 'fen kayıt süresi' ve '10 günden fazla bekleyen işlem sayısı'.
+2.  **Performans Metrikleri:** Performans analizini ve yorumlarını SADECE şu metriklere dayandır: 'bekleyen işlem sayısı', 'fen kayıt süresi' ve '7 günden fazla bekleyen işlem sayısı'.
 3.  **Format:** Raporu Markdown formatında, ana başlıklar (## Başlık) ve madde imleri (* Madde) kullanarak oluştur.
 
 RAPOR BÖLÜMLERİ:
