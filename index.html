@@ -204,7 +204,7 @@
         .export-btn:hover { background-color: #388E3C; }
         .personnel-waiting-list {
             margin-top: 15px; border-top: 1px solid #e2e8f0; padding-top: 10px;
-            max-height: 150px; overflow-y: auto; position: relative;
+            max-height: 250px; overflow-y: auto; position: relative;
         }
         .personnel-waiting-list h4 { margin: 0 0 8px 0; font-size: 0.9rem; color: #475569; }
         .personnel-waiting-list table { width: 100%; }
@@ -315,13 +315,13 @@
         const ALLOWED_COLS = ["kurum ad","ilçe","başvuru tarihi","fen kayıt tarihi","fen kayıt no","başvuru no","başvuran","işlem","zemin","görevli personel","tescil talep bilgisi","başvuru durumu","başvuru açıklama","iade"];
         const HEADER_KEYWORDS = {"kurum ad":["kurum","ad"],"ilçe":["ilçe", "ad"],"başvuru tarihi":["başvuru","tarih"],"fen kayıt tarihi":["fen","kayıt","tarih"],"fen kayıt no":["fen","kayıt","no"],"başvuru no":["başvuru","no"],"başvuran":["başvuran"],"işlem":["işlem"],"zemin":["zemin"],"görevli personel":["görevli","personel"],"tescil talep bilgisi":["tescil","talep","bilgi"],"başvuru durumu":["başvuru","durum"],"başvuru açıklama":["başvuru","açıklama"],"iade":["iade"]};
         
-        function normalizeHeader(header) { if (!header) return ""; let s; try { s = header.normalize('NFD').replace(/[\u0300-\u036f]/g, ''); } catch (e) { s = String(header); } s = s.trim().toLocaleLowerCase('tr').replace(/\s+/g, ' '); s = s.replace(/ı/g, 'i').replace(/İ/g, 'i'); return s; }
-        function splitPersonel(text) { if (text == null) return []; const str = typeof text === 'string' ? text : String(text); return str.split(/[,;–-]/g).map(s => { let part = s.trim(); const arrowIdx = part.indexOf('=>'); if (arrowIdx !== -1) part = part.slice(0, arrowIdx).trim(); return part; }).filter(Boolean); }
-        function formatDate(val) { if (!val) return ""; if (typeof val === 'number') { const date = XLSX.SSF.parse_date_code(val); if (!date) return ""; return `${date.y}-${String(date.m).padStart(2,'0')}-${String(date.d).padStart(2,'0')}`; } if (typeof val === 'string') { let match = val.match(/^(\d{4}-\d{2}-\d{2})/); if (match) return match[1]; match = val.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})/); if (match) { const day = String(match[1]).padStart(2, '0'); const month = String(match[2]).padStart(2, '0'); const year = match[3]; return `${year}-${month}-${day}`; } const part = val.split(" ")[0]; const m2 = part.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})/); if (m2) { const day = String(m2[1]).padStart(2, '0'); const month = String(m2[2]).padStart(2, '0'); const year = m2[3]; return `${year}-${month}-${day}`; } return part; } return val; }
-        function formatFenKayitNo(val) { if (val == null) return ""; if (typeof val === 'number') return val; if (typeof val === 'string') { const num = parseInt(val.replace(/\D/g,''),10); if (!isNaN(num)) return num; return val; } return val; }
-        function detectProvinceAndDistrict(rawKurumAd) { if (!rawKurumAd) return {province: null, district: null}; const normRaw = normalizeHeader(rawKurumAd); let province = null, district = null; for (let p of PROVINCES) { if (normRaw.includes(normalizeHeader(p))) { province = p; let idx = normRaw.indexOf(normalizeHeader(p)); let after = normRaw.substring(idx + normalizeHeader(p).length).trim(); if (after.length > 0) { after = after.replace(/belediyesi|belediye|ilce|ilçe|merkez|buyuksehir|tapu mudurlugu|kadastro mudurlugu/gi, '').trim(); if (after.length > 0) district = after.split(' ')[0].replace(/[^a-zA-ZçğıöşüÇĞİÖŞÜ\s]/g, ''); } break; } } return {province, district}; }
+        const normalizeHeader = (header) => { if (!header) return ""; let s; try { s = header.normalize('NFD').replace(/[\u0300-\u036f]/g, ''); } catch (e) { s = String(header); } s = s.trim().toLocaleLowerCase('tr').replace(/\s+/g, ' '); s = s.replace(/ı/g, 'i').replace(/İ/g, 'i'); return s; }
+        const splitPersonel = (text) => { if (text == null) return []; const str = typeof text === 'string' ? text : String(text); return str.split(/[,;–-]/g).map(s => { let part = s.trim(); const arrowIdx = part.indexOf('=>'); if (arrowIdx !== -1) part = part.slice(0, arrowIdx).trim(); return part; }).filter(Boolean); }
+        const formatDate = (val) => { if (!val) return ""; if (typeof val === 'number') { const date = XLSX.SSF.parse_date_code(val); if (!date) return ""; return `${date.y}-${String(date.m).padStart(2,'0')}-${String(date.d).padStart(2,'0')}`; } if (typeof val === 'string') { let match = val.match(/^(\d{4}-\d{2}-\d{2})/); if (match) return match[1]; match = val.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})/); if (match) { const day = String(match[1]).padStart(2, '0'); const month = String(match[2]).padStart(2, '0'); const year = match[3]; return `${year}-${month}-${day}`; } const part = val.split(" ")[0]; const m2 = part.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})/); if (m2) { const day = String(m2[1]).padStart(2, '0'); const month = String(m2[2]).padStart(2, '0'); const year = m2[3]; return `${year}-${month}-${day}`; } return part; } return val; }
+        const formatFenKayitNo = (val) => { if (val == null) return ""; if (typeof val === 'number') return val; if (typeof val === 'string') { const num = parseInt(val.replace(/\D/g,''),10); if (!isNaN(num)) return num; return val; } return val; }
+        const detectProvinceAndDistrict = (rawKurumAd) => { if (!rawKurumAd) return {province: null, district: null}; const normRaw = normalizeHeader(rawKurumAd); let province = null, district = null; for (let p of PROVINCES) { if (normRaw.includes(normalizeHeader(p))) { province = p; let idx = normRaw.indexOf(normalizeHeader(p)); let after = normRaw.substring(idx + normalizeHeader(p).length).trim(); if (after.length > 0) { after = after.replace(/belediyesi|belediye|ilce|ilçe|merkez|buyuksehir|tapu mudurlugu|kadastro mudurlugu/gi, '').trim(); if (after.length > 0) district = after.split(' ')[0].replace(/[^a-zA-ZçğıöşüÇĞİÖŞÜ\s]/g, ''); } break; } } return {province, district}; }
         
-        function readExcelPromise(file) {
+        const readExcelPromise = (file) => {
             return new Promise((resolve, reject) => {
                 if (!file) { reject(new Error("Dosya yüklenmedi veya geçersiz dosya.")); return; }
                 const validTypes = ['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet','application/vnd.ms-excel'];
@@ -371,7 +371,7 @@
             });
         }
 
-        function calcMetrics(arr) {
+        const calcMetrics = (arr) => {
             const today = new Date();
             const threeMonthsAgo = new Date();
             threeMonthsAgo.setMonth(today.getMonth() - 3);
@@ -408,7 +408,7 @@
                     const hasValidFenKayitNo = fenKayitNo != null && fenKayitNo != 0;
                     if (!isNaN(fd.getTime()) && fd.getFullYear() > 1900 && hasValidFenKayitNo) {
                          const diff = (today - fd) / (1000 * 60 * 60 * 24);
-                         if (diff >= 7) { // Değişiklik: 10 günden 7 güne indirildi
+                         if (diff >= 7) { 
                               overdue++;
                          }
                     }
@@ -512,11 +512,11 @@
             return ( 
                 <div className="chart-card" ref={personnelChartCardRef}> 
                     <button className="zoom-btn" title="Büyüt" onClick={() => onZoom({type: 'chart', data: personnelStats.totals })}>🔍</button> 
-                    <div className="chart-title">Personel İşlem Dağılımı (Toplam)</div> 
+                    <div className="chart-title">Tüm Personel İşlem Dağılımı</div> 
                     <div className="chart-wrapper"><canvas ref={barRef}></canvas></div> 
                     <div className="personnel-waiting-list"> 
                         <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}> 
-                            <h4>Bekleyen İşlem Sayıları</h4> 
+                            <h4>Bekleyen İşlem Sayıları (Tüm Personel)</h4> 
                            <button className="zoom-btn" style={{position: 'static', fontSize: '1rem'}} title="Büyüt" onClick={() => onZoom({type: 'waitingList', data: waitingList })}>🔍</button> 
                         </div> 
                         <table> 
@@ -601,7 +601,7 @@
                             const isClosed = status.includes('eksiklikten iade edildi') || status.includes('tescile gönderildi'); 
                             const fenKayitNo = task['fen kayıt no']; 
                             const hasValidFenKayitNo = fenKayitNo != null && fenKayitNo != 0; 
-                            if (diffDays >= 7 && !isClosed && hasValidFenKayitNo) { // Değişiklik: 10 günden 7 güne indirildi
+                            if (diffDays >= 7 && !isClosed && hasValidFenKayitNo) {
                                 if (!groupedTasks[fenKayitNo]) { 
                                     groupedTasks[fenKayitNo] = { 
                                         fenKayitNo: fenKayitNo, 
@@ -849,11 +849,12 @@ ${dataSummary}
                     if (reportType === 'il') {
                         filteredData = data.filter(d => d._province === selectedValue);
                     } else {
-                        filteredData = data.filter(d => splitPersonel(d['görevli personel']).includes(selectedValue));
+                        const normalizedSelectedValue = normalizeName(selectedValue);
+                        filteredData = data.filter(d => splitPersonel(d['görevli personel']).some(p => normalizeName(p) === normalizedSelectedValue));
                     }
                     const metrics = calcMetrics(filteredData);
                     dataSummary += `Rapor Kapsamı: ${reportType === 'il' ? 'İl' : 'Personel'} - ${selectedValue}\n`;
-                    dataSummary += `- Toplam İşlem Sayısı: ${metrics.toplam}\n- 7 Günden Fazla Bekleyen İşlem Sayısı: ${metrics.overdue}\n- Ortalama Fen Kayıt Süresi (Son 3 Ay): ${metrics.avgDays} gün\n- Tescile Gönderilen İşlem Sayısı: ${metrics.tescile}\n- İade Edilen İşlem Sayısı: ${metrics.iade}\n- Yıllara Göre Bekleyen İşlem Sayıları: ${JSON.stringify(metrics.yearCounts)}`;
+                    dataSummary += `- Toplam İşlem Sayısı: ${metrics.toplam}\n- 7 Günden Fazla Bekleyen İşlem Sayısı: ${metrics.overdue}\n- Ortalama Fen Kayıt Süresi (Son 3 Ay): ${metrics.avgDays} gün\n- Tescile Gönderilen İşlem Sayısı: ${metrics.tescile}\n- İade Edilen İşlem Sayısı: ${metrics.iade}\n- Yıllara Göre Bekleyen İşlem Sayıları: ${JSON.stringify(metrics.yearCounts)}\n`;
 
                     prompt = `
 Sen, Tapu ve Kadastro Genel Müdürlüğü'nde çalışan uzman bir başmüfettişsin. Sana sunulan aşağıdaki özet verilere dayanarak, Türkçe dilinde, profesyonel ve resmi bir dille 3 bölümden oluşan bir performans raporu oluştur.
@@ -994,7 +995,7 @@ ${dataSummary}
             const [zoomContent, setZoomContent] = useState(null);
 
             const modalContentRef = useRef(null);
-            
+
             const handleFile=async(e)=>{
                 const files=Array.from(e.target.files||[]);
                 if(!files.length) return;
@@ -1060,7 +1061,7 @@ ${dataSummary}
                 <div className="header-center">
                     <h1>MEGSİS İŞ TAKİP</h1>
                     <h2 style={{fontStyle: 'italic', fontSize: '0.9rem', color: '#64748b'}}>
-                        by Gökhan ELGÜL
+                        © Gökhan ELGÜL tarafından tasarlanmıştır.
                     </h2>
                 </div>
                 
