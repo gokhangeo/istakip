@@ -320,7 +320,8 @@
         const formatDate = (val) => { if (!val) return ""; if (typeof val === 'number') { const date = XLSX.SSF.parse_date_code(val); if (!date) return ""; return `${date.y}-${String(date.m).padStart(2,'0')}-${String(date.d).padStart(2,'0')}`; } if (typeof val === 'string') { let match = val.match(/^(\d{4}-\d{2}-\d{2})/); if (match) return match[1]; match = val.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})/); if (match) { const day = String(match[1]).padStart(2, '0'); const month = String(match[2]).padStart(2, '0'); const year = match[3]; return `${year}-${month}-${day}`; } const part = val.split(" ")[0]; const m2 = part.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})/); if (m2) { const day = String(m2[1]).padStart(2, '0'); const month = String(m2[2]).padStart(2, '0'); const year = m2[3]; return `${year}-${month}-${day}`; } return part; } return val; }
         const formatFenKayitNo = (val) => { if (val == null) return ""; if (typeof val === 'number') return val; if (typeof val === 'string') { const num = parseInt(val.replace(/\D/g,''),10); if (!isNaN(num)) return num; return val; } return val; }
         const detectProvinceAndDistrict = (rawKurumAd) => { if (!rawKurumAd) return {province: null, district: null}; const normRaw = normalizeHeader(rawKurumAd); let province = null, district = null; for (let p of PROVINCES) { if (normRaw.includes(normalizeHeader(p))) { province = p; let idx = normRaw.indexOf(normalizeHeader(p)); let after = normRaw.substring(idx + normalizeHeader(p).length).trim(); if (after.length > 0) { after = after.replace(/belediyesi|belediye|ilce|ilçe|merkez|buyuksehir|tapu mudurlugu|kadastro mudurlugu/gi, '').trim(); if (after.length > 0) district = after.split(' ')[0].replace(/[^a-zA-ZçğıöşüÇĞİÖŞÜ\s]/g, ''); } break; } } return {province, district}; }
-        
+        const normalizeName = (name) => { if (!name) return ""; return name.toString().trim().toLocaleLowerCase('tr').replace(/\s+/g, '').replace(/ı/g, 'i').replace(/ö/g, 'o').replace(/ü/g, 'u').replace(/ş/g, 's').replace(/ç/g, 'c').replace(/ğ/g, 'g');}
+
         const readExcelPromise = (file) => {
             return new Promise((resolve, reject) => {
                 if (!file) { reject(new Error("Dosya yüklenmedi veya geçersiz dosya.")); return; }
@@ -854,6 +855,14 @@ ${dataSummary}
                         const normalizedSelectedValue = normalizeName(selectedValue);
                         filteredData = data.filter(d => splitPersonel(d['görevli personel']).some(p => normalizeName(p) === normalizedSelectedValue));
                     }
+                    
+                    if (filteredData.length === 0) {
+                        setGeneratedReport(`Seçilen kriter için veri bulunamadı: ${selectedValue}`);
+                        setReportHtml(`<p>Seçilen kriter için veri bulunamadı: ${selectedValue}</p>`);
+                        setIsLoading(false);
+                        return;
+                    }
+
                     const metrics = calcMetrics(filteredData);
                     dataSummary += `Rapor Kapsamı: ${reportType === 'il' ? 'İl' : 'Personel'} - ${selectedValue}\n`;
                     dataSummary += `- Toplam İşlem Sayısı: ${metrics.toplam}\n- 7 Günden Fazla Bekleyen İşlem Sayısı: ${metrics.overdue}\n- Ortalama Fen Kayıt Süresi (Son 3 Ay): ${metrics.avgDays} gün\n- Tescile Gönderilen İşlem Sayısı: ${metrics.tescile}\n- İade Edilen İşlem Sayısı: ${metrics.iade}\n- Yıllara Göre Bekleyen İşlem Sayıları: ${JSON.stringify(metrics.yearCounts)}\n`;
