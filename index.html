@@ -512,7 +512,7 @@
             ); 
         }
         
-        function ChartsBelow({ data, onZoom, personnelChartCardRef, selectedIl }) {
+        function ChartsBelow({ data, onZoom, personnelChartCardRef, waitingChartCardRef, selectedIl }) {
             const totalRef = useRef();
             const waitingRef = useRef();
             const totalChartRef = useRef(null);
@@ -598,7 +598,7 @@
                         <div className="chart-title">Personel İşlem Dağılımı ({title})</div>
                         <div className="chart-wrapper" style={{height: '250px'}}><canvas ref={totalRef}></canvas></div>
                     </div>
-                    <div className="chart-card">
+                    <div className="chart-card" ref={waitingChartCardRef}>
                          <button className="zoom-btn" title="Büyüt" onClick={() => onZoom({ type: 'chart', data: personnelStats.waiting, title: `Bekleyen İşlem Sayıları (${title})` })}>🔍</button>
                         <div className="chart-title">Bekleyen İşlem Sayıları ({title})</div>
                         <div className="chart-wrapper" style={{height: '250px'}}><canvas ref={waitingRef}></canvas></div>
@@ -820,23 +820,56 @@
             ); 
         }
         
-        const ZoomedChart = ({ chartData, title }) => { 
-            const canvasRef = useRef(null); 
-            const chartRef = useRef(null); 
-            useEffect(() => { 
-                if (canvasRef.current && chartData) { 
-                    if (chartRef.current) chartRef.current.destroy(); 
+        const ZoomedChart = ({ chartData, title, onRender, orientation = 'vertical' }) => {
+            const canvasRef = useRef(null);
+            const chartRef = useRef(null);
+            useEffect(() => {
+                if (canvasRef.current && chartData) {
+                    if (chartRef.current) chartRef.current.destroy();
                     const sortedData = Object.entries(chartData).sort(([, a], [, b]) => b - a);
                     const labels = sortedData.map(d => d[0]);
                     const data = sortedData.map(d => d[1]);
-                    chartRef.current = new Chart(canvasRef.current, { 
-                        type:'bar', 
-                        data:{ labels, datasets:[{ label:'Toplam İşlem Sayısı', data, backgroundColor: labels.map((_,i)=>`hsl(${i*360/labels.length},70%,60%)`) }] }, 
-                        options:{ responsive:true, plugins:{ title: { display: true, text: title, font: {size: 16} }, legend:{ display:false }, datalabels: { anchor: 'end', align: 'top', color: '#444', font: { weight: 'bold', size: 14 } } }, scales:{ y:{ beginAtZero:true } }, maintainAspectRatio:false } 
-                    }); 
-                } 
-            }, [chartData, title]); 
-            return <div style={{width:'80vw', height:'70vh'}}><canvas ref={canvasRef}></canvas></div>; 
+                    
+                    const isHorizontal = orientation === 'horizontal';
+
+                    chartRef.current = new Chart(canvasRef.current, {
+                        type: 'bar',
+                        data: {
+                            labels,
+                            datasets: [{
+                                label: title,
+                                data,
+                                backgroundColor: labels.map((_, i) => `hsl(${(i * 360 / labels.length)}, 70%, 60%)`)
+                            }]
+                        },
+                        options: {
+                            indexAxis: isHorizontal ? 'y' : 'x',
+                            responsive: true,
+                            plugins: {
+                                title: { display: true, text: title, font: { size: 16 } },
+                                legend: { display: false },
+                                datalabels: {
+                                    anchor: 'end',
+                                    align: isHorizontal ? 'right' : 'top',
+                                    color: '#444',
+                                    font: { weight: 'normal', size: 14 } // Punto kalınlığı kaldırıldı
+                                }
+                            },
+                            scales: {
+                                x: { beginAtZero: true },
+                                y: { beginAtZero: true }
+                            },
+                            maintainAspectRatio: false,
+                            animation: {
+                                onComplete: () => {
+                                    if (onRender) onRender();
+                                }
+                            }
+                        }
+                    });
+                }
+            }, [chartData, title, onRender, orientation]);
+            return <div style={{width:'80vw', height:'70vh'}}><canvas ref={canvasRef}></canvas></div>;
         };
         const ZoomedSummary = ({ data, selectedIl }) => { return <SummaryTable data={data} selectedIl={selectedIl} onZoom={() => {}} />; };
         
@@ -1380,6 +1413,9 @@ You are an expert data analysis assistant for a Land Registry and Cadastre Direc
             const [zoomContent, setZoomContent] = useState(null);
 
             const modalContentRef = useRef(null);
+            const summaryTableRef = useRef(null);
+            const personnelChartRef = useRef(null);
+            const waitingChartRef = useRef(null);
 
             const handleFile=async(e)=>{
                 const files=Array.from(e.target.files||[]);
@@ -1420,6 +1456,101 @@ You are an expert data analysis assistant for a Land Registry and Cadastre Direc
                 }
             };
 
+            const handleExportGeneralReport = async () => {
+                setLoading(true);
+                const { jsPDF } = window.jspdf;
+                const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+
+                const renderContainer = document.createElement('div');
+                renderContainer.style.position = 'absolute';
+                renderContainer.style.left = '-9999px';
+                renderContainer.style.top = '-9999px';
+                document.body.appendChild(renderContainer);
+
+                const addElementToPdf = async (element, yPos) => {
+                    const canvas = await html2canvas(element, { scale: 2, backgroundColor: '#ffffff' });
+                    const imgData = canvas.toDataURL('image/png');
+                    const pageWidth = pdf.internal.pageSize.getWidth();
+                    const pageHeight = pdf.internal.pageSize.getHeight();
+                    const margin = 10;
+                    const imgWidth = pageWidth - (margin * 2);
+                    const imgHeight = (canvas.height * imgWidth) / canvas.width;
+                    
+                    if (yPos + imgHeight + margin > pageHeight && yPos > 10) {
+                        pdf.addPage();
+                        yPos = margin;
+                    }
+                    pdf.addImage(imgData, 'PNG', margin, yPos, imgWidth, imgHeight);
+                    return yPos + imgHeight + margin;
+                };
+
+                let yPosition = 10;
+                
+                const currentFilteredData = filteredData.length > 0 ? filteredData : data;
+                const titleSuffix = selectedIl.length > 0 ? ` (${selectedIl.join(', ')})` : ` (${[...new Set(currentFilteredData.map(d => d._province).filter(Boolean))].join(', ') || 'Tüm İller'})`;
+
+
+                if (summaryTableRef.current) {
+                    const summaryContainer = document.createElement('div');
+                    summaryContainer.style.background = '#f1f5f9';
+                    summaryContainer.style.padding = '15px';
+                    const titleElement = document.createElement('h3');
+                    titleElement.innerText = `Özet Tablo ${titleSuffix}`;
+                    titleElement.style.textAlign = 'center';
+                    titleElement.style.marginBottom = '10px';
+                    summaryContainer.appendChild(summaryTableRef.current.cloneNode(true));
+                    renderContainer.appendChild(summaryContainer);
+                    yPosition = await addElementToPdf(summaryContainer, yPosition);
+                    renderContainer.removeChild(summaryContainer);
+                }
+
+                const personnelStats = { totals: {}, waiting: {} };
+                currentFilteredData.forEach(r => {
+                    const personnel = splitPersonel(r['görevli personel']);
+                    if (personnel.length > 0) {
+                        personnel.forEach(p => {
+                            if (p) personnelStats.totals[p] = (personnelStats.totals[p] || 0) + 1;
+                        });
+                        const status = String(r['başvuru durumu'] || '').toLocaleLowerCase('tr');
+                        const isClosed = status.includes('eksiklikten iade edildi') || status.includes('tescile gönderildi');
+                        if (!isClosed) {
+                            personnel.forEach(p => {
+                                if (p) personnelStats.waiting[p] = (personnelStats.waiting[p] || 0) + 1;
+                            });
+                        }
+                    }
+                });
+
+                const chartConfigs = [
+                    { data: personnelStats.totals, title: `Personel İşlem Dağılımı ${titleSuffix}` },
+                    { data: personnelStats.waiting, title: `Bekleyen İşlem Sayıları ${titleSuffix}` }
+                ];
+                
+                for (const config of chartConfigs) {
+                     if (Object.keys(config.data).length > 0) {
+                        const chartContainer = document.createElement('div');
+                        chartContainer.style.width = '1200px'; // Increased width for better layout
+                        chartContainer.style.height = '700px'; // Increased height
+                        chartContainer.style.background = '#ffffff';
+                        chartContainer.style.padding = '20px';
+                        renderContainer.appendChild(chartContainer);
+                        
+                        const tempRoot = ReactDOM.createRoot(chartContainer);
+                        await new Promise(resolve => {
+                            // Pass vertical orientation for PDF
+                            tempRoot.render(<ZoomedChart chartData={config.data} title={config.title} onRender={resolve} orientation="vertical" />);
+                        });
+                        
+                        yPosition = await addElementToPdf(chartContainer, yPosition);
+                        tempRoot.unmount();
+                    }
+                }
+
+                document.body.removeChild(renderContainer);
+                pdf.save('Genel_Rapor.pdf');
+                setLoading(false);
+            };
+
             const ilOptions = Array.from(new Set(data.map(d=>d._province).filter(p=>p))).sort((a,b)=>a.localeCompare(b,'tr'));
             const personnelOptions = Array.from(new Set(data.flatMap(d=>splitPersonel(d['görevli personel'])))).sort((a,b)=>a.localeCompare(b,'tr'));
             const sortOptions=[{label:'Sıralama Yok',value:''},{label:'Başvuru Tarihine Göre',value:'başvuru tarihi'},{label:'Fen Kayıt Tarihine Göre',value:'fen kayıt tarihi'},{label:'İade Edilen',value:'iade edilen'}];
@@ -1450,8 +1581,8 @@ You are an expert data analysis assistant for a Land Registry and Cadastre Direc
                     </h2>
                 </div>
                 
+                {loading && <div style={{position:'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', zIndex: 3000, background: 'rgba(0,0,0,0.7)', color: 'white', padding: '20px', borderRadius: '10px'}}>Rapor Oluşturuluyor...</div>}
                 {data.length === 0 && !loading && !errorMsg && <LandingPage onFileChange={handleFile} />}
-                {loading && <p style={{textAlign:'center'}}>Yükleniyor...</p>}
                 {errorMsg && <p className="error-message">{errorMsg}</p>}
                 
                 {data.length > 0 && <>
@@ -1478,11 +1609,15 @@ You are an expert data analysis assistant for a Land Registry and Cadastre Direc
                             <label>Veri Yönetimi</label>
                             <button onClick={() => { setData([]); setSelectedIl([]); setSelectedPersonel([]); }} style={{backgroundColor: '#ef4444', color: 'white'}}>Verileri Temizle</button>
                         </div>
+                        <div className="control-group">
+                            <label>Genel Rapor</label>
+                            <button onClick={handleExportGeneralReport} style={{backgroundColor: '#059669', color: 'white'}}>Genel Rapor İndir (PDF)</button>
+                        </div>
                     </div>
                     <Dashboard data={data} filtered={filteredData} sortField={sortField} selectedPersonel={selectedPersonel} />
                     <div className="charts-below">
-                        <ChartsBelow data={filteredData} onZoom={setZoomContent} selectedIl={selectedIl} />
-                        <SummaryTable data={data} selectedIl={selectedIl} onZoom={() => setZoomContent({type: 'summary'})} />
+                        <ChartsBelow data={filteredData} onZoom={setZoomContent} personnelChartCardRef={personnelChartRef} waitingChartCardRef={waitingChartRef} selectedIl={selectedIl} />
+                        <SummaryTable data={data} selectedIl={selectedIl} onZoom={() => setZoomContent({type: 'summary'})} summaryTableRef={summaryTableRef} />
                     </div>
                     <WarningTable data={filteredData} />
                     <DataTable data={filteredData} sortField={sortField} />
