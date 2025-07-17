@@ -459,7 +459,7 @@
             ); 
         }
         
-        function ChartsBelow({ data, onZoom, personnelChartCardRef }) { 
+        function ChartsBelow({ data, onZoom, personnelChartCardRef, selectedIl }) { 
             const barRef = useRef(); 
             const barChartRef = useRef(null); 
             const [personnelStats, setPersonnelStats] = useState({ totals: {}, waiting: {} }); 
@@ -510,15 +510,19 @@
                 </tr>
             );
 
+            const title = selectedIl.length > 0 
+                ? selectedIl.join(' - ') 
+                : ([...new Set(data.map(d => d._province).filter(Boolean))].join(' - ') || 'Tüm İller');
+
             return ( 
                 <div className="chart-card" ref={personnelChartCardRef}> 
-                    <button className="zoom-btn" title="Büyüt" onClick={() => onZoom({type: 'chart', data: personnelStats.totals })}>🔍</button> 
-                    <div className="chart-title">Tüm Personel İşlem Dağılımı</div> 
+                    <button className="zoom-btn" title="Büyüt" onClick={() => onZoom({type: 'chart', data: personnelStats.totals, title: `Personel İşlem Dağılımı (${title})` })}>🔍</button> 
+                    <div className="chart-title">Personel İşlem Dağılımı ({title})</div> 
                     <div className="chart-wrapper"><canvas ref={barRef}></canvas></div> 
                     <div className="personnel-waiting-list"> 
                         <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}> 
-                            <h4>Bekleyen İşlem Sayıları (Tüm Personel)</h4> 
-                           <button className="zoom-btn" style={{position: 'static', fontSize: '1rem'}} title="Büyüt" onClick={() => onZoom({type: 'waitingList', data: waitingList })}>🔍</button> 
+                            <h4>Bekleyen İşlem Sayıları ({title})</h4> 
+                           <button className="zoom-btn" style={{position: 'static', fontSize: '1rem'}} title="Büyüt" onClick={() => onZoom({type: 'waitingList', data: waitingList, title: `Bekleyen İşlem Sayıları (${title})` })}>🔍</button> 
                         </div> 
                         <table> 
                             <tbody> 
@@ -538,9 +542,10 @@
                 if (!groupArr[groupKey]) groupArr[groupKey] = []; 
                 groupArr[groupKey].push(row); 
             }); 
-            const groupKeys = selectedIl && selectedIl.length > 0 ? Object.keys(groupArr).filter(gk => selectedIl.includes(gk)) : Object.keys(groupArr); 
+            const groupKeys = selectedIl.length > 0 ? selectedIl : [...new Set(data.map(d => d._province).filter(Boolean))];
+            
             const rows = groupKeys.map(key => { 
-                const arr = groupArr[key]; 
+                const arr = data.filter(d => d._province === key);
                 const m = calcMetrics(arr); 
                 return { key, ...m }; 
             }); 
@@ -742,10 +747,26 @@
             ); 
         }
         
-        const ZoomedChart = ({ chartData }) => { const canvasRef = useRef(null); const chartRef = useRef(null); useEffect(() => { if (canvasRef.current && chartData) { if (chartRef.current) chartRef.current.destroy(); const labels = Object.keys(chartData); const data = Object.values(chartData); chartRef.current = new Chart(canvasRef.current, { type:'bar', data:{ labels, datasets:[{ label:'Toplam İşlem Sayısı', data, backgroundColor: labels.map((_,i)=>`hsl(${i*360/labels.length},70%,60%)`) }] }, options:{ responsive:true, plugins:{ legend:{ display:false }, datalabels: { anchor: 'end', align: 'top', color: '#444', font: { weight: 'bold', size: 14 } } }, scales:{ y:{ beginAtZero:true } }, maintainAspectRatio:false } }); } }, [chartData]); return <div style={{width:'80vw', height:'70vh'}}><canvas ref={canvasRef}></canvas></div>; };
+        const ZoomedChart = ({ chartData, title }) => { 
+            const canvasRef = useRef(null); 
+            const chartRef = useRef(null); 
+            useEffect(() => { 
+                if (canvasRef.current && chartData) { 
+                    if (chartRef.current) chartRef.current.destroy(); 
+                    const labels = Object.keys(chartData); 
+                    const data = Object.values(chartData); 
+                    chartRef.current = new Chart(canvasRef.current, { 
+                        type:'bar', 
+                        data:{ labels, datasets:[{ label:'Toplam İşlem Sayısı', data, backgroundColor: labels.map((_,i)=>`hsl(${i*360/labels.length},70%,60%)`) }] }, 
+                        options:{ responsive:true, plugins:{ title: { display: true, text: title, font: {size: 16} }, legend:{ display:false }, datalabels: { anchor: 'end', align: 'top', color: '#444', font: { weight: 'bold', size: 14 } } }, scales:{ y:{ beginAtZero:true } }, maintainAspectRatio:false } 
+                    }); 
+                } 
+            }, [chartData, title]); 
+            return <div style={{width:'80vw', height:'70vh'}}><canvas ref={canvasRef}></canvas></div>; 
+        };
         const ZoomedSummary = ({ data, selectedIl }) => { return <SummaryTable data={data} selectedIl={selectedIl} onZoom={() => {}} />; };
         
-        const ZoomedWaitingList = ({ data }) => {
+        const ZoomedWaitingList = ({ data, title }) => {
             const tableContent = data.length > 0 ? (
                 data.map(item => (
                     <tr key={item.name}>
@@ -761,6 +782,7 @@
 
             return (
                 <div style={{minWidth: '400px'}}>
+                    <div className="chart-title" style={{textAlign: 'center', fontSize: '1.2rem', marginBottom: '15px'}}>{title}</div>
                     <div style={{maxHeight:'70vh', overflowY:'auto'}}>
                         <table className="zoomed-waiting-list-table">
                             <thead>
@@ -1109,8 +1131,8 @@ ${dataSummary}
                     </div>
                     <Dashboard data={data} filtered={filteredData} sortField={sortField} selectedPersonel={selectedPersonel} />
                     <div className="charts-below">
-                        <ChartsBelow data={filteredData} onZoom={setZoomContent} />
-                        <SummaryTable data={filteredData} selectedIl={selectedIl} onZoom={() => setZoomContent({type: 'summary'})} />
+                        <ChartsBelow data={filteredData} onZoom={setZoomContent} selectedIl={selectedIl} />
+                        <SummaryTable data={data} selectedIl={selectedIl} onZoom={() => setZoomContent({type: 'summary'})} />
                     </div>
                     <WarningTable data={filteredData} />
                     <DataTable data={filteredData} sortField={sortField} />
@@ -1121,17 +1143,13 @@ ${dataSummary}
                     <div className="modal-overlay" onClick={() => setZoomContent(null)}>
                         <div className="modal" onClick={e => e.stopPropagation()}>
                            <div className="modal-header">
-                                <h3>{
-                                    zoomContent.type === 'chart' ? 'Personel İşlem Dağılımı (Büyük Görünüm)' 
-                                    : zoomContent.type === 'summary' ? 'Özet Tablo (Büyük Görünüm)' 
-                                    : 'Bekleyen İşlem Sayıları'
-                                }</h3>
+                                <h3>{zoomContent.title || 'Büyük Görünüm'}</h3>
                                 <button className="close-btn" onClick={() => setZoomContent(null)}>×</button>
                            </div>
                            <div className="modal-content" ref={modalContentRef}>
-                                {zoomContent.type === 'chart' && <ZoomedChart chartData={zoomContent.data} />}
+                                {zoomContent.type === 'chart' && <ZoomedChart chartData={zoomContent.data} title={zoomContent.title} />}
                                 {zoomContent.type === 'summary' && <ZoomedSummary data={filteredData} selectedIl={selectedIl} />}
-                                {zoomContent.type === 'waitingList' && <ZoomedWaitingList data={zoomContent.data} />}
+                                {zoomContent.type === 'waitingList' && <ZoomedWaitingList data={zoomContent.data} title={zoomContent.title} />}
                            </div>
                            <div className="modal-footer">
                                 {zoomContent.type === 'waitingList' ?
