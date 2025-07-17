@@ -241,6 +241,30 @@
             color: #0c4a6e;
             font-size: 1.3rem;
         }
+        .ai-reporter-tabs {
+            display: flex;
+            gap: 5px;
+            border-bottom: 1px solid #bae6fd;
+            margin-bottom: 16px;
+        }
+        .ai-reporter-tab {
+            padding: 10px 15px;
+            cursor: pointer;
+            border-radius: 6px 6px 0 0;
+            background-color: transparent;
+            border: 1px solid transparent;
+            border-bottom: none;
+            font-weight: 500;
+            color: #0369a1;
+        }
+        .ai-reporter-tab.active {
+            background-color: #fff;
+            border-color: #bae6fd;
+            color: #0c4a6e;
+        }
+        .ai-reporter-content {
+            /* styles for content area */
+        }
         .ai-reporter-controls {
             display: flex;
             gap: 15px;
@@ -293,6 +317,29 @@
         .ai-report-display ul { padding-left: 20px; margin-bottom: 1em; }
         .ai-report-display li { margin-bottom: 0.5em; }
         .ai-report-display strong { color: #1e40af; }
+        .interactive-query-input {
+            width: 100%;
+            padding: 10px;
+            border-radius: 6px;
+            border: 1px solid #d1d5db;
+            font-size: 1rem;
+            min-height: 80px;
+            margin-bottom: 10px;
+        }
+        .interactive-display-container {
+            margin-top: 16px;
+            padding: 20px;
+            border-radius: 8px;
+            background-color: #ffffff;
+            border: 1px solid #e2e8f0;
+            min-height: 300px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .interactive-display-container table {
+            width: 100%;
+        }
 
 
         @media (max-width: 600px) {
@@ -410,7 +457,7 @@
                     if (!isNaN(fd.getTime()) && fd.getFullYear() > 1900 && hasValidFenKayitNo) {
                          const diff = (today - fd) / (1000 * 60 * 60 * 24);
                          if (diff >= 7) { 
-                              overdue++;
+                             overdue++;
                          }
                     }
                 }
@@ -800,13 +847,122 @@
             );
         };
 
+        function InteractiveDisplay({ result, data }) {
+            const canvasRef = useRef(null);
+            const chartInstanceRef = useRef(null);
+
+            useEffect(() => {
+                if (chartInstanceRef.current) {
+                    chartInstanceRef.current.destroy();
+                    chartInstanceRef.current = null;
+                }
+
+                if (!result || !result.processedData || !canvasRef.current) {
+                    return;
+                }
+
+                const { config, processedData } = result;
+                const labels = processedData.map(d => d.label);
+                const values = processedData.map(d => d.value);
+
+                if (config.chartType === 'table') {
+                    return; // Handled by JSX below
+                }
+
+                chartInstanceRef.current = new Chart(canvasRef.current, {
+                    type: config.chartType,
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: config.title,
+                            data: values,
+                            backgroundColor: labels.map((_, i) => `hsl(${(i * 360 / labels.length)}, 70%, 60%)`),
+                            borderColor: '#fff',
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            title: {
+                                display: true,
+                                text: config.title,
+                                font: { size: 16 }
+                            },
+                            legend: {
+                                display: config.chartType === 'pie',
+                                position: 'bottom'
+                            },
+                            datalabels: {
+                                anchor: 'end',
+                                align: 'end',
+                                color: '#333',
+                                font: {
+                                    weight: 'bold'
+                                },
+                                formatter: (value) => value > 0 ? value : ''
+                            }
+                        }
+                    }
+                });
+
+            }, [result]);
+
+            if (!result) {
+                return <p>Grafik veya tablo oluşturmak için yukarıya bir sorgu yazın.</p>;
+            }
+            if (result.error) {
+                return <p style={{color: 'red'}}>{result.error}</p>;
+            }
+             if (!result.processedData) {
+                return <p>Sorgunuz işleniyor veya bir hata oluştu...</p>;
+            }
+
+            const { config, processedData } = result;
+
+            if (config.chartType === 'table') {
+                return (
+                    <div style={{width: '100%', height: '100%'}}>
+                        <h3>{config.title}</h3>
+                        <div className="table-wrapper" style={{maxHeight: '400px'}}>
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>{config.dimension}</th>
+                                        <th>Değer</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {processedData.map(row => (
+                                        <tr key={row.label}>
+                                            <td>{row.label}</td>
+                                            <td>{row.value}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                );
+            }
+
+            return <canvas ref={canvasRef}></canvas>;
+        }
+
         function AIReportGenerator({ data, ilOptions, personnelOptions, selectedIl }) {
+            const [aiMode, setAiMode] = useState('report'); // 'report' or 'interactive'
             const [reportType, setReportType] = useState('il');
             const [selectedValue, setSelectedValue] = useState('');
             const [isLoading, setIsLoading] = useState(false);
             const [generatedReport, setGeneratedReport] = useState('');
             const [reportHtml, setReportHtml] = useState('');
             const reportDisplayRef = useRef(null);
+
+            // New states for interactive mode
+            const [interactiveQuery, setInteractiveQuery] = useState('');
+            const [interactiveResult, setInteractiveResult] = useState(null);
+
 
             const API_KEY = "AIzaSyAXPI6pT3qPGQ6JYQODz8mk-GZHV3t3oLA";
             const markdownConverter = new showdown.Converter();
@@ -816,7 +972,7 @@
                 setGeneratedReport('');
                 setReportHtml('');
             }, [reportType]);
-
+            
             const handleGenerateReport = async () => {
                 const isComparative = reportType === 'karşılaştırmalı';
                 if (!isComparative && !selectedValue) {
@@ -975,6 +1131,144 @@ ${dataSummary}
                 });
             };
 
+            const handleGenerateInteractive = async () => {
+                if (!interactiveQuery) {
+                    setInteractiveResult({ error: "Lütfen bir sorgu girin." });
+                    return;
+                }
+                setIsLoading(true);
+                setInteractiveResult(null);
+
+                const prompt = `
+You are an expert data analysis assistant for a Land Registry and Cadastre Directorate. Your task is to interpret a user's natural language query in Turkish and convert it into a structured JSON object.
+
+**Available Data Fields (Dimension):**
+- "Personel", "görevli", "çalışan" -> "görevli personel"
+- "İl", "şehir", "müdürlük" -> "_province"
+- "İlçe" -> "_district"
+- "İşlem türü" -> "işlem"
+- "Durum", "başvuru durumu" -> "başvuru durumu"
+- "Yıl", "sene" -> "yıl" (Derived from 'başvuru tarihi')
+
+**Available Metrics:**
+1.  **count**: Total number of tasks. Keywords: "İş sayısı", "adet", "sayısı", "toplam iş".
+2.  **pending_count**: Number of tasks that are not closed (not 'tescile gönderildi' or 'iade edildi'). Keywords: "bekleyen iş", "beklemedeki", "açık iş".
+3.  **overdue_count**: Number of tasks waiting longer than a specific period. Keywords: "X günden fazla bekleyen", "gecikmiş", "uyarıdaki".
+
+**Available Chart Types:**
+- "Bar grafiği", "çubuk grafik" -> "bar"
+- "Pasta grafiği", "daire grafik" -> "pie"
+- "Çizgi grafiği" -> "line"
+- "Tablo" -> "table"
+
+**Rules:**
+1.  Analyze the user's query: "${interactiveQuery}".
+2.  Determine the **dimension**, **metric**, and **chartType**.
+3.  If the metric is **overdue_count**, you MUST extract the number of days from the query (e.g., from "10 günden fazla", extract 10). If no number is specified, default to 7.
+4.  Create a suitable **title** in Turkish.
+5.  Respond with ONLY the JSON object. Do not add any extra text or markdown.
+`;
+
+                const payload = {
+                    contents: [{ parts: [{ text: prompt }] }],
+                    generationConfig: {
+                        responseMimeType: "application/json",
+                        responseSchema: {
+                            type: "OBJECT",
+                            properties: {
+                                "chartType": { "type": "STRING", "enum": ["bar", "pie", "line", "table"] },
+                                "title": { "type": "STRING" },
+                                "dimension": { "type": "STRING", "enum": ["görevli personel", "_province", "_district", "işlem", "başvuru durumu", "yıl"] },
+                                "metric": { "type": "STRING", "enum": ["count", "pending_count", "overdue_count"] },
+                                "days": { "type": "NUMBER" }
+                            },
+                            required: ["chartType", "dimension", "metric", "title"]
+                        }
+                    }
+                };
+
+                try {
+                    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${API_KEY}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload),
+                    });
+
+                    if (!response.ok) throw new Error(`API request failed with status ${response.status}`);
+                    
+                    const result = await response.json();
+                    const configText = result.candidates[0].content.parts[0].text;
+                    const config = JSON.parse(configText);
+
+                    // Process data based on AI config
+                    const processedData = processDataForInteractive(data, config);
+                    setInteractiveResult({ config, processedData });
+
+                } catch (error) {
+                    console.error("Interactive AI error:", error);
+                    setInteractiveResult({ error: `Sorgu işlenirken bir hata oluştu: ${error.message}` });
+                } finally {
+                    setIsLoading(false);
+                }
+            };
+
+            const processDataForInteractive = (sourceData, config) => {
+                const results = {};
+
+                sourceData.forEach(row => {
+                    let keys = [];
+                    if (config.dimension === 'görevli personel') {
+                        keys = splitPersonel(row['görevli personel']);
+                    } else if (config.dimension === 'yıl') {
+                        if(row['başvuru tarihi']) {
+                            const year = new Date(row['başvuru tarihi']).getFullYear();
+                            if(year) keys = [String(year)];
+                        }
+                    } else {
+                        const key = row[config.dimension];
+                        if (key) keys = [key];
+                    }
+
+                    if (keys.length === 0) keys = ["(Belirtilmemiş)"];
+
+                    keys.forEach(key => {
+                        if (!results[key]) {
+                            results[key] = { count: 0, pendingCount: 0, overdueCount: 0 };
+                        }
+                        
+                        const status = String(row['başvuru durumu'] || '').toLocaleLowerCase('tr');
+                        const isClosed = status.includes('eksiklikten iade edildi') || status.includes('tescile gönderildi');
+
+                        if (config.metric === 'count') {
+                            results[key].count++;
+                        } else if (config.metric === 'pending_count') {
+                            if (!isClosed) {
+                                results[key].pendingCount++;
+                            }
+                        } else if (config.metric === 'overdue_count') {
+                             const fStr = row['fen kayıt tarihi'];
+                             const daysThreshold = config.days || 7;
+                             if (fStr && !isClosed) {
+                                 const diff = (new Date() - new Date(fStr)) / (1000 * 60 * 60 * 24);
+                                 if (diff >= daysThreshold) {
+                                     results[key].overdueCount++;
+                                 }
+                             }
+                        }
+                    });
+                });
+                
+                return Object.entries(results).map(([label, values]) => {
+                    let value;
+                    if (config.metric === 'count') value = values.count;
+                    else if (config.metric === 'pending_count') value = values.pendingCount;
+                    else if (config.metric === 'overdue_count') value = values.overdueCount;
+                    else value = 0;
+                    return { label, value };
+                }).sort((a, b) => b.value - a.value);
+            };
+
+
             const options = reportType === 'il' ? ilOptions : personnelOptions;
             const isComparative = reportType === 'karşılaştırmalı';
             const canGenerate = !isLoading && (isComparative ? selectedIl.length > 1 : !!selectedValue);
@@ -984,35 +1278,64 @@ ${dataSummary}
                     <div className="ai-reporter-header">
                         <h3>Yapay Zeka Destekli Raporlama</h3>
                     </div>
-                    <div className="ai-reporter-controls">
-                        <div className="control-group">
-                            <label>Rapor Türü</label>
-                            <select value={reportType} onChange={e => setReportType(e.target.value)}>
-                                <option value="il">İl Bazında</option>
-                                <option value="personel">Personel Bazında</option>
-                                <option value="karşılaştırmalı">Karşılaştırmalı İl Raporu</option>
-                            </select>
-                        </div>
-                        {!isComparative && (
-                            <div className="control-group">
-                                <label>{reportType === 'il' ? 'İl Seçin' : 'Personel Seçin'}</label>
-                                <select value={selectedValue} onChange={e => setSelectedValue(e.target.value)} disabled={options.length === 0}>
-                                    <option value="">-- Seçim Yapın --</option>
-                                    {options.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                                </select>
-                            </div>
-                        )}
-                        <div className="ai-reporter-actions">
-                             <button onClick={handleGenerateReport} disabled={!canGenerate}>
-                                {isLoading ? 'Oluşturuluyor...' : 'Rapor Oluştur'}
-                            </button>
-                            <button onClick={handleExportToPdf} className="pdf-export" disabled={isLoading || !generatedReport}>
-                                PDF Olarak İndir
-                            </button>
-                        </div>
+                    
+                    <div className="ai-reporter-tabs">
+                        <button className={`ai-reporter-tab ${aiMode === 'report' ? 'active' : ''}`} onClick={() => setAiMode('report')}>Otomatik Rapor</button>
+                        <button className={`ai-reporter-tab ${aiMode === 'interactive' ? 'active' : ''}`} onClick={() => setAiMode('interactive')}>İnteraktif Sorgu</button>
                     </div>
-                     {isComparative && <p style={{marginTop: '10px', color: '#0c4a6e'}}><i>Karşılaştırma yapılacak illeri üst menüdeki 'İl Filtresi' butonundan seçebilirsiniz. (En az 2 il seçilmelidir)</i></p>}
-                    <div className="ai-report-display" ref={reportDisplayRef} dangerouslySetInnerHTML={{ __html: reportHtml || '<p>Oluşturulan rapor burada görünecektir.</p>' }}>
+
+                    <div className="ai-reporter-content">
+                        {aiMode === 'report' && (
+                            <>
+                                <div className="ai-reporter-controls">
+                                    <div className="control-group">
+                                        <label>Rapor Türü</label>
+                                        <select value={reportType} onChange={e => setReportType(e.target.value)}>
+                                            <option value="il">İl Bazında</option>
+                                            <option value="personel">Personel Bazında</option>
+                                            <option value="karşılaştırmalı">Karşılaştırmalı İl Raporu</option>
+                                        </select>
+                                    </div>
+                                    {!isComparative && (
+                                        <div className="control-group">
+                                            <label>{reportType === 'il' ? 'İl Seçin' : 'Personel Seçin'}</label>
+                                            <select value={selectedValue} onChange={e => setSelectedValue(e.target.value)} disabled={options.length === 0}>
+                                                <option value="">-- Seçim Yapın --</option>
+                                                {options.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                                            </select>
+                                        </div>
+                                    )}
+                                    <div className="ai-reporter-actions">
+                                         <button onClick={handleGenerateReport} disabled={!canGenerate}>
+                                            {isLoading ? 'Oluşturuluyor...' : 'Rapor Oluştur'}
+                                        </button>
+                                        <button onClick={handleExportToPdf} className="pdf-export" disabled={isLoading || !generatedReport}>
+                                            PDF Olarak İndir
+                                        </button>
+                                    </div>
+                                </div>
+                                {isComparative && <p style={{marginTop: '10px', color: '#0c4a6e'}}><i>Karşılaştırma yapılacak illeri üst menüdeki 'İl Filtresi' butonundan seçebilirsiniz. (En az 2 il seçilmelidir)</i></p>}
+                                <div className="ai-report-display" ref={reportDisplayRef} dangerouslySetInnerHTML={{ __html: reportHtml || '<p>Oluşturulan rapor burada görünecektir.</p>' }}>
+                                </div>
+                            </>
+                        )}
+
+                        {aiMode === 'interactive' && (
+                            <>
+                                <textarea
+                                    className="interactive-query-input"
+                                    placeholder="Örn: Personel bazında 7 günden fazla bekleyen işleri pasta grafiği olarak göster"
+                                    value={interactiveQuery}
+                                    onChange={e => setInteractiveQuery(e.target.value)}
+                                />
+                                <button onClick={handleGenerateInteractive} disabled={isLoading}>
+                                    {isLoading ? 'Oluşturuluyor...' : 'Grafik/Tablo Oluştur'}
+                                </button>
+                                <div className="interactive-display-container">
+                                    {isLoading ? <p>Yükleniyor...</p> : <InteractiveDisplay result={interactiveResult} data={data} />}
+                                </div>
+                            </>
+                        )}
                     </div>
                 </div>
             );
@@ -1136,7 +1459,7 @@ ${dataSummary}
                     </div>
                     <WarningTable data={filteredData} />
                     <DataTable data={filteredData} sortField={sortField} />
-                    <AIReportGenerator data={data} ilOptions={ilOptions} personnelOptions={personnelOptions} selectedIl={selectedIl} />
+                    <AIReportGenerator data={filteredData.length > 0 ? filteredData : data} ilOptions={ilOptions} personnelOptions={personnelOptions} selectedIl={selectedIl} />
                 </>}
                 
                 {zoomContent && (
