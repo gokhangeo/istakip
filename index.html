@@ -167,13 +167,19 @@
         .datatable-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; padding: 0 5px; }
         .datatable-header h3 { margin: 0; font-size: 1.2rem; color: #334155; }
         table { border-collapse: collapse; width: 100%; font-size: 0.9rem; }
-        .datatable-container table { min-width: 1800px; }
+        .datatable-container table { min-width: 1800px; table-layout: fixed; }
         th, td { padding: 10px 14px; border-bottom: 1px solid #e5e7eb; text-align: left; vertical-align: middle; }
         th { background: #f9fafb; position: sticky; top: 0; z-index: 3; font-size: 0.85rem; white-space: nowrap; }
         tr:nth-child(even) td { background: #fafafa; }
         tr:hover td { background: #eef2f7; }
-        th:first-child, td:first-child { position: sticky; left: 0; background: inherit; z-index: 2; }
+        .datatable-container th:first-child, .datatable-container td:first-child { 
+            position: sticky; 
+            left: 0; 
+            background: inherit; 
+            z-index: 2; 
+        }
         .col-zemin, .col-personel, .col-kurum-ad, .col-başvuran, .col-tescil-talep-bilgisi, .col-başvuru-açıklama { white-space: normal; word-break: break-word; }
+        .datatable-container .col-zemin { min-width: 250px; }
         .charts-below { display: flex; gap: 24px; margin-top: 20px; flex-wrap: nowrap; overflow-x: auto; }
         .chart-card {
             background: #f1f5f9; border-radius: 12px; padding: 14px 16px;
@@ -506,79 +512,99 @@
             ); 
         }
         
-        function ChartsBelow({ data, onZoom, personnelChartCardRef, selectedIl }) { 
-            const barRef = useRef(); 
-            const barChartRef = useRef(null); 
-            const [personnelStats, setPersonnelStats] = useState({ totals: {}, waiting: {} }); 
-            
-            useEffect(() => { 
-                if (!data || data.length === 0) { setPersonnelStats({ totals: {}, waiting: {} }); return; } 
-                const totalsMap = {}; const waitingMap = {}; 
-                data.forEach(r => { 
-                    const personnel = splitPersonel(r['görevli personel']); 
-                    if (personnel.length === 0) return; 
-                    personnel.forEach(p => { if (p) totalsMap[p] = (totalsMap[p] || 0) + 1; }); 
-                    const status = String(r['başvuru durumu'] || '').toLocaleLowerCase('tr'); 
-                    const isClosed = status.includes('eksiklikten iade edildi') || status.includes('tescile gönderildi'); 
-                    if (!isClosed) { personnel.forEach(p => { if (p) waitingMap[p] = (waitingMap[p] || 0) + 1; }); } 
-                }); 
-                setPersonnelStats({ totals: totalsMap, waiting: waitingMap }); 
-            }, [data]); 
-            
-            useEffect(() => { 
-                try { 
-                    if (barRef.current) { 
-                        const labels = Object.keys(personnelStats.totals); 
-                        const dataValues = Object.values(personnelStats.totals); 
-                        if (barChartRef.current) barChartRef.current.destroy(); 
-                        barChartRef.current = new Chart(barRef.current, { 
-                            type:'bar', 
-                            data:{ labels, datasets:[{ label:'Toplam İşlem Sayısı', data:dataValues, backgroundColor: labels.map((_,i)=>`hsl(${i*360/labels.length},70%,60%)`) }] }, 
-                            options:{ responsive:true, plugins:{ legend:{ display:false }, datalabels: { anchor: 'end', align: 'top', color: '#444', font: { weight: 'bold' } } }, scales:{ y:{ beginAtZero:true } }, maintainAspectRatio:false } 
-                        }); 
-                    } 
-                } catch(err) { console.error("ChartsBelow chart error:", err); } 
-            }, [personnelStats.totals]); 
-            
-            const waitingList = Object.entries(personnelStats.waiting).map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count); 
-            
-            if (!data || data.length===0) return null; 
-            
-            const waitingListContent = waitingList.length > 0 ? (
-                waitingList.map(item => (
-                    <tr key={item.name}>
-                        <td>{item.name}</td>
-                        <td>{item.count}</td>
-                    </tr>
-                ))
-            ) : (
-                <tr>
-                    <td colSpan="2" style={{textAlign: 'center', color: '#6b7280'}}>Bekleyen işlem yok.</td>
-                </tr>
+        function ChartsBelow({ data, onZoom, personnelChartCardRef, selectedIl }) {
+            const totalRef = useRef();
+            const waitingRef = useRef();
+            const totalChartRef = useRef(null);
+            const waitingChartRef = useRef(null);
+            const [personnelStats, setPersonnelStats] = useState({ totals: {}, waiting: {} });
+
+            useEffect(() => {
+                if (!data || data.length === 0) {
+                    setPersonnelStats({ totals: {}, waiting: {} });
+                    return;
+                }
+                const totalsMap = {};
+                const waitingMap = {};
+                data.forEach(r => {
+                    const personnel = splitPersonel(r['görevli personel']);
+                    if (personnel.length === 0) return;
+                    personnel.forEach(p => {
+                        if (p) totalsMap[p] = (totalsMap[p] || 0) + 1;
+                    });
+                    const status = String(r['başvuru durumu'] || '').toLocaleLowerCase('tr');
+                    const isClosed = status.includes('eksiklikten iade edildi') || status.includes('tescile gönderildi');
+                    if (!isClosed) {
+                        personnel.forEach(p => {
+                            if (p) waitingMap[p] = (waitingMap[p] || 0) + 1;
+                        });
+                    }
+                });
+                setPersonnelStats({ totals: totalsMap, waiting: waitingMap });
+            }, [data]);
+
+            const createSortedChart = (canvasRef, chartRef, chartData, label) => {
+                try {
+                    if (canvasRef.current) {
+                        const sortedData = Object.entries(chartData).sort(([, a], [, b]) => b - a);
+                        const labels = sortedData.map(d => d[0]);
+                        const dataValues = sortedData.map(d => d[1]);
+
+                        if (chartRef.current) chartRef.current.destroy();
+                        
+                        chartRef.current = new Chart(canvasRef.current, {
+                            type: 'bar',
+                            data: {
+                                labels,
+                                datasets: [{
+                                    label,
+                                    data: dataValues,
+                                    backgroundColor: labels.map((_, i) => `hsl(${(i * 360 / labels.length)}, 70%, 60%)`)
+                                }]
+                            },
+                            options: {
+                                indexAxis: 'y',
+                                responsive: true,
+                                plugins: {
+                                    legend: { display: false },
+                                    datalabels: { anchor: 'end', align: 'right', color: '#444', font: { weight: 'bold' } }
+                                },
+                                scales: { x: { beginAtZero: true } },
+                                maintainAspectRatio: false
+                            }
+                        });
+                    }
+                } catch (err) {
+                    console.error("Chart creation error:", err);
+                }
+            };
+
+            useEffect(() => {
+                createSortedChart(totalRef, totalChartRef, personnelStats.totals, 'Toplam İşlem Sayısı');
+            }, [personnelStats.totals]);
+
+            useEffect(() => {
+                createSortedChart(waitingRef, waitingChartRef, personnelStats.waiting, 'Bekleyen İşlem Sayısı');
+            }, [personnelStats.waiting]);
+
+            if (!data || data.length === 0) return null;
+
+            const title = selectedIl.length > 0 ? selectedIl.join(' - ') : ([...new Set(data.map(d => d._province).filter(Boolean))].join(' - ') || 'Tüm İller');
+
+            return (
+                <>
+                    <div className="chart-card" ref={personnelChartCardRef}>
+                        <button className="zoom-btn" title="Büyüt" onClick={() => onZoom({ type: 'chart', data: personnelStats.totals, title: `Personel İşlem Dağılımı (${title})` })}>🔍</button>
+                        <div className="chart-title">Personel İşlem Dağılımı ({title})</div>
+                        <div className="chart-wrapper" style={{height: '250px'}}><canvas ref={totalRef}></canvas></div>
+                    </div>
+                    <div className="chart-card">
+                         <button className="zoom-btn" title="Büyüt" onClick={() => onZoom({ type: 'chart', data: personnelStats.waiting, title: `Bekleyen İşlem Sayıları (${title})` })}>🔍</button>
+                        <div className="chart-title">Bekleyen İşlem Sayıları ({title})</div>
+                        <div className="chart-wrapper" style={{height: '250px'}}><canvas ref={waitingRef}></canvas></div>
+                    </div>
+                </>
             );
-
-            const title = selectedIl.length > 0 
-                ? selectedIl.join(' - ') 
-                : ([...new Set(data.map(d => d._province).filter(Boolean))].join(' - ') || 'Tüm İller');
-
-            return ( 
-                <div className="chart-card" ref={personnelChartCardRef}> 
-                    <button className="zoom-btn" title="Büyüt" onClick={() => onZoom({type: 'chart', data: personnelStats.totals, title: `Personel İşlem Dağılımı (${title})` })}>🔍</button> 
-                    <div className="chart-title">Personel İşlem Dağılımı ({title})</div> 
-                    <div className="chart-wrapper"><canvas ref={barRef}></canvas></div> 
-                    <div className="personnel-waiting-list"> 
-                        <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}> 
-                            <h4>Bekleyen İşlem Sayıları ({title})</h4> 
-                           <button className="zoom-btn" style={{position: 'static', fontSize: '1rem'}} title="Büyüt" onClick={() => onZoom({type: 'waitingList', data: waitingList, title: `Bekleyen İşlem Sayıları (${title})` })}>🔍</button> 
-                        </div> 
-                        <table> 
-                            <tbody> 
-                                {waitingListContent}
-                            </tbody> 
-                        </table> 
-                    </div> 
-                </div> 
-            ); 
         }
         
         function SummaryTable({ data, selectedIl, onZoom, summaryTableRef }) { 
@@ -800,8 +826,9 @@
             useEffect(() => { 
                 if (canvasRef.current && chartData) { 
                     if (chartRef.current) chartRef.current.destroy(); 
-                    const labels = Object.keys(chartData); 
-                    const data = Object.values(chartData); 
+                    const sortedData = Object.entries(chartData).sort(([, a], [, b]) => b - a);
+                    const labels = sortedData.map(d => d[0]);
+                    const data = sortedData.map(d => d[1]);
                     chartRef.current = new Chart(canvasRef.current, { 
                         type:'bar', 
                         data:{ labels, datasets:[{ label:'Toplam İşlem Sayısı', data, backgroundColor: labels.map((_,i)=>`hsl(${i*360/labels.length},70%,60%)`) }] }, 
