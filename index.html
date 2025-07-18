@@ -820,18 +820,19 @@
             ); 
         }
         
-        const ZoomedChart = ({ chartData, title, onRender, orientation = 'vertical' }) => {
+        const ZoomedChart = ({ chartData, title, onRender, isForPdf = false }) => {
             const canvasRef = useRef(null);
             const chartRef = useRef(null);
+
             useEffect(() => {
                 if (canvasRef.current && chartData) {
-                    if (chartRef.current) chartRef.current.destroy();
+                    if (chartRef.current) {
+                        chartRef.current.destroy();
+                    }
                     const sortedData = Object.entries(chartData).sort(([, a], [, b]) => b - a);
                     const labels = sortedData.map(d => d[0]);
                     const data = sortedData.map(d => d[1]);
                     
-                    const isHorizontal = orientation === 'horizontal';
-
                     chartRef.current = new Chart(canvasRef.current, {
                         type: 'bar',
                         data: {
@@ -843,34 +844,68 @@
                             }]
                         },
                         options: {
-                            indexAxis: isHorizontal ? 'y' : 'x',
+                            indexAxis: 'x', // Always vertical bar chart
                             responsive: true,
+                            maintainAspectRatio: false,
                             plugins: {
                                 title: { display: true, text: title, font: { size: 16 } },
                                 legend: { display: false },
                                 datalabels: {
                                     anchor: 'end',
-                                    align: isHorizontal ? 'right' : 'top',
+                                    align: 'top',
                                     color: '#444',
-                                    font: { weight: 'normal', size: 14 } // Punto kalınlığı kaldırıldı
+                                    font: { weight: 'normal', size: 14 },
+                                    formatter: (value) => value > 0 ? value : null,
                                 }
                             },
                             scales: {
-                                x: { beginAtZero: true },
+                                x: { 
+                                    beginAtZero: true,
+                                    ticks: {
+                                        autoSkip: false,
+                                        maxRotation: 90,
+                                        minRotation: 45
+                                    }
+                                },
                                 y: { beginAtZero: true }
                             },
-                            maintainAspectRatio: false,
                             animation: {
-                                onComplete: () => {
-                                    if (onRender) onRender();
-                                }
+                                onComplete: () => { if (onRender) onRender(); }
                             }
                         }
                     });
                 }
-            }, [chartData, title, onRender, orientation]);
-            return <div style={{width:'80vw', height:'70vh'}}><canvas ref={canvasRef}></canvas></div>;
+                return () => {
+                    if (chartRef.current) {
+                        chartRef.current.destroy();
+                        chartRef.current = null;
+                    }
+                };
+            }, [chartData, title, onRender]);
+
+            if (isForPdf) {
+                // For PDF rendering, the parent container is already sized.
+                // The canvas will responsively fill this container.
+                return (
+                    <div style={{ width: '100%', height: '100%', position: 'relative' }}>
+                        <canvas ref={canvasRef}></canvas>
+                    </div>
+                );
+            }
+
+            // For Modal view, add a scrollable container
+            const numItems = chartData ? Object.keys(chartData).length : 0;
+            const minWidth = numItems * 40; // 40px per bar for readability
+
+            return (
+                <div style={{ width: '100%', height: '70vh', overflowX: 'auto' }}>
+                    <div style={{ minWidth: `${minWidth}px`, height: '100%', position: 'relative' }}>
+                        <canvas ref={canvasRef}></canvas>
+                    </div>
+                </div>
+            );
         };
+
         const ZoomedSummary = ({ data, selectedIl }) => { return <SummaryTable data={data} selectedIl={selectedIl} onZoom={() => {}} />; };
         
         const ZoomedWaitingList = ({ data, title }) => {
@@ -1024,7 +1059,7 @@
             const [interactiveResult, setInteractiveResult] = useState(null);
 
 
-            const API_KEY = "AIzaSyAXPI6pT3qPGQ6JYQODz8mk-GZHV3t3oLA";
+            const API_KEY = "YOUR_API_KEY"; // IMPORTANT: Replace with your actual Gemini API Key
             const markdownConverter = new showdown.Converter();
 
             useEffect(() => {
@@ -1529,20 +1564,27 @@ You are an expert data analysis assistant for a Land Registry and Cadastre Direc
                 for (const config of chartConfigs) {
                      if (Object.keys(config.data).length > 0) {
                         const chartContainer = document.createElement('div');
-                        chartContainer.style.width = '1200px'; // Increased width for better layout
-                        chartContainer.style.height = '700px'; // Increased height
+                        
+                        // Dinamik olarak genişlik ayarla
+                        const numItems = Object.keys(config.data).length;
+                        const chartWidth = Math.max(1200, numItems * 40); // Her çubuk için ~40px
+                        const chartHeight = 800; // Okunurluk için daha büyük sabit yükseklik
+
+                        chartContainer.style.width = `${chartWidth}px`;
+                        chartContainer.style.height = `${chartHeight}px`;
                         chartContainer.style.background = '#ffffff';
                         chartContainer.style.padding = '20px';
                         renderContainer.appendChild(chartContainer);
                         
                         const tempRoot = ReactDOM.createRoot(chartContainer);
                         await new Promise(resolve => {
-                            // Pass vertical orientation for PDF
-                            tempRoot.render(<ZoomedChart chartData={config.data} title={config.title} onRender={resolve} orientation="vertical" />);
+                            // PDF için her zaman dikey grafik oluştur
+                            tempRoot.render(<ZoomedChart chartData={config.data} title={config.title} onRender={resolve} isForPdf={true} />);
                         });
                         
                         yPosition = await addElementToPdf(chartContainer, yPosition);
                         tempRoot.unmount();
+                        renderContainer.removeChild(chartContainer); 
                     }
                 }
 
