@@ -1652,14 +1652,52 @@ You are an expert data analysis assistant for a Land Registry and Cadastre Direc
                 .filter(p => p) // Filter out empty/null districts
             )).sort((a,b)=>a.localeCompare(b,'tr'));
             const personnelOptions = Array.from(new Set(data.flatMap(d=>splitPersonel(d['görevli personel'])))).sort((a,b)=>a.localeCompare(b,'tr'));
-            const sortOptions=[{label:'Sıralama Yok',value:''},{label:'Başvuru Tarihine Göre',value:'başvuru tarihi'},{label:'Fen Kayıt Tarihine Göre',value:'fen kayıt tarihi'},{label:'İade Edilen',value:'iade edilen'}];
+            const sortOptions=[
+                {label:'Sıralama Yok',value:''},
+                {label:'Başvuru Tarihine Göre',value:'başvuru tarihi'},
+                {label:'Fen Kayıt Tarihine Göre',value:'fen kayıt tarihi'},
+                {label:'İade Edilen',value:'iade edilen'},
+                {label:'Bekleyen (Eskiden Yeniye)', value:'bekleyen_eski_yeni'},
+                {label:'Bekleyen (Yeniden Eskiye)', value:'bekleyen_yeni_eski'}
+            ];
             
             const filteredData=(() => {
                 let arr=[...data];
                 if(selectedIl.length>0) arr=arr.filter(d=>selectedIl.includes(d._province));
-                if(selectedIlce.length > 0) arr = arr.filter(d => selectedIlce.includes(d._district)); // Yeni filtreleme adımı
+                if(selectedIlce.length > 0) arr = arr.filter(d => selectedIlce.includes(d._district));
                 if(selectedPersonel.length>0) arr=arr.filter(d=>{const ppl=splitPersonel(d['görevli personel']); return selectedPersonel.some(sp=>ppl.includes(sp));});
-                if(sortField==='iade edilen') arr=arr.filter(d=>String(d['başvuru durumu']||'').toLocaleLowerCase('tr').includes('eksiklikten iade edildi'));
+                
+                if(sortField==='iade edilen') {
+                    arr=arr.filter(d=>String(d['başvuru durumu']||'').toLocaleLowerCase('tr').includes('eksiklikten iade edildi'));
+                } else if (sortField === 'bekleyen_eski_yeni') {
+                    arr = arr.filter(d => {
+                        const status = String(d['başvuru durumu'] || '').toLocaleLowerCase('tr');
+                        return !status.includes('eksiklikten iade edildi') && !status.includes('tescile gönderildi');
+                    });
+                    arr.sort((a, b) => {
+                        const dx = new Date(a['başvuru tarihi']);
+                        const dy = new Date(b['başvuru tarihi']);
+                        if (!isNaN(dx) && !isNaN(dy)) return dx - dy;
+                        return 0;
+                    });
+                } else if (sortField === 'bekleyen_yeni_eski') {
+                    arr = arr.filter(d => {
+                        const status = String(d['başvuru durumu'] || '').toLocaleLowerCase('tr');
+                        return !status.includes('eksiklikten iade edildi') && !status.includes('tescile gönderildi');
+                    });
+                    arr.sort((a, b) => {
+                        const dx = new Date(a['başvuru tarihi']);
+                        const dy = new Date(b['başvuru tarihi']);
+                        if (!isNaN(dx) && !isNaN(dy)) return dy - dx;
+                        return 0;
+                    });
+                } else if (sortField) {
+                     arr.sort((a,b)=>{ 
+                        const x=a[sortField]||'', y=b[sortField]||''; 
+                        if(sortField.includes('tarih')){ const dx=new Date(x), dy=new Date(y); if(!isNaN(dx)&&!isNaN(dy)) return dx-dy; } 
+                        return x<y?-1:x>y?1:0; 
+                    }); 
+                }
                 return arr;
             })();
             
