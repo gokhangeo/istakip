@@ -372,7 +372,41 @@
         const splitPersonel = (text) => { if (text == null) return []; const str = typeof text === 'string' ? text : String(text); return str.split(/[,;–-]/g).map(s => { let part = s.trim(); const arrowIdx = part.indexOf('=>'); if (arrowIdx !== -1) part = part.slice(0, arrowIdx).trim(); return part; }).filter(Boolean); }
         const formatDate = (val) => { if (!val) return ""; if (typeof val === 'number') { const date = XLSX.SSF.parse_date_code(val); if (!date) return ""; return `${date.y}-${String(date.m).padStart(2,'0')}-${String(date.d).padStart(2,'0')}`; } if (typeof val === 'string') { let match = val.match(/^(\d{4}-\d{2}-\d{2})/); if (match) return match[1]; match = val.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})/); if (match) { const day = String(match[1]).padStart(2, '0'); const month = String(match[2]).padStart(2, '0'); const year = match[3]; return `${year}-${month}-${day}`; } const part = val.split(" ")[0]; const m2 = part.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})/); if (m2) { const day = String(m2[1]).padStart(2, '0'); const month = String(m2[2]).padStart(2, '0'); const year = m2[3]; return `${year}-${month}-${day}`; } return part; } return val; }
         const formatFenKayitNo = (val) => { if (val == null) return ""; if (typeof val === 'number') return val; if (typeof val === 'string') { const num = parseInt(val.replace(/\D/g,''),10); if (!isNaN(num)) return num; return val; } return val; }
-        const detectProvinceAndDistrict = (rawKurumAd) => { if (!rawKurumAd) return {province: null, district: null}; const normRaw = normalizeHeader(rawKurumAd); let province = null, district = null; for (let p of PROVINCES) { if (normRaw.includes(normalizeHeader(p))) { province = p; let idx = normRaw.indexOf(normalizeHeader(p)); let after = normRaw.substring(idx + normalizeHeader(p).length).trim(); if (after.length > 0) { after = after.replace(/belediyesi|belediye|ilce|ilçe|merkez|buyuksehir|tapu mudurlugu|kadastro mudurlugu/gi, '').trim(); if (after.length > 0) district = after.split(' ')[0].replace(/[^a-zA-ZçğıöşüÇĞİÖŞÜ\s]/g, ''); } break; } } return {province, district}; }
+        const detectProvinceAndDistrict = (rawKurumAd) => {
+            if (!rawKurumAd) return { province: null, district: null };
+            const normRaw = normalizeHeader(rawKurumAd);
+            let province = null, district = null;
+        
+            for (let p of PROVINCES) {
+                const normP = normalizeHeader(p);
+                if (normRaw.includes(normP)) {
+                    province = p;
+                    let after = normRaw.substring(normRaw.indexOf(normP) + normP.length).trim();
+                    const hasMerkez = after.includes('merkez');
+                    let cleanedAfter = after.replace(/belediyesi|belediye|bld|ilce|ilçe|merkez|buyuksehir|büyükşehir|tapu mudurlugu|kadastro mudurlugu|müdürlüğü|müd/gi, '').trim();
+
+                    if (cleanedAfter.length > 0) {
+                        district = cleanedAfter.split(' ')[0].replace(/[^a-zA-ZçğıöşüÇĞİÖŞÜ]/g, '');
+                    } else if (hasMerkez) {
+                        district = "Merkez";
+                    }
+                    break; 
+                }
+            }
+            
+            if (!province && normRaw.length > 0) {
+                let cleanedRaw = normRaw.replace(/belediyesi|belediye|bld|ilce|ilçe|merkez|buyuksehir|büyükşehir|tapu mudurlugu|kadastro mudurlugu|müdürlüğü|müd/gi, '').trim();
+                if (cleanedRaw.length > 0) {
+                    district = cleanedRaw.split(' ')[0].replace(/[^a-zA-ZçğıöşüÇĞİÖŞÜ]/g, '');
+                }
+            }
+
+            if (district) {
+                district = district.charAt(0).toLocaleUpperCase('tr') + district.slice(1);
+            }
+
+            return { province, district };
+        }
         const normalizeName = (name) => { if (!name) return ""; return name.toString().trim().toLocaleLowerCase('tr').replace(/\s+/g, '').replace(/ı/g, 'i').replace(/ö/g, 'o').replace(/ü/g, 'u').replace(/ş/g, 's').replace(/ç/g, 'c').replace(/ğ/g, 'g');}
 
         const readExcelPromise = (file) => {
@@ -397,6 +431,7 @@
                         let provincesInFile = new Set();
                         for (let kurum of allKurumAd) { const {province} = detectProvinceAndDistrict(kurum); if (province) provincesInFile.add(province); }
                         let singleProvince = (provincesInFile.size === 1) ? Array.from(provincesInFile)[0] : null;
+                        
                         const rows = json.slice(1).map(row => {
                             const obj = {};
                             ALLOWED_COLS.forEach(col => {
@@ -406,15 +441,29 @@
                                 else if(col==='fen kayıt no'||col==='başvuru no') obj[col]=formatFenKayitNo(val);
                                 else obj[col]=val??"";
                             });
+
                             let kurumAd = String(obj['kurum ad']||'').trim();
-                            const {province, district} = detectProvinceAndDistrict(kurumAd);
-                            if (singleProvince) {
-                                obj._province = singleProvince;
-                                obj._district = district || "";
-                            } else {
-                                obj._province = province || null;
-                                obj._district = district || "";
+                            const { province, district: districtFromKurumAd } = detectProvinceAndDistrict(kurumAd);
+
+                            // Determine Province
+                            obj._province = province || (singleProvince || null);
+
+                            // Determine District: Priority 1: 'ilçe' column. Priority 2: Parse 'kurum ad'.
+                            let finalDistrict = "";
+                            const districtFromIlceCol = obj['ilçe'] ? String(obj['ilçe']).trim() : null;
+
+                            if (districtFromIlceCol) {
+                                finalDistrict = districtFromIlceCol;
+                            } else if (districtFromKurumAd) {
+                                finalDistrict = districtFromKurumAd;
                             }
+
+                            // Capitalize for consistency
+                            if (finalDistrict) {
+                                finalDistrict = finalDistrict.charAt(0).toLocaleUpperCase('tr') + finalDistrict.slice(1).toLocaleLowerCase('tr');
+                            }
+                            obj._district = finalDistrict;
+                            
                             return obj;
                         });
                         resolve(rows);
@@ -1443,8 +1492,10 @@ You are an expert data analysis assistant for a Land Registry and Cadastre Direc
             const [sortField,setSortField]=useState('');
             const [selectedPersonel,setSelectedPersonel]=useState([]);
             const [selectedIl,setSelectedIl]=useState([]);
+            const [selectedIlce, setSelectedIlce] = useState([]); // Yeni state: İlçe seçimi için
             const [showPersonelModal,setShowPersonelModal]=useState(false);
             const [showIlModal,setShowIlModal]=useState(false);
+            const [showIlceModal, setShowIlceModal] = useState(false); // Yeni state: İlçe modalı için
             const [zoomContent, setZoomContent] = useState(null);
 
             const modalContentRef = useRef(null);
@@ -1594,11 +1645,19 @@ You are an expert data analysis assistant for a Land Registry and Cadastre Direc
             };
 
             const ilOptions = Array.from(new Set(data.map(d=>d._province).filter(p=>p))).sort((a,b)=>a.localeCompare(b,'tr'));
+            const ilceOptions = Array.from(new Set(
+                data
+                .filter(d => selectedIl.length === 0 || selectedIl.includes(d._province)) // Filter by selected provinces
+                .map(d => d._district)
+                .filter(p => p) // Filter out empty/null districts
+            )).sort((a,b)=>a.localeCompare(b,'tr'));
             const personnelOptions = Array.from(new Set(data.flatMap(d=>splitPersonel(d['görevli personel'])))).sort((a,b)=>a.localeCompare(b,'tr'));
             const sortOptions=[{label:'Sıralama Yok',value:''},{label:'Başvuru Tarihine Göre',value:'başvuru tarihi'},{label:'Fen Kayıt Tarihine Göre',value:'fen kayıt tarihi'},{label:'İade Edilen',value:'iade edilen'}];
+            
             const filteredData=(() => {
                 let arr=[...data];
                 if(selectedIl.length>0) arr=arr.filter(d=>selectedIl.includes(d._province));
+                if(selectedIlce.length > 0) arr = arr.filter(d => selectedIlce.includes(d._district)); // Yeni filtreleme adımı
                 if(selectedPersonel.length>0) arr=arr.filter(d=>{const ppl=splitPersonel(d['görevli personel']); return selectedPersonel.some(sp=>ppl.includes(sp));});
                 if(sortField==='iade edilen') arr=arr.filter(d=>String(d['başvuru durumu']||'').toLocaleLowerCase('tr').includes('eksiklikten iade edildi'));
                 return arr;
@@ -1644,12 +1703,18 @@ You are an expert data analysis assistant for a Land Registry and Cadastre Direc
                             <button onClick={()=>setShowIlModal(true)}>{selectedIl.length ? `${selectedIl.length} il seçili` : 'İl Seç'}</button>
                         </div>
                         <div className="control-group">
+                            <label>İlçe Filtresi</label>
+                            <button onClick={()=>setShowIlceModal(true)} disabled={ilceOptions.length === 0}>
+                                {selectedIlce.length ? `${selectedIlce.length} ilçe seçili` : 'İlçe Seç'}
+                            </button>
+                        </div>
+                        <div className="control-group">
                             <label>Personel Filtresi</label>
                             <button onClick={()=>setShowPersonelModal(true)}>{selectedPersonel.length ? `${selectedPersonel.length} personel seçili` : 'Personel Seç'}</button>
                         </div>
                          <div className="control-group">
                             <label>Veri Yönetimi</label>
-                            <button onClick={() => { setData([]); setSelectedIl([]); setSelectedPersonel([]); }} style={{backgroundColor: '#ef4444', color: 'white'}}>Verileri Temizle</button>
+                            <button onClick={() => { setData([]); setSelectedIl([]); setSelectedPersonel([]); setSelectedIlce([]); }} style={{backgroundColor: '#ef4444', color: 'white'}}>Verileri Temizle</button>
                         </div>
                         <div className="control-group">
                             <label>Genel Rapor</label>
@@ -1704,6 +1769,24 @@ You are an expert data analysis assistant for a Land Registry and Cadastre Direc
                                 </div>
                             </div>
                             <div className="modal-footer"><button className="download-btn" onClick={()=>{setSelectedIl([]); setShowIlModal(false);}}>Temizle & Kapat</button></div>
+                        </div>
+                    </div>
+                )}
+                {showIlceModal && (
+                    <div className="modal-overlay" onClick={() => setShowIlceModal(false)}>
+                        <div className="modal" onClick={e => e.stopPropagation()}>
+                            <div className="modal-header"><h3>İlçe Seç</h3><button className="close-btn" onClick={()=>setShowIlceModal(false)}>×</button></div>
+                            <div className="modal-content">
+                                <div className="filter-list">
+                                    {ilceOptions.map(ilce => <div className="filter-item" key={ilce}><label>
+                                        <input type="checkbox" checked={selectedIlce.includes(ilce)} onChange={e=>{
+                                            if(e.target.checked) setSelectedIlce([...selectedIlce, ilce]);
+                                            else setSelectedIlce(selectedIlce.filter(i => i !== ilce));
+                                        }}/> {ilce}
+                                    </label></div>)}
+                                </div>
+                            </div>
+                            <div className="modal-footer"><button className="download-btn" onClick={()=>{setSelectedIlce([]); setShowIlceModal(false);}}>Temizle & Kapat</button></div>
                         </div>
                     </div>
                 )}
