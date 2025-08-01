@@ -735,6 +735,7 @@
                                         fenKayitNo: fenKayitNo, 
                                         il: task._province || '', 
                                         ilce: task['ilçe'] || '', 
+                                        islem: task['işlem'] || '',
                                         zemin: task['zemin'] || '', 
                                         beklemeSuresi: Math.floor(diffDays), 
                                         personnel: splitPersonel(task['görevli personel']) 
@@ -753,6 +754,7 @@
                     'Fen Kayıt No': row.fenKayitNo, 
                     'İl': row.il, 
                     'İlçe': row.ilce, 
+                    'İşlem': row.islem,
                     'Zemin': row.zemin, 
                     'Bekleme Süresi (Gün)': row.beklemeSuresi 
                 })); 
@@ -766,7 +768,7 @@
                         ws[cell_ref].s.alignment = { wrapText: true }; 
                     } 
                 } 
-                ws['!cols'] = [ { wch: 30 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 40 }, { wch: 20 } ]; 
+                ws['!cols'] = [ { wch: 30 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 20 }, { wch: 40 }, { wch: 20 } ]; 
                 const wb = XLSX.utils.book_new(); 
                 XLSX.utils.book_append_sheet(wb, ws, 'Uyari Raporu'); 
                 XLSX.writeFile(wb, 'uyari_raporu.xlsx'); 
@@ -788,6 +790,7 @@
                                     <th className="col-fen-kayit-no">Fen Kayıt No</th> 
                                     <th className="col-il">İl</th> 
                                     <th className="col-ilce">İlçe</th> 
+                                    <th className="col-islem">İşlem</th>
                                     <th className="col-zemin">Zemin</th> 
                                     <th className="col-bekleme-süresi-gün">Bekleme Süresi (Gün)</th> 
                                 </tr> 
@@ -806,6 +809,7 @@
                                         <td className="col-fen-kayit-no">{row.fenKayitNo}</td> 
                                         <td className="col-il">{row.il}</td> 
                                         <td className="col-ilce">{row.ilce}</td> 
+                                        <td className="col-islem">{row.islem}</td>
                                         <td className="col-zemin">{row.zemin}</td> 
                                         <td className="col-bekleme-süresi-gün">{row.beklemeSuresi}</td> 
                                     </tr> 
