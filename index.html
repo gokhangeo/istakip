@@ -787,7 +787,7 @@
             return ( 
                 <div className="warning-table-container"> 
                     <div className="warning-table-header"> 
-                        <h3>7 Günden Fazla Bekleyen İşlemler (Uyarı)</h3> 
+                        <h3>7 Günden Fazla Bekleyen İşlemler (Uyarı) (Toplam: {warningRows.length})</h3> 
                         <div className="button-group"> 
                             <button onClick={handleExportWarningExcel} className="export-btn" title="Excel olarak indir">Excel İndir</button> 
                         </div> 
@@ -1552,7 +1552,7 @@ You are an expert data analysis assistant for a Land Registry and Cadastre Direc
                 try {
                     const response = await fetch(url);
                     if (!response.ok) {
-                        console.error('GitHub\'dan dosya alınamadı. URL\'yi ve dosya izinlerini kontrol edin.');
+                        // Silently fail as requested
                         return [];
                     }
                     const arrayBuffer = await response.arrayBuffer();
@@ -1562,7 +1562,7 @@ You are an expert data analysis assistant for a Land Registry and Cadastre Direc
                     const json = XLSX.utils.sheet_to_json(ws, { header: 1 });
                     return json.flat().filter(name => name != null && name.toString().trim() !== '');
                 } catch (error) {
-                    console.error("Mühendis listesi okunurken hata:", error);
+                    // Silently fail as requested
                     return [];
                 }
             };
