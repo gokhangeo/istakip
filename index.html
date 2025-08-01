@@ -561,7 +561,7 @@
             ); 
         }
         
-        function ChartsBelow({ data, onZoom, personnelChartCardRef, waitingChartCardRef, selectedIl }) {
+        function ChartsBelow({ data, onZoom, personnelChartCardRef, waitingChartCardRef, selectedIl, isEngineer }) {
             const totalRef = useRef();
             const waitingRef = useRef();
             const totalChartRef = useRef(null);
@@ -596,7 +596,7 @@
                 try {
                     if (canvasRef.current) {
                         const sortedData = Object.entries(chartData).sort(([, a], [, b]) => b - a);
-                        const labels = sortedData.map(d => d[0]);
+                        const labels = sortedData.map(d => isEngineer(d[0]) ? `${d[0]} (Müh.)` : d[0]);
                         const dataValues = sortedData.map(d => d[1]);
 
                         if (chartRef.current) chartRef.current.destroy();
@@ -618,7 +618,17 @@
                                     legend: { display: false },
                                     datalabels: { anchor: 'end', align: 'right', color: '#444', font: { weight: 'bold' } }
                                 },
-                                scales: { x: { beginAtZero: true } },
+                                scales: { 
+                                    y: {
+                                        ticks: {
+                                            color: (context) => {
+                                                const originalName = context.tick.label.replace(' (Müh.)', '');
+                                                return isEngineer(originalName) ? 'red' : '#666';
+                                            }
+                                        }
+                                    },
+                                    x: { beginAtZero: true } 
+                                },
                                 maintainAspectRatio: false
                             }
                         });
@@ -630,11 +640,11 @@
 
             useEffect(() => {
                 createSortedChart(totalRef, totalChartRef, personnelStats.totals, 'Toplam İşlem Sayısı');
-            }, [personnelStats.totals]);
+            }, [personnelStats.totals, isEngineer]);
 
             useEffect(() => {
                 createSortedChart(waitingRef, waitingChartRef, personnelStats.waiting, 'Bekleyen İşlem Sayısı');
-            }, [personnelStats.waiting]);
+            }, [personnelStats.waiting, isEngineer]);
 
             if (!data || data.length === 0) return null;
 
@@ -714,7 +724,7 @@
             ); 
         }
         
-        function WarningTable({ data }) { 
+        function WarningTable({ data, isEngineer }) { 
             const [warningRows, setWarningRows] = useState([]); 
             useEffect(() => { 
                 const today = new Date(); 
@@ -750,7 +760,7 @@
             }, [data]); 
             const handleExportWarningExcel = () => { 
                 const dataToExport = warningRows.map(row => ({ 
-                    'Personel': row.personnel.join("\n"), 
+                    'Personel': row.personnel.map(p => isEngineer(p) ? `${p} (Müh.)` : p).join("\n"), 
                     'Fen Kayıt No': row.fenKayitNo, 
                     'İl': row.il, 
                     'İlçe': row.ilce, 
@@ -801,7 +811,9 @@
                                         <td className="col-personel">
                                             {row.personnel.map((p, i) => (
                                                 <React.Fragment key={i}>
-                                                    {p}
+                                                    <span style={{ color: isEngineer(p) ? 'red' : 'inherit' }}>
+                                                        {p} {isEngineer(p) ? '(Müh.)' : ''}
+                                                    </span>
                                                     {i < row.personnel.length - 1 && <br />}
                                                 </React.Fragment>
                                             ))}
@@ -821,7 +833,7 @@
             ); 
         }
         
-        function DataTable({ data, sortField }) { 
+        function DataTable({ data, sortField, isEngineer }) { 
             let rows = [...(data||[])]; 
             if(sortField==='iade edilen'){ rows=rows.filter(d=>String(d['başvuru durumu']||'').toLocaleLowerCase('tr').includes('eksiklikten iade edildi')); } 
             else if(sortField){ 
@@ -833,7 +845,17 @@
             } 
             const exportToExcel=()=>{ 
                 try { 
-                    const ws=XLSX.utils.json_to_sheet(rows.map(r=>{ const obj={}; ALLOWED_COLS.forEach(col => { obj[col.toLocaleUpperCase('tr-TR')] = r[col]; }); return obj; })); 
+                    const ws=XLSX.utils.json_to_sheet(rows.map(r=>{ 
+                        const obj={}; 
+                        ALLOWED_COLS.forEach(col => { 
+                            if (col === 'görevli personel') {
+                                obj[col.toLocaleUpperCase('tr-TR')] = splitPersonel(r[col]).map(p => isEngineer(p) ? `${p} (Müh.)` : p).join(', ');
+                            } else {
+                                obj[col.toLocaleUpperCase('tr-TR')] = r[col]; 
+                            }
+                        }); 
+                        return obj; 
+                    })); 
                     const wb=XLSX.utils.book_new(); 
                     XLSX.utils.book_append_sheet(wb,ws,'Tum_Islemler'); 
                     XLSX.writeFile(wb,'tum_islemler.xlsx'); 
@@ -844,7 +866,24 @@
             const tableBody = rows.length > 0 ? (
                 rows.map((row,i) => (
                     <tr key={i}>
-                        {ALLOWED_COLS.map(col => <td key={col} className={`col-${col.replace(/\s+/g, '-')}`}>{row[col]}</td>)}
+                        {ALLOWED_COLS.map(col => {
+                            if (col === 'görevli personel') {
+                                const personnel = splitPersonel(row[col]);
+                                return (
+                                    <td key={col} className={`col-${col.replace(/\s+/g, '-')}`}>
+                                        {personnel.map((p, i) => (
+                                            <React.Fragment key={i}>
+                                                <span style={{ color: isEngineer(p) ? 'red' : 'inherit' }}>
+                                                    {p} {isEngineer(p) ? '(Müh.)' : ''}
+                                                </span>
+                                                {i < personnel.length - 1 && ', '}
+                                            </React.Fragment>
+                                        ))}
+                                    </td>
+                                );
+                            }
+                            return <td key={col} className={`col-${col.replace(/\s+/g, '-')}`}>{row[col]}</td>
+                        })}
                     </tr>
                 ))
             ) : (
@@ -873,7 +912,7 @@
             ); 
         }
         
-        const ZoomedChart = ({ chartData, title, onRender, isForPdf = false }) => {
+        const ZoomedChart = ({ chartData, title, onRender, isForPdf = false, isEngineer }) => {
             const canvasRef = useRef(null);
             const chartRef = useRef(null);
 
@@ -883,7 +922,7 @@
                         chartRef.current.destroy();
                     }
                     const sortedData = Object.entries(chartData).sort(([, a], [, b]) => b - a);
-                    const labels = sortedData.map(d => d[0]);
+                    const labels = sortedData.map(d => isEngineer(d[0]) ? `${d[0]} (Müh.)` : d[0]);
                     const data = sortedData.map(d => d[1]);
                     
                     chartRef.current = new Chart(canvasRef.current, {
@@ -897,7 +936,7 @@
                             }]
                         },
                         options: {
-                            indexAxis: 'x', // Always vertical bar chart
+                            indexAxis: 'x', 
                             responsive: true,
                             maintainAspectRatio: false,
                             plugins: {
@@ -917,7 +956,11 @@
                                     ticks: {
                                         autoSkip: false,
                                         maxRotation: 90,
-                                        minRotation: 45
+                                        minRotation: 45,
+                                        color: (context) => {
+                                            const originalName = context.tick.label.replace(' (Müh.)', '');
+                                            return isEngineer(originalName) ? 'red' : '#666';
+                                        }
                                     }
                                 },
                                 y: { beginAtZero: true }
@@ -934,11 +977,9 @@
                         chartRef.current = null;
                     }
                 };
-            }, [chartData, title, onRender]);
+            }, [chartData, title, onRender, isEngineer]);
 
             if (isForPdf) {
-                // For PDF rendering, the parent container is already sized.
-                // The canvas will responsively fill this container.
                 return (
                     <div style={{ width: '100%', height: '100%', position: 'relative' }}>
                         <canvas ref={canvasRef}></canvas>
@@ -946,9 +987,8 @@
                 );
             }
 
-            // For Modal view, add a scrollable container
             const numItems = chartData ? Object.keys(chartData).length : 0;
-            const minWidth = numItems * 40; // 40px per bar for readability
+            const minWidth = numItems * 40; 
 
             return (
                 <div style={{ width: '100%', height: '70vh', overflowX: 'auto' }}>
@@ -1098,7 +1138,7 @@
             return <canvas ref={canvasRef}></canvas>;
         }
 
-        function AIReportGenerator({ data, ilOptions, personnelOptions, selectedIl }) {
+        function AIReportGenerator({ data, ilOptions, personnelOptions, selectedIl, isEngineer }) {
             const [aiMode, setAiMode] = useState('report'); // 'report' or 'interactive'
             const [reportType, setReportType] = useState('il');
             const [selectedValue, setSelectedValue] = useState('');
@@ -1449,7 +1489,7 @@ You are an expert data analysis assistant for a Land Registry and Cadastre Direc
                                             <label>{reportType === 'il' ? 'İl Seçin' : 'Personel Seçin'}</label>
                                             <select value={selectedValue} onChange={e => setSelectedValue(e.target.value)} disabled={options.length === 0}>
                                                 <option value="">-- Seçim Yapın --</option>
-                                                {options.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                                                {options.map(opt => <option key={opt} value={opt}>{opt} {isEngineer(opt) ? '(Müh.)' : ''}</option>)}
                                             </select>
                                         </div>
                                     )}
@@ -1491,21 +1531,56 @@ You are an expert data analysis assistant for a Land Registry and Cadastre Direc
 
         function App(){
             const [data,setData]=useState([]);
+            const [engineers, setEngineers] = useState([]);
             const [loading,setLoading]=useState(false);
             const [errorMsg,setErrorMsg]=useState("");
             const [sortField,setSortField]=useState('');
             const [selectedPersonel,setSelectedPersonel]=useState([]);
             const [selectedIl,setSelectedIl]=useState([]);
-            const [selectedIlce, setSelectedIlce] = useState([]); // Yeni state: İlçe seçimi için
+            const [selectedIlce, setSelectedIlce] = useState([]); 
             const [showPersonelModal,setShowPersonelModal]=useState(false);
             const [showIlModal,setShowIlModal]=useState(false);
-            const [showIlceModal, setShowIlceModal] = useState(false); // Yeni state: İlçe modalı için
+            const [showIlceModal, setShowIlceModal] = useState(false); 
             const [zoomContent, setZoomContent] = useState(null);
 
             const modalContentRef = useRef(null);
             const summaryTableRef = useRef(null);
             const personnelChartRef = useRef(null);
             const waitingChartRef = useRef(null);
+            
+            const readExcelFromUrl = async (url) => {
+                try {
+                    const response = await fetch(url);
+                    if (!response.ok) {
+                        console.error('GitHub\'dan dosya alınamadı. URL\'yi ve dosya izinlerini kontrol edin.');
+                        return [];
+                    }
+                    const arrayBuffer = await response.arrayBuffer();
+                    const data = new Uint8Array(arrayBuffer);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    const ws = workbook.Sheets[workbook.SheetNames[0]];
+                    const json = XLSX.utils.sheet_to_json(ws, { header: 1 });
+                    return json.flat().filter(name => name != null && name.toString().trim() !== '');
+                } catch (error) {
+                    console.error("Mühendis listesi okunurken hata:", error);
+                    return [];
+                }
+            };
+            
+            useEffect(() => {
+                const fetchEngineers = async () => {
+                    const engineerListUrl = 'https://raw.githubusercontent.com/gokhangeo/istakip/main/M%C3%BChendis.xlsx';
+                    const engineerNames = await readExcelFromUrl(engineerListUrl);
+                    setEngineers(engineerNames.map(String)); 
+                };
+                fetchEngineers();
+            }, []);
+
+            const isEngineer = (name) => {
+                if (!name) return false;
+                const normalizedName = normalizeName(name);
+                return engineers.some(eng => normalizeName(eng) === normalizedName);
+            };
 
             const handleFile=async(e)=>{
                 const files=Array.from(e.target.files||[]);
@@ -1620,10 +1695,9 @@ You are an expert data analysis assistant for a Land Registry and Cadastre Direc
                      if (Object.keys(config.data).length > 0) {
                         const chartContainer = document.createElement('div');
                         
-                        // Dinamik olarak genişlik ayarla
                         const numItems = Object.keys(config.data).length;
-                        const chartWidth = Math.max(1200, numItems * 40); // Her çubuk için ~40px
-                        const chartHeight = 800; // Okunurluk için daha büyük sabit yükseklik
+                        const chartWidth = Math.max(1200, numItems * 40);
+                        const chartHeight = 800;
 
                         chartContainer.style.width = `${chartWidth}px`;
                         chartContainer.style.height = `${chartHeight}px`;
@@ -1633,8 +1707,7 @@ You are an expert data analysis assistant for a Land Registry and Cadastre Direc
                         
                         const tempRoot = ReactDOM.createRoot(chartContainer);
                         await new Promise(resolve => {
-                            // PDF için her zaman dikey grafik oluştur
-                            tempRoot.render(<ZoomedChart chartData={config.data} title={config.title} onRender={resolve} isForPdf={true} />);
+                            tempRoot.render(<ZoomedChart chartData={config.data} title={config.title} onRender={resolve} isForPdf={true} isEngineer={isEngineer} />);
                         });
                         
                         yPosition = await addElementToPdf(chartContainer, yPosition);
@@ -1651,9 +1724,9 @@ You are an expert data analysis assistant for a Land Registry and Cadastre Direc
             const ilOptions = Array.from(new Set(data.map(d=>d._province).filter(p=>p))).sort((a,b)=>a.localeCompare(b,'tr'));
             const ilceOptions = Array.from(new Set(
                 data
-                .filter(d => selectedIl.length === 0 || selectedIl.includes(d._province)) // Filter by selected provinces
+                .filter(d => selectedIl.length === 0 || selectedIl.includes(d._province))
                 .map(d => d._district)
-                .filter(p => p) // Filter out empty/null districts
+                .filter(p => p)
             )).sort((a,b)=>a.localeCompare(b,'tr'));
             const personnelOptions = Array.from(new Set(data.flatMap(d=>splitPersonel(d['görevli personel'])))).sort((a,b)=>a.localeCompare(b,'tr'));
             const sortOptions=[
@@ -1724,7 +1797,7 @@ You are an expert data analysis assistant for a Land Registry and Cadastre Direc
                     </h2>
                 </div>
                 
-                {loading && <div style={{position:'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', zIndex: 3000, background: 'rgba(0,0,0,0.7)', color: 'white', padding: '20px', borderRadius: '10px'}}>Rapor Oluşturuluyor...</div>}
+                {loading && <div style={{position:'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', zIndex: 3000, background: 'rgba(0,0,0,0.7)', color: 'white', padding: '20px', borderRadius: '10px'}}>Yükleniyor...</div>}
                 {data.length === 0 && !loading && !errorMsg && <LandingPage onFileChange={handleFile} />}
                 {errorMsg && <p className="error-message">{errorMsg}</p>}
                 
@@ -1765,12 +1838,12 @@ You are an expert data analysis assistant for a Land Registry and Cadastre Direc
                     </div>
                     <Dashboard data={data} filtered={filteredData} sortField={sortField} selectedPersonel={selectedPersonel} />
                     <div className="charts-below">
-                        <ChartsBelow data={filteredData} onZoom={setZoomContent} personnelChartCardRef={personnelChartRef} waitingChartCardRef={waitingChartRef} selectedIl={selectedIl} />
+                        <ChartsBelow data={filteredData} onZoom={setZoomContent} personnelChartCardRef={personnelChartRef} waitingChartCardRef={waitingChartRef} selectedIl={selectedIl} isEngineer={isEngineer} />
                         <SummaryTable data={data} selectedIl={selectedIl} onZoom={() => setZoomContent({type: 'summary'})} summaryTableRef={summaryTableRef} />
                     </div>
-                    <WarningTable data={filteredData} />
-                    <DataTable data={filteredData} sortField={sortField} />
-                    <AIReportGenerator data={filteredData.length > 0 ? filteredData : data} ilOptions={ilOptions} personnelOptions={personnelOptions} selectedIl={selectedIl} />
+                    <WarningTable data={filteredData} isEngineer={isEngineer} />
+                    <DataTable data={filteredData} sortField={sortField} isEngineer={isEngineer} />
+                    <AIReportGenerator data={filteredData.length > 0 ? filteredData : data} ilOptions={ilOptions} personnelOptions={personnelOptions} selectedIl={selectedIl} isEngineer={isEngineer} />
                 </>}
                 
                 {zoomContent && (
@@ -1781,7 +1854,7 @@ You are an expert data analysis assistant for a Land Registry and Cadastre Direc
                                 <button className="close-btn" onClick={() => setZoomContent(null)}>×</button>
                            </div>
                            <div className="modal-content" ref={modalContentRef}>
-                                {zoomContent.type === 'chart' && <ZoomedChart chartData={zoomContent.data} title={zoomContent.title} />}
+                                {zoomContent.type === 'chart' && <ZoomedChart chartData={zoomContent.data} title={zoomContent.title} isEngineer={isEngineer} />}
                                 {zoomContent.type === 'summary' && <ZoomedSummary data={filteredData} selectedIl={selectedIl} />}
                                 {zoomContent.type === 'waitingList' && <ZoomedWaitingList data={zoomContent.data} title={zoomContent.title} />}
                            </div>
@@ -1838,11 +1911,11 @@ You are an expert data analysis assistant for a Land Registry and Cadastre Direc
                              <div className="modal-header"><h3>Personel Seç</h3><button className="close-btn" onClick={()=>setShowPersonelModal(false)}>×</button></div>
                              <div className="modal-content">
                                 <div className="filter-list">
-                                    {personnelOptions.map(p => <div className="filter-item" key={p}><label>
+                                    {personnelOptions.map(p => <div className="filter-item" key={p}><label style={{color: isEngineer(p) ? 'red' : 'inherit'}}>
                                         <input type="checkbox" checked={selectedPersonel.includes(p)} onChange={e=>{
                                             if(e.target.checked) setSelectedPersonel([...selectedPersonel,p]);
                                             else setSelectedPersonel(selectedPersonel.filter(sp=>sp!==p));
-                                        }}/> {p}
+                                        }}/> {p} {isEngineer(p) ? '(Müh.)' : ''}
                                     </label></div>)}
                                 </div>
                             </div>
