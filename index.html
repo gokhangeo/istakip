@@ -1735,6 +1735,7 @@ You are an expert data analysis assistant for a Land Registry and Cadastre Direc
                 {label:'Başvuru Tarihine Göre',value:'başvuru tarihi'},
                 {label:'Fen Kayıt Tarihine Göre',value:'fen kayıt tarihi'},
                 {label:'İade Edilen',value:'iade edilen'},
+                {label:'Tescile Giden', value:'tescile_giden'},
                 {label:'Bekleyen (Eskiden Yeniye)', value:'bekleyen_eski_yeni'},
                 {label:'Bekleyen (Yeniden Eskiye)', value:'bekleyen_yeni_eski'}
             ];
@@ -1747,6 +1748,17 @@ You are an expert data analysis assistant for a Land Registry and Cadastre Direc
                 
                 if(sortField==='iade edilen') {
                     arr=arr.filter(d=>String(d['başvuru durumu']||'').toLocaleLowerCase('tr').includes('eksiklikten iade edildi'));
+                } else if (sortField === 'tescile_giden') {
+                    arr = arr.filter(d => {
+                        const aciklama = String(d['başvuru açıklama'] || '').toLocaleLowerCase('tr');
+                        return aciklama.includes('tescil edildi');
+                    });
+                    arr.sort((a, b) => {
+                        const dx = new Date(a['fen kayıt tarihi']);
+                        const dy = new Date(b['fen kayıt tarihi']);
+                        if (!isNaN(dx) && !isNaN(dy)) return dx - dy;
+                        return 0;
+                    });
                 } else if (sortField === 'bekleyen_eski_yeni') {
                     arr = arr.filter(d => {
                         const status = String(d['başvuru durumu'] || '').toLocaleLowerCase('tr');
