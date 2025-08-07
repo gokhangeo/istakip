@@ -836,32 +836,63 @@
         
         function DataTable({ data, sortField, isEngineer }) { 
             let rows = [...(data||[])]; 
-            if(sortField==='iade edilen'){ rows=rows.filter(d=>String(d['başvuru durumu']||'').toLocaleLowerCase('tr').includes('eksiklikten iade edildi')); } 
-            else if(sortField){ 
-                rows.sort((a,b)=>{ 
-                    const x=a[sortField]||'', y=b[sortField]||''; 
-                    if(sortField.includes('tarih')){ const dx=new Date(x), dy=new Date(y); if(!isNaN(dx)&&!isNaN(dy)) return dx-dy; } 
-                    return x<y?-1:x>y?1:0; 
-                }); 
-            } 
+            
             const exportToExcel=()=>{ 
-                try { 
-                    const ws=XLSX.utils.json_to_sheet(rows.map(r=>{ 
-                        const obj={}; 
-                        ALLOWED_COLS.forEach(col => { 
+                try {
+                    const headers = ALLOWED_COLS.map(col => col.toLocaleUpperCase('tr-TR'));
+                    const sheetData = [headers];
+                    
+                    const redFontStyle = { font: { color: { rgb: "FFFF0000" } } };
+
+                    rows.forEach(row => {
+                        const rowData = ALLOWED_COLS.map(col => {
                             if (col === 'görevli personel') {
-                                obj[col.toLocaleUpperCase('tr-TR')] = splitPersonel(r[col]).map(p => isEngineer(p) ? `${p} (Müh.)` : p).join(', ');
-                            } else {
-                                obj[col.toLocaleUpperCase('tr-TR')] = r[col]; 
+                                return splitPersonel(row[col]).map(p => isEngineer(p) ? `${p} (Müh.)` : p).join(', ');
                             }
-                        }); 
-                        return obj; 
-                    })); 
-                    const wb=XLSX.utils.book_new(); 
-                    XLSX.utils.book_append_sheet(wb,ws,'Tum_Islemler'); 
-                    XLSX.writeFile(wb,'tum_islemler.xlsx'); 
-                } catch(err) { console.error("Excel export error:", err); alert("Excel indirirken hata oluştu."); } 
+                            return row[col];
+                        });
+                        sheetData.push(rowData);
+                    });
+
+                    const ws = XLSX.utils.aoa_to_sheet(sheetData);
+
+                    rows.forEach((row, rowIndex) => {
+                        ALLOWED_COLS.forEach((col, colIndex) => {
+                            const cell_ref = XLSX.utils.encode_cell({c: colIndex, r: rowIndex + 1});
+                            if (!ws[cell_ref]) return;
+
+                            let shouldBeRed = false;
+                            
+                            if (col === 'başvuru açıklama') {
+                                const cellValue = String(row[col] || '').toLocaleLowerCase('tr');
+                                if (cellValue.includes('iptal') || cellValue.includes('tescil edildi')) {
+                                    shouldBeRed = true;
+                                }
+                            } else if (col === 'görevli personel') {
+                                const personnel = splitPersonel(row[col]);
+                                if (personnel.some(p => isEngineer(p))) {
+                                    shouldBeRed = true;
+                                }
+                            }
+
+                            if (shouldBeRed) {
+                                ws[cell_ref].s = redFontStyle;
+                            }
+                        });
+                    });
+                    
+                    const wb = XLSX.utils.book_new(); 
+                    XLSX.utils.book_append_sheet(wb, ws, 'Tum_Islemler'); 
+                    XLSX.writeFile(wb, 'tum_islemler.xlsx'); 
+                } catch(err) { 
+                    console.error("Excel export error:", err);
+                    // Using a custom modal or a less intrusive notification would be better in a real app
+                    // but for now, we'll stick to the existing pattern of not using alert().
+                    // Maybe log an error to the console for the user.
+                    console.log("Excel'e aktarma sırasında bir hata oluştu. Lütfen konsolu kontrol edin.");
+                } 
             }; 
+            
             if(!rows) return null; 
 
             const tableBody = rows.length > 0 ? (
@@ -1736,6 +1767,7 @@ You are an expert data analysis assistant for a Land Registry and Cadastre Direc
                 {label:'Fen Kayıt Tarihine Göre',value:'fen kayıt tarihi'},
                 {label:'İade Edilen',value:'iade edilen'},
                 {label:'Tescile Giden', value:'tescile_giden'},
+                {label:'İptal Edilen', value:'iptal_edilen'},
                 {label:'Bekleyen (Eskiden Yeniye)', value:'bekleyen_eski_yeni'},
                 {label:'Bekleyen (Yeniden Eskiye)', value:'bekleyen_yeni_eski'}
             ];
@@ -1752,6 +1784,17 @@ You are an expert data analysis assistant for a Land Registry and Cadastre Direc
                     arr = arr.filter(d => {
                         const aciklama = String(d['başvuru açıklama'] || '').toLocaleLowerCase('tr');
                         return aciklama.includes('tescil edildi');
+                    });
+                    arr.sort((a, b) => {
+                        const dx = new Date(a['fen kayıt tarihi']);
+                        const dy = new Date(b['fen kayıt tarihi']);
+                        if (!isNaN(dx) && !isNaN(dy)) return dx - dy;
+                        return 0;
+                    });
+                } else if (sortField === 'iptal_edilen') {
+                    arr = arr.filter(d => {
+                        const aciklama = String(d['başvuru açıklama'] || '').toLocaleLowerCase('tr');
+                        return aciklama.includes('iptal');
                     });
                     arr.sort((a, b) => {
                         const dx = new Date(a['fen kayıt tarihi']);
