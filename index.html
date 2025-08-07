@@ -886,9 +886,6 @@
                     XLSX.writeFile(wb, 'tum_islemler.xlsx'); 
                 } catch(err) { 
                     console.error("Excel export error:", err);
-                    // Using a custom modal or a less intrusive notification would be better in a real app
-                    // but for now, we'll stick to the existing pattern of not using alert().
-                    // Maybe log an error to the console for the user.
                     console.log("Excel'e aktarma sırasında bir hata oluştu. Lütfen konsolu kontrol edin.");
                 } 
             }; 
@@ -911,6 +908,24 @@
                                                 {i < personnel.length - 1 && ', '}
                                             </React.Fragment>
                                         ))}
+                                    </td>
+                                );
+                            }
+                             if (col === 'başvuru açıklama') {
+                                const text = row[col];
+                                if (typeof text !== 'string' || !text) {
+                                    return <td key={col} className={`col-${col.replace(/\s+/g, '-')}`}>{text}</td>;
+                                }
+                                const keywords = ['iptal', 'tescil edildi'];
+                                const regex = new RegExp(`(${keywords.join('|')})`, 'gi');
+                                const parts = text.split(regex);
+                                return (
+                                    <td key={col} className={`col-${col.replace(/\s+/g, '-')}`}>
+                                        {parts.map((part, index) => 
+                                            keywords.some(kw => part.toLowerCase() === kw.toLowerCase()) ? 
+                                            <span key={index} style={{color: 'red'}}>{part}</span> : 
+                                            part
+                                        )}
                                     </td>
                                 );
                             }
@@ -1766,7 +1781,7 @@ You are an expert data analysis assistant for a Land Registry and Cadastre Direc
                 {label:'Başvuru Tarihine Göre',value:'başvuru tarihi'},
                 {label:'Fen Kayıt Tarihine Göre',value:'fen kayıt tarihi'},
                 {label:'İade Edilen',value:'iade edilen'},
-                {label:'Tescile Giden', value:'tescile_giden'},
+                {label:'Tescil Edilen', value:'tescile_giden'},
                 {label:'İptal Edilen', value:'iptal_edilen'},
                 {label:'Bekleyen (Eskiden Yeniye)', value:'bekleyen_eski_yeni'},
                 {label:'Bekleyen (Yeniden Eskiye)', value:'bekleyen_yeni_eski'}
