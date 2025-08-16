@@ -839,51 +839,72 @@
             
             const exportToExcel=()=>{ 
                 try {
-                    const headers = ALLOWED_COLS.map(col => col.toLocaleUpperCase('tr-TR'));
-                    const sheetData = [headers];
-                    
-                    const redFontStyle = { font: { color: { rgb: "FFFF0000" } } };
-
-                    rows.forEach(row => {
-                        const rowData = ALLOWED_COLS.map(col => {
-                            if (col === 'görevli personel') {
-                                return splitPersonel(row[col]).map(p => isEngineer(p) ? `${p} (Müh.)` : p).join(', ');
-                            }
-                            return row[col];
-                        });
-                        sheetData.push(rowData);
-                    });
-
-                    const ws = XLSX.utils.aoa_to_sheet(sheetData);
-
-                    rows.forEach((row, rowIndex) => {
-                        ALLOWED_COLS.forEach((col, colIndex) => {
-                            const cell_ref = XLSX.utils.encode_cell({c: colIndex, r: rowIndex + 1});
-                            if (!ws[cell_ref]) return;
-
-                            let shouldBeRed = false;
-                            
-                            if (col === 'başvuru açıklama') {
-                                const cellValue = String(row[col] || '').toLocaleLowerCase('tr');
-                                if (cellValue.includes('iptal') || cellValue.includes('tescil edildi')) {
-                                    shouldBeRed = true;
+                    if (sortField === 'tescile_giden' || sortField === 'iade edilen') {
+                        const customHeaders = ['İLÇE', 'FEN KAYIT TARİHİ', 'FEN KAYIT NO', 'İŞLEM', 'ZEMİN', 'GÖREVLİ PERSONEL', 'BAŞVURU AÇIKLAMA'];
+                        const customCols = ['ilçe', 'fen kayıt tarihi', 'fen kayıt no', 'işlem', 'zemin', 'görevli personel', 'başvuru açıklama'];
+                        
+                        const sheetData = [customHeaders];
+                        rows.forEach(row => {
+                            const rowData = customCols.map(col => {
+                                if (col === 'görevli personel') {
+                                    return splitPersonel(row[col]).map(p => isEngineer(p) ? `${p} (Müh.)` : p).join(', ');
                                 }
-                            } else if (col === 'görevli personel') {
-                                const personnel = splitPersonel(row[col]);
-                                if (personnel.some(p => isEngineer(p))) {
-                                    shouldBeRed = true;
-                                }
-                            }
-
-                            if (shouldBeRed) {
-                                ws[cell_ref].s = redFontStyle;
-                            }
+                                return row[col];
+                            });
+                            sheetData.push(rowData);
                         });
-                    });
-                    
-                    const wb = XLSX.utils.book_new(); 
-                    XLSX.utils.book_append_sheet(wb, ws, 'Tum_Islemler'); 
-                    XLSX.writeFile(wb, 'tum_islemler.xlsx'); 
+
+                        const ws = XLSX.utils.aoa_to_sheet(sheetData);
+                        const wb = XLSX.utils.book_new();
+                        XLSX.utils.book_append_sheet(wb, ws, 'Rapor');
+                        XLSX.writeFile(wb, `${sortField}.xlsx`);
+                    } else {
+                        const headers = ALLOWED_COLS.map(col => col.toLocaleUpperCase('tr-TR'));
+                        const sheetData = [headers];
+                        
+                        const redFontStyle = { font: { color: { rgb: "FFFF0000" } } };
+
+                        rows.forEach(row => {
+                            const rowData = ALLOWED_COLS.map(col => {
+                                if (col === 'görevli personel') {
+                                    return splitPersonel(row[col]).map(p => isEngineer(p) ? `${p} (Müh.)` : p).join(', ');
+                                }
+                                return row[col];
+                            });
+                            sheetData.push(rowData);
+                        });
+
+                        const ws = XLSX.utils.aoa_to_sheet(sheetData);
+
+                        rows.forEach((row, rowIndex) => {
+                            ALLOWED_COLS.forEach((col, colIndex) => {
+                                const cell_ref = XLSX.utils.encode_cell({c: colIndex, r: rowIndex + 1});
+                                if (!ws[cell_ref]) return;
+
+                                let shouldBeRed = false;
+                                
+                                if (col === 'başvuru açıklama') {
+                                    const cellValue = String(row[col] || '').toLocaleLowerCase('tr');
+                                    if (cellValue.includes('iptal') || cellValue.includes('tescil edildi')) {
+                                        shouldBeRed = true;
+                                    }
+                                } else if (col === 'görevli personel') {
+                                    const personnel = splitPersonel(row[col]);
+                                    if (personnel.some(p => isEngineer(p))) {
+                                        shouldBeRed = true;
+                                    }
+                                }
+
+                                if (shouldBeRed) {
+                                    ws[cell_ref].s = redFontStyle;
+                                }
+                            });
+                        });
+                        
+                        const wb = XLSX.utils.book_new(); 
+                        XLSX.utils.book_append_sheet(wb, ws, 'Tum_Islemler'); 
+                        XLSX.writeFile(wb, 'tum_islemler.xlsx'); 
+                    }
                 } catch(err) { 
                     console.error("Excel export error:", err);
                     console.log("Excel'e aktarma sırasında bir hata oluştu. Lütfen konsolu kontrol edin.");
@@ -1795,6 +1816,12 @@ You are an expert data analysis assistant for a Land Registry and Cadastre Direc
                 
                 if(sortField==='iade edilen') {
                     arr=arr.filter(d=>String(d['başvuru durumu']||'').toLocaleLowerCase('tr').includes('eksiklikten iade edildi'));
+                     arr.sort((a, b) => {
+                        const dx = new Date(a['fen kayıt tarihi']);
+                        const dy = new Date(b['fen kayıt tarihi']);
+                        if (!isNaN(dx) && !isNaN(dy)) return dx - dy;
+                        return 0;
+                    });
                 } else if (sortField === 'tescile_giden') {
                     arr = arr.filter(d => {
                         const aciklama = String(d['başvuru açıklama'] || '').toLocaleLowerCase('tr');
