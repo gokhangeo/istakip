@@ -835,11 +835,18 @@
         }
         
         function DataTable({ data, sortField, isEngineer }) { 
+            const [searchTerm, setSearchTerm] = useState('');
             let rows = [...(data||[])]; 
+
+            if (searchTerm) {
+                rows = rows.filter(row =>
+                    String(row['fen kayıt no'] || '').includes(searchTerm)
+                );
+            }
             
             const exportToExcel=()=>{ 
                 try {
-                    if (sortField === 'tescile_giden' || sortField === 'iade edilen') {
+                    if (sortField === 'tescile_giden' || sortField === 'iade edilen' || sortField === 'iptal_edilen') {
                         const customHeaders = ['İLÇE', 'FEN KAYIT TARİHİ', 'FEN KAYIT NO', 'İŞLEM', 'ZEMİN', 'GÖREVLİ PERSONEL', 'BAŞVURU AÇIKLAMA'];
                         const customCols = ['ilçe', 'fen kayıt tarihi', 'fen kayıt no', 'işlem', 'zemin', 'görevli personel', 'başvuru açıklama'];
                         
@@ -964,7 +971,16 @@
                 <div className="datatable-container"> 
                     <div className="datatable-header"> 
                         <h3>Tüm İşlemler</h3> 
-                        <button className="export-btn" onClick={exportToExcel} title="Bu tabloyu Excel olarak indir">Excel İndir</button> 
+                        <div style={{display: 'flex', gap: '10px', alignItems: 'center'}}>
+                            <input
+                                type="text"
+                                placeholder="Fen Kayıt No ile Ara..."
+                                value={searchTerm}
+                                onChange={e => setSearchTerm(e.target.value)}
+                                style={{padding: '6px 10px', borderRadius: '4px', border: '1px solid #d1d5db'}}
+                            />
+                            <button className="export-btn" onClick={exportToExcel} title="Bu tabloyu Excel olarak indir">Excel İndir</button> 
+                        </div>
                     </div> 
                     <div className="table-wrapper" style={{marginTop: 0}}> 
                         <table> 
