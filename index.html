@@ -480,8 +480,9 @@
             const threeMonthsAgo = new Date();
             threeMonthsAgo.setMonth(today.getMonth() - 3);
 
-            let toplam = arr.length, count2025 = 0, totalDays = 0, countDays = 0, overdue = 0;
+            let toplam = arr.length, count2025 = 0, totalDays = 0, countDays = 0;
             let yearCounts = {}, tescileGiden = 0, tescilEdilen = 0, iade = 0, iptal = 0;
+            const overdueFenKayitNos = new Set();
 
             arr.forEach(d => {
                 const bStr = d['başvuru tarihi'];
@@ -515,7 +516,7 @@
                     if (!isNaN(fd.getTime()) && fd.getFullYear() > 1900 && hasValidFenKayitNo) {
                          const diff = (today - fd) / (1000 * 60 * 60 * 24);
                          if (diff >= 7) { 
-                             overdue++;
+                             overdueFenKayitNos.add(fenKayitNo);
                          }
                     }
                 }
@@ -542,14 +543,23 @@
                 }
             });
 
+            const overdue = overdueFenKayitNos.size;
             const avgDays = countDays > 0 ? Math.round(totalDays / countDays) : 0;
             const totalWaiting = Object.values(yearCounts).reduce((a, b) => a + b, 0);
             return { toplam, count2025, avgDays, overdue, yearCounts, tescileGiden, tescilEdilen, iade, iptal, totalWaiting };
         }
         
-        function Dashboard({ data, filtered, sortField, selectedPersonel }) { 
-            const baseArr = (selectedPersonel.length > 0 || filtered.length > 0) ? filtered : data; 
-            const metrics = calcMetrics(baseArr); 
+        function Dashboard({ data, filtered, sortField, selectedPersonel, selectedIl, selectedIlce }) { 
+            const metrics = calcMetrics(data.filter(d => {
+                if (selectedIl.length > 0 && !selectedIl.includes(d._province)) return false;
+                if (selectedIlce.length > 0 && !selectedIlce.includes(d._district)) return false;
+                if (selectedPersonel.length > 0) {
+                    const ppl = splitPersonel(d['görevli personel']);
+                    if (!selectedPersonel.some(sp => ppl.includes(sp))) return false;
+                }
+                return true;
+            }));
+
             const sumRef = useRef(), overdueRef = useRef(), yearRef = useRef(); 
             const sumChartRef = useRef(null), overdueChartRef = useRef(null), yearChartRef = useRef(null); 
             
@@ -721,7 +731,7 @@
                         <td>{r.count2025}</td>
                         <td>{r.avgDays} gün</td>
                         <td>{r.overdue}</td>
-                        <td>{r.tescile}</td>
+                        <td>{r.tescileGiden}</td>
                         <td>{r.iade}</td>
                         <td>{r.totalWaiting}</td>
                     </tr>
@@ -755,12 +765,15 @@
             ); 
         }
         
-        function WarningTable({ data, isEngineer }) { 
+        function WarningTable({ data, isEngineer, showOnlyEngineers, onToggleEngineers }) { 
             const [warningRows, setWarningRows] = useState([]); 
+            
             useEffect(() => { 
+                let relevantData = data;
+                
                 const today = new Date(); 
                 const groupedTasks = {}; 
-                data.forEach(task => { 
+                relevantData.forEach(task => { 
                     const fStr = task['fen kayıt tarihi']; 
                     if (fStr) { 
                         const fenKayitDate = new Date(fStr); 
@@ -786,19 +799,31 @@
                         } 
                     } 
                 }); 
-                const finalRows = Object.values(groupedTasks).sort((a, b) => b.beklemeSuresi - a.beklemeSuresi); 
+                let finalRows = Object.values(groupedTasks).sort((a, b) => b.beklemeSuresi - a.beklemeSuresi); 
+                
+                if (showOnlyEngineers) {
+                    finalRows = finalRows.filter(row => row.personnel.some(p => isEngineer(p)));
+                }
+
                 setWarningRows(finalRows); 
-            }, [data]); 
+            }, [data, isEngineer, showOnlyEngineers]); 
+
             const handleExportWarningExcel = () => { 
-                const dataToExport = warningRows.map(row => ({ 
-                    'Personel': row.personnel.map(p => isEngineer(p) ? `${p} (Müh.)` : p).join("\n"), 
-                    'Fen Kayıt No': row.fenKayitNo, 
-                    'İl': row.il, 
-                    'İlçe': row.ilce, 
-                    'İşlem': row.islem,
-                    'Zemin': row.zemin, 
-                    'Bekleme Süresi (Gün)': row.beklemeSuresi 
-                })); 
+                const dataToExport = warningRows.map(row => {
+                    let personnelList = row.personnel;
+                    if (showOnlyEngineers) {
+                        personnelList = personnelList.filter(p => isEngineer(p));
+                    }
+                    return { 
+                        'Personel': personnelList.map(p => isEngineer(p) ? `${p} (Müh.)` : p).join("\n"), 
+                        'Fen Kayıt No': row.fenKayitNo, 
+                        'İl': row.il, 
+                        'İlçe': row.ilce, 
+                        'İşlem': row.islem,
+                        'Zemin': row.zemin, 
+                        'Bekleme Süresi (Gün)': row.beklemeSuresi 
+                    };
+                }); 
                 const ws = XLSX.utils.json_to_sheet(dataToExport); 
                 const range = XLSX.utils.decode_range(ws['!ref']); 
                 for (let R = range.s.r + 1; R <= range.e.r; ++R) { 
@@ -820,6 +845,10 @@
                     <div className="warning-table-header"> 
                         <h3>7 Günden Fazla Bekleyen İşlemler (Uyarı) (Toplam: {warningRows.length})</h3> 
                         <div className="button-group"> 
+                             <label style={{display: 'flex', alignItems: 'center', cursor: 'pointer', marginRight: '10px'}}>
+                                <input type="checkbox" checked={showOnlyEngineers} onChange={onToggleEngineers} />
+                                Sadece Müh. Göster
+                            </label>
                             <button onClick={handleExportWarningExcel} className="export-btn" title="Excel olarak indir">Excel İndir</button> 
                         </div> 
                     </div> 
@@ -840,14 +869,17 @@
                                 {warningRows.map((row) => ( 
                                     <tr key={row.fenKayitNo}> 
                                         <td className="col-personel">
-                                            {row.personnel.map((p, i) => (
-                                                <React.Fragment key={i}>
-                                                    <span style={{ color: isEngineer(p) ? 'red' : 'inherit' }}>
-                                                        {p} {isEngineer(p) ? '(Müh.)' : ''}
-                                                    </span>
-                                                    {i < row.personnel.length - 1 && <br />}
-                                                </React.Fragment>
-                                            ))}
+                                            {
+                                                (showOnlyEngineers ? row.personnel.filter(p => isEngineer(p)) : row.personnel)
+                                                .map((p, i, arr) => (
+                                                    <React.Fragment key={i}>
+                                                        <span style={{ color: isEngineer(p) ? 'red' : 'inherit' }}>
+                                                            {p} {isEngineer(p) ? '(Müh.)' : ''}
+                                                        </span>
+                                                        {i < arr.length - 1 && <br />}
+                                                    </React.Fragment>
+                                                ))
+                                            }
                                         </td>
                                         <td className="col-fen-kayit-no">{row.fenKayitNo}</td> 
                                         <td className="col-il">{row.il}</td> 
@@ -864,9 +896,16 @@
             ); 
         }
         
-        function DataTable({ data, sortField, isEngineer }) { 
+        function DataTable({ data, sortField, isEngineer, showOnlyEngineers, onToggleEngineers }) { 
             const [searchTerm, setSearchTerm] = useState('');
             let rows = [...(data||[])]; 
+
+            if (showOnlyEngineers) {
+                rows = rows.filter(row => {
+                    const personnel = splitPersonel(row['görevli personel']);
+                    return personnel.some(p => isEngineer(p));
+                });
+            }
 
             if (searchTerm) {
                 rows = rows.filter(row =>
@@ -884,7 +923,11 @@
                         rows.forEach(row => {
                             const rowData = customCols.map(col => {
                                 if (col === 'görevli personel') {
-                                    return splitPersonel(row[col]).map(p => isEngineer(p) ? `${p} (Müh.)` : p).join(', ');
+                                    let personnel = splitPersonel(row[col]);
+                                    if (showOnlyEngineers) {
+                                        personnel = personnel.filter(p => isEngineer(p));
+                                    }
+                                    return personnel.map(p => isEngineer(p) ? `${p} (Müh.)` : p).join(', ');
                                 }
                                 return row[col];
                             });
@@ -904,7 +947,11 @@
                         rows.forEach(row => {
                             const rowData = ALLOWED_COLS.map(col => {
                                 if (col === 'görevli personel') {
-                                    return splitPersonel(row[col]).map(p => isEngineer(p) ? `${p} (Müh.)` : p).join(', ');
+                                    let personnel = splitPersonel(row[col]);
+                                    if (showOnlyEngineers) {
+                                        personnel = personnel.filter(p => isEngineer(p));
+                                    }
+                                    return personnel.map(p => isEngineer(p) ? `${p} (Müh.)` : p).join(', ');
                                 }
                                 return row[col];
                             });
@@ -955,7 +1002,10 @@
                     <tr key={i}>
                         {ALLOWED_COLS.map(col => {
                             if (col === 'görevli personel') {
-                                const personnel = splitPersonel(row[col]);
+                                let personnel = splitPersonel(row[col]);
+                                if (showOnlyEngineers) {
+                                    personnel = personnel.filter(p => isEngineer(p));
+                                }
                                 return (
                                     <td key={col} className={`col-${col.replace(/\s+/g, '-')}`}>
                                         {personnel.map((p, i) => (
@@ -1002,6 +1052,10 @@
                     <div className="datatable-header"> 
                         <h3>Tüm İşlemler</h3> 
                         <div style={{display: 'flex', gap: '10px', alignItems: 'center'}}>
+                            <label style={{display: 'flex', alignItems: 'center', cursor: 'pointer'}}>
+                                <input type="checkbox" checked={showOnlyEngineers} onChange={onToggleEngineers} />
+                                Sadece Müh. Göster
+                            </label>
                             <input
                                 type="text"
                                 placeholder="Fen Kayıt No ile Ara..."
@@ -1656,6 +1710,7 @@ You are an expert data analysis assistant for a Land Registry and Cadastre Direc
             const [showIlModal,setShowIlModal]=useState(false);
             const [showIlceModal, setShowIlceModal] = useState(false); 
             const [zoomContent, setZoomContent] = useState(null);
+            const [showOnlyEngineers, setShowOnlyEngineers] = useState(false);
 
             const modalContentRef = useRef(null);
             const summaryTableRef = useRef(null);
@@ -1982,13 +2037,13 @@ You are an expert data analysis assistant for a Land Registry and Cadastre Direc
                             <button onClick={handleExportGeneralReport} style={{backgroundColor: '#059669', color: 'white'}}>Genel Rapor İndir (PDF)</button>
                         </div>
                     </div>
-                    <Dashboard data={data} filtered={filteredData} sortField={sortField} selectedPersonel={selectedPersonel} />
+                    <Dashboard data={data} filtered={filteredData} sortField={sortField} selectedPersonel={selectedPersonel} selectedIl={selectedIl} selectedIlce={selectedIlce} />
                     <div className="charts-below">
                         <ChartsBelow data={filteredData} onZoom={setZoomContent} personnelChartCardRef={personnelChartRef} waitingChartCardRef={waitingChartRef} selectedIl={selectedIl} isEngineer={isEngineer} />
                         <SummaryTable data={data} selectedIl={selectedIl} onZoom={() => setZoomContent({type: 'summary'})} summaryTableRef={summaryTableRef} />
                     </div>
-                    <WarningTable data={filteredData} isEngineer={isEngineer} />
-                    <DataTable data={filteredData} sortField={sortField} isEngineer={isEngineer} />
+                    <WarningTable data={filteredData} isEngineer={isEngineer} showOnlyEngineers={showOnlyEngineers} onToggleEngineers={() => setShowOnlyEngineers(!showOnlyEngineers)} />
+                    <DataTable data={filteredData} sortField={sortField} isEngineer={isEngineer} showOnlyEngineers={showOnlyEngineers} onToggleEngineers={() => setShowOnlyEngineers(!showOnlyEngineers)} />
                     <AIReportGenerator data={filteredData.length > 0 ? filteredData : data} ilOptions={ilOptions} personnelOptions={personnelOptions} selectedIl={selectedIl} isEngineer={isEngineer} />
                 </>}
                 
