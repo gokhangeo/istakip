@@ -528,10 +528,18 @@
                     }
                 }
 
-                if (status.includes('tescile gönderildi')) tescileGiden++;
-                if (aciklama.includes('tescil edildi')) tescilEdilen++;
-                if (status.includes('eksiklikten iade edildi')) iade++;
-                if (aciklama.includes('iptal')) iptal++;
+                if (status.includes('tescile gönderildi')) {
+                    tescileGiden++;
+                    if (aciklama.includes('tescil edildi')) {
+                        tescilEdilen++;
+                    }
+                    if (aciklama.includes('iptal')) {
+                        iptal++;
+                    }
+                }
+                if (status.includes('eksiklikten iade edildi')) {
+                    iade++;
+                }
             });
 
             const avgDays = countDays > 0 ? Math.round(totalDays / countDays) : 0;
@@ -562,7 +570,7 @@
                     <div className="card"><h3>7+ Gün Bekleyen</h3><span className="value">{metrics.overdue}</span><div className="chart-container"><canvas ref={overdueRef}></canvas></div></div> 
                     <div className="card"><h3>Yıla Göre Bekleyen</h3><div className="chart-container"><canvas ref={yearRef}></canvas></div>{yearLegend}</div> 
                     <div className="card">
-                        <h3>Durum</h3>
+                        <h3>İşlem Durumları</h3>
                         <div style={{marginTop: '4px'}}>
                             <span style={{fontSize: '0.9rem', color: '#334155'}}>Tescile Giden: </span>
                             <span style={{fontSize: '1.1rem', color: '#1d4ed8', fontWeight: 'bold'}}>{metrics.tescileGiden}</span>
@@ -572,11 +580,11 @@
                             <span style={{fontSize: '1.1rem', color: '#1d4ed8', fontWeight: 'bold'}}>{metrics.tescilEdilen}</span>
                         </div>
                          <div style={{marginTop: '2px'}}>
-                            <span style={{fontSize: '0.9rem', color: '#334155'}}>İptal: </span>
+                            <span style={{fontSize: '0.9rem', color: '#334155'}}>İptal Edilen: </span>
                             <span style={{fontSize: '1.1rem', color: '#1d4ed8', fontWeight: 'bold'}}>{metrics.iptal}</span>
                         </div>
                         <div style={{marginTop: '2px'}}>
-                            <span style={{fontSize: '0.9rem', color: '#334155'}}>İade: </span>
+                            <span style={{fontSize: '0.9rem', color: '#334155'}}>İade Edilen: </span>
                             <span style={{fontSize: '1.1rem', color: '#1d4ed8', fontWeight: 'bold'}}>{metrics.iade}</span>
                         </div>
                     </div>
