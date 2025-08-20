@@ -197,7 +197,7 @@
         .warning-table-container { margin-top: 24px; padding: 16px; border-radius: 12px; border: 2px solid #ef4444; background: #fef2f2; }
         .warning-table-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
         .warning-table-header h3 { margin: 0; color: #991b1b; }
-        .warning-table-header .button-group { display: flex; gap: 10px; }
+        .warning-table-header .button-group { display: flex; gap: 10px; align-items: center; }
         .warning-table-container table { table-layout: auto; }
         .warning-table-container .col-personel { width: 25%; min-width: 180px; }
         .warning-table-container .col-zemin { width: 40%; }
@@ -603,6 +603,7 @@
         }
         
         function ChartsBelow({ data, onZoom, personnelChartCardRef, waitingChartCardRef, selectedIl, isEngineer }) {
+            const [showOnlyEngineers, setShowOnlyEngineers] = useState(false);
             const totalRef = useRef();
             const waitingRef = useRef();
             const totalChartRef = useRef(null);
@@ -680,30 +681,44 @@
             };
 
             useEffect(() => {
-                createSortedChart(totalRef, totalChartRef, personnelStats.totals, 'Toplam İşlem Sayısı');
-            }, [personnelStats.totals, isEngineer]);
+                const filteredTotals = showOnlyEngineers
+                    ? Object.fromEntries(Object.entries(personnelStats.totals).filter(([name]) => isEngineer(name)))
+                    : personnelStats.totals;
+                createSortedChart(totalRef, totalChartRef, filteredTotals, 'Toplam İşlem Sayısı');
+            }, [personnelStats.totals, isEngineer, showOnlyEngineers]);
 
             useEffect(() => {
-                createSortedChart(waitingRef, waitingChartRef, personnelStats.waiting, 'Bekleyen İşlem Sayısı');
-            }, [personnelStats.waiting, isEngineer]);
+                const filteredWaiting = showOnlyEngineers
+                    ? Object.fromEntries(Object.entries(personnelStats.waiting).filter(([name]) => isEngineer(name)))
+                    : personnelStats.waiting;
+                createSortedChart(waitingRef, waitingChartRef, filteredWaiting, 'Bekleyen İşlem Sayısı');
+            }, [personnelStats.waiting, isEngineer, showOnlyEngineers]);
 
             if (!data || data.length === 0) return null;
 
             const title = selectedIl.length > 0 ? selectedIl.join(' - ') : ([...new Set(data.map(d => d._province).filter(Boolean))].join(' - ') || 'Tüm İller');
 
             return (
-                <>
-                    <div className="chart-card" ref={personnelChartCardRef}>
-                        <button className="zoom-btn" title="Büyüt" onClick={() => onZoom({ type: 'chart', data: personnelStats.totals, title: `Personel İşlem Dağılımı (${title})` })}>🔍</button>
-                        <div className="chart-title">Personel İşlem Dağılımı ({title})</div>
-                        <div className="chart-wrapper" style={{height: '250px'}}><canvas ref={totalRef}></canvas></div>
+                 <div style={{flex: 2, display: 'flex', flexDirection: 'column', gap: '10px', minWidth: '724px'}}>
+                    <div style={{alignSelf: 'center'}}>
+                        <label style={{display: 'flex', alignItems: 'center', cursor: 'pointer', fontSize: '0.9rem'}}>
+                            <input type="checkbox" checked={showOnlyEngineers} onChange={() => setShowOnlyEngineers(!showOnlyEngineers)} />
+                            Grafiklerde Sadece Mühendisleri Göster
+                        </label>
                     </div>
-                    <div className="chart-card" ref={waitingChartCardRef}>
-                         <button className="zoom-btn" title="Büyüt" onClick={() => onZoom({ type: 'chart', data: personnelStats.waiting, title: `Bekleyen İşlem Sayıları (${title})` })}>🔍</button>
-                        <div className="chart-title">Bekleyen İşlem Sayıları ({title})</div>
-                        <div className="chart-wrapper" style={{height: '250px'}}><canvas ref={waitingRef}></canvas></div>
+                    <div style={{display: 'flex', gap: '24px'}}>
+                        <div className="chart-card" ref={personnelChartCardRef}>
+                            <button className="zoom-btn" title="Büyüt" onClick={() => onZoom({ type: 'chart', data: showOnlyEngineers ? Object.fromEntries(Object.entries(personnelStats.totals).filter(([name]) => isEngineer(name))) : personnelStats.totals, title: `Personel İşlem Dağılımı (${title})` })}>🔍</button>
+                            <div className="chart-title">Personel İşlem Dağılımı ({title})</div>
+                            <div className="chart-wrapper" style={{height: '250px'}}><canvas ref={totalRef}></canvas></div>
+                        </div>
+                        <div className="chart-card" ref={waitingChartCardRef}>
+                             <button className="zoom-btn" title="Büyüt" onClick={() => onZoom({ type: 'chart', data: showOnlyEngineers ? Object.fromEntries(Object.entries(personnelStats.waiting).filter(([name]) => isEngineer(name))) : personnelStats.waiting, title: `Bekleyen İşlem Sayıları (${title})` })}>🔍</button>
+                            <div className="chart-title">Bekleyen İşlem Sayıları ({title})</div>
+                            <div className="chart-wrapper" style={{height: '250px'}}><canvas ref={waitingRef}></canvas></div>
+                        </div>
                     </div>
-                </>
+                </div>
             );
         }
         
@@ -915,9 +930,13 @@
             
             const exportToExcel=()=>{ 
                 try {
-                    if (sortField === 'tescile_giden' || sortField === 'iade edilen' || sortField === 'iptal_edilen') {
-                        const customHeaders = ['İLÇE', 'FEN KAYIT TARİHİ', 'FEN KAYIT NO', 'İŞLEM', 'ZEMİN', 'GÖREVLİ PERSONEL', 'BAŞVURU AÇIKLAMA'];
-                        const customCols = ['ilçe', 'fen kayıt tarihi', 'fen kayıt no', 'işlem', 'zemin', 'görevli personel', 'başvuru açıklama'];
+                    if (sortField === 'tescile_giden' || sortField === 'iade edilen' || sortField === 'iptal_edilen' || sortField === 'fen_kayit_alinmayan') {
+                        const customHeaders = sortField === 'fen_kayit_alinmayan'
+                            ? ['İLÇE', 'BAŞVURU TARİHİ', 'FEN KAYIT NO', 'İŞLEM', 'ZEMİN', 'GÖREVLİ PERSONEL', 'BAŞVURU AÇIKLAMA', 'ÖDEME']
+                            : ['İLÇE', 'FEN KAYIT TARİHİ', 'FEN KAYIT NO', 'İŞLEM', 'ZEMİN', 'GÖREVLİ PERSONEL', 'BAŞVURU AÇIKLAMA'];
+                        const customCols = sortField === 'fen_kayit_alinmayan'
+                            ? ['ilçe', 'başvuru tarihi', 'fen kayıt no', 'işlem', 'zemin', 'görevli personel', 'başvuru açıklama', 'ödeme']
+                            : ['ilçe', 'fen kayıt tarihi', 'fen kayıt no', 'işlem', 'zemin', 'görevli personel', 'başvuru açıklama'];
                         
                         const sheetData = [customHeaders];
                         rows.forEach(row => {
