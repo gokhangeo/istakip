@@ -366,8 +366,8 @@
         Chart.register(ChartDataLabels);
 
         const PROVINCES = ["Adana","Adıyaman","Afyonkarahisar","Ağrı","Amasya","Ankara","Antalya","Artvin","Aydın","Balıkesir","Bilecik","Bingöl","Bitlis","Bolu","Burdur","Bursa","Çanakkale","Çankırı","Çorum","Denizli","Diyarbakır","Edirne","Elazığ","Erzincan","Erzurum","Eskişehir","Gaziantep","Giresun","Gümüşhane","Hakkari","Hatay","Isparta","Mersin","İstanbul","İzmir","Kars","Kastamonu","Kayseri","Kırklareli","Kırşehir","Kocaeli","Konya","Kütahya","Malatya","Manisa","Kahramanmaraş","Mardin","Muğla","Muş","Nevşehir","Niğde","Ordu","Rize","Sakarya","Samsun","Siirt","Sinop","Sivas","Tekirdağ","Tokat","Trabzon","Tunceli","Şanlıurfa","Uşak","Van","Yozgat","Zonguldak","Aksaray","Bayburt","Karaman","Kırıkkale","Batman","Şırnak","Bartın","Ardahan","Iğdır","Yalova","Karabük","Kilis","Osmaniye","Düzce"];
-        const ALLOWED_COLS = ["kurum ad","ilçe","başvuru tarihi","fen kayıt tarihi","fen kayıt no","başvuru no","başvuran","işlem","zemin","görevli personel","tescil talep bilgisi","başvuru durumu","başvuru açıklama","iade"];
-        const HEADER_KEYWORDS = {"kurum ad":["kurum","ad"],"ilçe":["ilçe", "ad"],"başvuru tarihi":["başvuru","tarih"],"fen kayıt tarihi":["fen","kayıt","tarih"],"fen kayıt no":["fen","kayıt","no"],"başvuru no":["başvuru","no"],"başvuran":["başvuran"],"işlem":["işlem"],"zemin":["zemin"],"görevli personel":["görevli","personel"],"tescil talep bilgisi":["tescil","talep","bilgi"],"başvuru durumu":["başvuru","durum"],"başvuru açıklama":["başvuru","açıklama"],"iade":["iade"]};
+        const ALLOWED_COLS = ["kurum ad","ilçe","başvuru tarihi","fen kayıt tarihi","fen kayıt no","başvuru no","başvuran","işlem","zemin","görevli personel","tescil talep bilgisi","başvuru durumu","başvuru açıklama","iade", "ödeme"];
+        const HEADER_KEYWORDS = {"kurum ad":["kurum","ad"],"ilçe":["ilçe", "ad"],"başvuru tarihi":["başvuru","tarih"],"fen kayıt tarihi":["fen","kayıt","tarih"],"fen kayıt no":["fen","kayıt","no"],"başvuru no":["başvuru","no"],"başvuran":["başvuran"],"işlem":["işlem"],"zemin":["zemin"],"görevli personel":["görevli","personel"],"tescil talep bilgisi":["tescil","talep","bilgi"],"başvuru durumu":["başvuru","durum"],"başvuru açıklama":["başvuru","açıklama"],"iade":["iade"], "ödeme": ["ödeme"]};
         
         const normalizeHeader = (header) => { if (!header) return ""; let s; try { s = header.normalize('NFD').replace(/[\u0300-\u036f]/g, ''); } catch (e) { s = String(header); } s = s.trim().toLocaleLowerCase('tr').replace(/\s+/g, ' '); s = s.replace(/ı/g, 'i').replace(/İ/g, 'i'); return s; }
         const splitPersonel = (text) => { if (text == null) return []; const str = typeof text === 'string' ? text : String(text); return str.split(/[,;–-]/g).map(s => { let part = s.trim(); const arrowIdx = part.indexOf('=>'); if (arrowIdx !== -1) part = part.slice(0, arrowIdx).trim(); return part; }).filter(Boolean); }
@@ -1905,6 +1905,7 @@ You are an expert data analysis assistant for a Land Registry and Cadastre Direc
                 {label:'İade Edilen',value:'iade edilen'},
                 {label:'Tescil Edilen', value:'tescile_giden'},
                 {label:'İptal Edilen', value:'iptal_edilen'},
+                {label:'Fen Kayıt Alınmayan', value:'fen_kayit_alinmayan'},
                 {label:'Bekleyen (Eskiden Yeniye)', value:'bekleyen_eski_yeni'},
                 {label:'Bekleyen (Yeniden Eskiye)', value:'bekleyen_yeni_eski'}
             ];
@@ -1946,6 +1947,11 @@ You are an expert data analysis assistant for a Land Registry and Cadastre Direc
                         const dy = new Date(b['fen kayıt tarihi']);
                         if (!isNaN(dx) && !isNaN(dy)) return dx - dy;
                         return 0;
+                    });
+                } else if (sortField === 'fen_kayit_alinmayan') {
+                    arr = arr.filter(d => {
+                        const odeme = String(d['ödeme'] || '').toLocaleLowerCase('tr');
+                        return odeme.includes('ödendi') && (d['fen kayıt no'] === 0 || d['fen kayıt no'] == null);
                     });
                 } else if (sortField === 'bekleyen_eski_yeni') {
                     arr = arr.filter(d => {
