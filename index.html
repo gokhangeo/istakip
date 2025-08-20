@@ -602,8 +602,7 @@
             ); 
         }
         
-        function ChartsBelow({ data, onZoom, personnelChartCardRef, waitingChartCardRef, selectedIl, isEngineer }) {
-            const [showOnlyEngineers, setShowOnlyEngineers] = useState(false);
+        function ChartsBelow({ data, onZoom, personnelChartCardRef, waitingChartCardRef, selectedIl, isEngineer, showOnlyEngineers, onToggleEngineers }) {
             const totalRef = useRef();
             const waitingRef = useRef();
             const totalChartRef = useRef(null);
@@ -702,7 +701,7 @@
                  <div style={{flex: 2, display: 'flex', flexDirection: 'column', gap: '10px', minWidth: '724px'}}>
                     <div style={{alignSelf: 'center'}}>
                         <label style={{display: 'flex', alignItems: 'center', cursor: 'pointer', fontSize: '0.9rem'}}>
-                            <input type="checkbox" checked={showOnlyEngineers} onChange={() => setShowOnlyEngineers(!showOnlyEngineers)} />
+                            <input type="checkbox" checked={showOnlyEngineers} onChange={onToggleEngineers} />
                             Grafiklerde Sadece Mühendisleri Göster
                         </label>
                     </div>
@@ -2064,7 +2063,7 @@ You are an expert data analysis assistant for a Land Registry and Cadastre Direc
                     </div>
                     <Dashboard data={data} filtered={filteredData} sortField={sortField} selectedPersonel={selectedPersonel} selectedIl={selectedIl} selectedIlce={selectedIlce} />
                     <div className="charts-below">
-                        <ChartsBelow data={filteredData} onZoom={setZoomContent} personnelChartCardRef={personnelChartRef} waitingChartCardRef={waitingChartRef} selectedIl={selectedIl} isEngineer={isEngineer} />
+                        <ChartsBelow data={filteredData} onZoom={setZoomContent} personnelChartCardRef={personnelChartRef} waitingChartCardRef={waitingChartRef} selectedIl={selectedIl} isEngineer={isEngineer} showOnlyEngineers={showOnlyEngineers} onToggleEngineers={() => setShowOnlyEngineers(!showOnlyEngineers)} />
                         <SummaryTable data={data} selectedIl={selectedIl} onZoom={() => setZoomContent({type: 'summary'})} summaryTableRef={summaryTableRef} />
                     </div>
                     <WarningTable data={filteredData} isEngineer={isEngineer} showOnlyEngineers={showOnlyEngineers} onToggleEngineers={() => setShowOnlyEngineers(!showOnlyEngineers)} />
