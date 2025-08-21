@@ -153,6 +153,21 @@
         .modal-header h3 { margin: 0; font-size: 1.2rem; }
         .modal-header .close-btn { background: transparent; border: none; font-size: 1.5rem; cursor: pointer; padding: 0; line-height: 1; }
         .modal-content { padding: 20px; overflow-y: auto; }
+        .modal-content:-webkit-full-screen {
+            background-color: white;
+            padding: 20px;
+            overflow: auto;
+        }
+        .modal-content:-moz-full-screen {
+            background-color: white;
+            padding: 20px;
+            overflow: auto;
+        }
+        .modal-content:fullscreen {
+            background-color: white;
+            padding: 20px;
+            overflow: auto;
+        }
         .modal-footer {
             margin-top: auto; padding: 15px 20px; border-top: 1px solid #e5e7eb;
             display: flex; gap: 10px; justify-content: flex-end; background-color: #f9fafb;
@@ -2150,7 +2165,7 @@ You are an expert data analysis assistant for a Land Registry and Cadastre Direc
                                 <button className="close-btn" onClick={() => setZoomContent(null)}>×</button>
                            </div>
                            <div className="modal-content" ref={modalContentRef}>
-                                {zoomContent.type === 'chart' && <ZoomedChart chartData={zoomContent.data} title={zoomContent.title} isEngineer={isEngineer} />}
+                                {zoomContent.type === 'chart' && <ZoomedChart chartData={zoomContent.data} title={zoomContent.title} isEngineer={isEngineer} isFullscreen={isFullscreen} />}
                                 {zoomContent.type === 'summary' && <ZoomedSummary data={filteredData} selectedIl={selectedIl} />}
                                 {zoomContent.type === 'waitingList' && <ZoomedWaitingList data={zoomContent.data} title={zoomContent.title} />}
                            </div>
