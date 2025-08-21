@@ -624,6 +624,72 @@
                 </div>
             ); 
         }
+
+        // YENİ: İşlem Sayıları Grafiği Bileşeni
+        function IslemSayılarıChart({ data, onZoom }) {
+            const canvasRef = useRef(null);
+            const chartRef = useRef(null);
+            const [chartData, setChartData] = useState({});
+
+            useEffect(() => {
+                const işlemCounts = {};
+                data.forEach(row => {
+                    let işlem = row['işlem'] ? String(row['işlem']).trim() : '(Boş)';
+
+                    // Gruplama kuralları
+                    if (işlem === 'Mahkeme Plan Örneği' || işlem === 'Plan Örneği') {
+                        işlem = 'Plan Örneği';
+                    } else if (işlem.startsWith('Ayırma Ve Yola / Yeşil Alana Terk')) {
+                        işlem = 'Ayırma Ve Yola / Yeşil Alana Terk';
+                    }
+
+                    işlemCounts[işlem] = (işlemCounts[işlem] || 0) + 1;
+                });
+                setChartData(işlemCounts);
+            }, [data]);
+
+            useEffect(() => {
+                if (canvasRef.current && Object.keys(chartData).length > 0) {
+                    const sortedData = Object.entries(chartData).sort(([, a], [, b]) => b - a);
+                    const labels = sortedData.map(d => d[0]);
+                    const dataValues = sortedData.map(d => d[1]);
+
+                    if (chartRef.current) chartRef.current.destroy();
+
+                    chartRef.current = new Chart(canvasRef.current, {
+                        type: 'bar',
+                        data: {
+                            labels,
+                            datasets: [{
+                                label: 'İşlem Sayısı',
+                                data: dataValues,
+                                backgroundColor: labels.map((_, i) => `hsl(${(i * 360 / labels.length)}, 70%, 60%)`)
+                            }]
+                        },
+                        options: {
+                            indexAxis: 'y',
+                            responsive: true,
+                            plugins: {
+                                legend: { display: false },
+                                datalabels: { anchor: 'end', align: 'right', color: '#444', font: { weight: 'bold' } }
+                            },
+                            scales: { x: { beginAtZero: true } },
+                            maintainAspectRatio: false
+                        }
+                    });
+                }
+            }, [chartData]);
+            
+            const title = `İşlem Sayıları (${[...new Set(data.map(d => d._province).filter(Boolean))].join(', ') || 'Tüm İller'})`;
+
+            return (
+                <div className="chart-card">
+                    <button className="zoom-btn" title="Büyüt" onClick={() => onZoom({ type: 'chart', data: chartData, title: title })}>🔍</button>
+                    <div className="chart-title">{title}</div>
+                    <div className="chart-wrapper" style={{height: '250px'}}><canvas ref={canvasRef}></canvas></div>
+                </div>
+            );
+        }
         
         function ChartsBelow({ data, onZoom, personnelChartCardRef, waitingChartCardRef, selectedIl, isEngineer, showOnlyEngineers, onToggleEngineers, sortField }) {
             const totalRef = useRef();
@@ -752,7 +818,7 @@
             const title = selectedIl.length > 0 ? selectedIl.join(' - ') : ([...new Set(data.map(d => d._province).filter(Boolean))].join(' - ') || 'Tüm İller');
 
             return (
-                 <div style={{flex: 2, display: 'flex', flexDirection: 'column', gap: '10px', minWidth: '724px'}}>
+                 <div style={{flex: 3, display: 'flex', flexDirection: 'column', gap: '10px', minWidth: '1086px'}}>
                     <div style={{alignSelf: 'center'}}>
                         <label style={{display: 'flex', alignItems: 'center', cursor: 'pointer', fontSize: '0.9rem'}}>
                             <input type="checkbox" checked={showOnlyEngineers} onChange={onToggleEngineers} />
@@ -770,6 +836,7 @@
                             <div className="chart-title">{dynamicTitle} ({title})</div>
                             <div className="chart-wrapper" style={{height: '250px'}}><canvas ref={dynamicRef}></canvas></div>
                         </div>
+                        <IslemSayılarıChart data={data} onZoom={onZoom} />
                     </div>
                 </div>
             );
@@ -1162,7 +1229,7 @@
                         chartRef.current.destroy();
                     }
                     const sortedData = Object.entries(chartData).sort(([, a], [, b]) => b - a);
-                    const labels = sortedData.map(d => isEngineer(d[0]) ? `${d[0]} (Müh.)` : d[0]);
+                    const labels = sortedData.map(d => isEngineer && isEngineer(d[0]) ? `${d[0]} (Müh.)` : d[0]);
                     const data = sortedData.map(d => d[1]);
                     
                     chartRef.current = new Chart(canvasRef.current, {
@@ -1198,6 +1265,7 @@
                                         maxRotation: 90,
                                         minRotation: 45,
                                         color: (context) => {
+                                            if (!isEngineer) return '#666';
                                             const originalName = context.tick.label.replace(' (Müh.)', '');
                                             return isEngineer(originalName) ? 'red' : '#666';
                                         }
@@ -2018,7 +2086,7 @@ You are an expert data analysis assistant for a Land Registry and Cadastre Direc
                 
                 if(sortField==='iade edilen') {
                     arr=arr.filter(d=>String(d['başvuru durumu']||'').toLocaleLowerCase('tr').includes('eksiklikten iade edildi'));
-                     arr.sort((a, b) => {
+                      arr.sort((a, b) => {
                         const dx = new Date(a['fen kayıt tarihi']);
                         const dy = new Date(b['fen kayıt tarihi']);
                         if (!isNaN(dx) && !isNaN(dy)) return dx - dy;
