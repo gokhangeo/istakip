@@ -602,36 +602,67 @@
             ); 
         }
         
-        function ChartsBelow({ data, onZoom, personnelChartCardRef, waitingChartCardRef, selectedIl, isEngineer, showOnlyEngineers, onToggleEngineers }) {
+        function ChartsBelow({ data, onZoom, personnelChartCardRef, waitingChartCardRef, selectedIl, isEngineer, showOnlyEngineers, onToggleEngineers, sortField }) {
             const totalRef = useRef();
-            const waitingRef = useRef();
+            const dynamicRef = useRef();
             const totalChartRef = useRef(null);
-            const waitingChartRef = useRef(null);
-            const [personnelStats, setPersonnelStats] = useState({ totals: {}, waiting: {} });
+            const dynamicChartRef = useRef(null);
+            const [personnelStats, setPersonnelStats] = useState({ totals: {}, dynamic: {} });
+            
+            let dynamicTitle = "Bekleyen İşlem Sayıları";
+            switch(sortField) {
+                case 'iade edilen': dynamicTitle = 'İade Edilen İşlem Sayıları'; break;
+                case 'tescile_giden': dynamicTitle = 'Tescil Edilen İşlem Sayıları'; break;
+                case 'iptal_edilen': dynamicTitle = 'İptal Edilen İşlem Sayıları'; break;
+                case 'fen_kayit_alinmayan': dynamicTitle = 'Fen Kayıt Alınmayan İşlem Sayıları'; break;
+            }
 
             useEffect(() => {
                 if (!data || data.length === 0) {
-                    setPersonnelStats({ totals: {}, waiting: {} });
+                    setPersonnelStats({ totals: {}, dynamic: {} });
                     return;
                 }
                 const totalsMap = {};
-                const waitingMap = {};
+                const dynamicMap = {};
                 data.forEach(r => {
                     const personnel = splitPersonel(r['görevli personel']);
                     if (personnel.length === 0) return;
+                    
                     personnel.forEach(p => {
                         if (p) totalsMap[p] = (totalsMap[p] || 0) + 1;
                     });
+                    
+                    let conditionMet = false;
                     const status = String(r['başvuru durumu'] || '').toLocaleLowerCase('tr');
-                    const isClosed = status.includes('eksiklikten iade edildi') || status.includes('tescile gönderildi');
-                    if (!isClosed) {
+                    const aciklama = String(r['başvuru açıklama'] || '').toLocaleLowerCase('tr');
+                    const odeme = String(r['ödeme'] || '').toLocaleLowerCase('tr');
+
+                    switch(sortField) {
+                        case 'iade edilen': 
+                            if(status.includes('eksiklikten iade edildi')) conditionMet = true;
+                            break;
+                        case 'tescile_giden':
+                            if(status.includes('tescile gönderildi') && aciklama.includes('tescil edildi')) conditionMet = true;
+                            break;
+                        case 'iptal_edilen':
+                            if(status.includes('tescile gönderildi') && aciklama.includes('iptal')) conditionMet = true;
+                            break;
+                        case 'fen_kayit_alinmayan':
+                            if(odeme.includes('ödendi') && (r['fen kayıt no'] === 0 || r['fen kayıt no'] == null)) conditionMet = true;
+                            break;
+                        default:
+                            if(!status.includes('eksiklikten iade edildi') && !status.includes('tescile gönderildi')) conditionMet = true;
+                            break;
+                    }
+
+                    if (conditionMet) {
                         personnel.forEach(p => {
-                            if (p) waitingMap[p] = (waitingMap[p] || 0) + 1;
+                            if (p) dynamicMap[p] = (dynamicMap[p] || 0) + 1;
                         });
                     }
                 });
-                setPersonnelStats({ totals: totalsMap, waiting: waitingMap });
-            }, [data]);
+                setPersonnelStats({ totals: totalsMap, dynamic: dynamicMap });
+            }, [data, sortField]);
 
             const createSortedChart = (canvasRef, chartRef, chartData, label) => {
                 try {
@@ -687,11 +718,11 @@
             }, [personnelStats.totals, isEngineer, showOnlyEngineers]);
 
             useEffect(() => {
-                const filteredWaiting = showOnlyEngineers
-                    ? Object.fromEntries(Object.entries(personnelStats.waiting).filter(([name]) => isEngineer(name)))
-                    : personnelStats.waiting;
-                createSortedChart(waitingRef, waitingChartRef, filteredWaiting, 'Bekleyen İşlem Sayısı');
-            }, [personnelStats.waiting, isEngineer, showOnlyEngineers]);
+                const filteredDynamic = showOnlyEngineers
+                    ? Object.fromEntries(Object.entries(personnelStats.dynamic).filter(([name]) => isEngineer(name)))
+                    : personnelStats.dynamic;
+                createSortedChart(dynamicRef, dynamicChartRef, filteredDynamic, dynamicTitle);
+            }, [personnelStats.dynamic, isEngineer, showOnlyEngineers, dynamicTitle]);
 
             if (!data || data.length === 0) return null;
 
@@ -712,9 +743,9 @@
                             <div className="chart-wrapper" style={{height: '250px'}}><canvas ref={totalRef}></canvas></div>
                         </div>
                         <div className="chart-card" ref={waitingChartCardRef}>
-                             <button className="zoom-btn" title="Büyüt" onClick={() => onZoom({ type: 'chart', data: showOnlyEngineers ? Object.fromEntries(Object.entries(personnelStats.waiting).filter(([name]) => isEngineer(name))) : personnelStats.waiting, title: `Bekleyen İşlem Sayıları (${title})` })}>🔍</button>
-                            <div className="chart-title">Bekleyen İşlem Sayıları ({title})</div>
-                            <div className="chart-wrapper" style={{height: '250px'}}><canvas ref={waitingRef}></canvas></div>
+                             <button className="zoom-btn" title="Büyüt" onClick={() => onZoom({ type: 'chart', data: showOnlyEngineers ? Object.fromEntries(Object.entries(personnelStats.dynamic).filter(([name]) => isEngineer(name))) : personnelStats.dynamic, title: `${dynamicTitle} (${title})` })}>🔍</button>
+                            <div className="chart-title">{dynamicTitle} ({title})</div>
+                            <div className="chart-wrapper" style={{height: '250px'}}><canvas ref={dynamicRef}></canvas></div>
                         </div>
                     </div>
                 </div>
@@ -2062,9 +2093,11 @@ You are an expert data analysis assistant for a Land Registry and Cadastre Direc
                         </div>
                     </div>
                     <Dashboard data={data} filtered={filteredData} sortField={sortField} selectedPersonel={selectedPersonel} selectedIl={selectedIl} selectedIlce={selectedIlce} />
-                    <div className="charts-below">
-                        <ChartsBelow data={filteredData} onZoom={setZoomContent} personnelChartCardRef={personnelChartRef} waitingChartCardRef={waitingChartRef} selectedIl={selectedIl} isEngineer={isEngineer} showOnlyEngineers={showOnlyEngineers} onToggleEngineers={() => setShowOnlyEngineers(!showOnlyEngineers)} />
-                        <SummaryTable data={data} selectedIl={selectedIl} onZoom={() => setZoomContent({type: 'summary'})} summaryTableRef={summaryTableRef} />
+                    <div>
+                        <div className="charts-below">
+                            <ChartsBelow data={filteredData} onZoom={setZoomContent} personnelChartCardRef={personnelChartRef} waitingChartCardRef={waitingChartRef} selectedIl={selectedIl} isEngineer={isEngineer} showOnlyEngineers={showOnlyEngineers} onToggleEngineers={() => setShowOnlyEngineers(!showOnlyEngineers)} sortField={sortField} />
+                            <SummaryTable data={data} selectedIl={selectedIl} onZoom={() => setZoomContent({type: 'summary'})} summaryTableRef={summaryTableRef} />
+                        </div>
                     </div>
                     <WarningTable data={filteredData} isEngineer={isEngineer} showOnlyEngineers={showOnlyEngineers} onToggleEngineers={() => setShowOnlyEngineers(!showOnlyEngineers)} />
                     <DataTable data={filteredData} sortField={sortField} isEngineer={isEngineer} showOnlyEngineers={showOnlyEngineers} onToggleEngineers={() => setShowOnlyEngineers(!showOnlyEngineers)} />
