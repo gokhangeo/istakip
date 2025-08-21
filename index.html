@@ -635,9 +635,9 @@
             let dynamicTitle = "Bekleyen İşlem Sayıları";
             switch(sortField) {
                 case 'iade edilen': dynamicTitle = 'İade Edilen İşlem Sayıları'; break;
-                case 'tescile_giden': dynamicTitle = 'Tescil Edilen İşlem Sayıları'; break;
-                case 'iptal_edilen': dynamicTitle = 'İptal Edilen İşlem Sayıları'; break;
-                case 'fen_kayit_alinmayan': dynamicTitle = 'Fen Kayıt Alınmayan İşlem Sayıları'; break;
+                case 'tescile_giden': dynamicTitle = 'Tescil Edilen(Tescilden Geldi Yapılmayan)'; break;
+                case 'iptal_edilen': dynamicTitle = 'Tapu İptal Edilen(Tescilden Geldi-Eksiklikten İade Yapılmayan)'; break;
+                case 'fen_kayit_alinmayan': dynamicTitle = 'Fen Kayıt Alınmayan(Ödemesi Yapılan)'; break;
             }
 
             useEffect(() => {
