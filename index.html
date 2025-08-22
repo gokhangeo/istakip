@@ -1906,6 +1906,18 @@ You are an expert data analysis assistant for a Land Registry and Cadastre Direc
             const [isLoading, setIsLoading] = useState(false);
             const [error, setError] = useState('');
 
+            const getRowIdentifier = (row) => {
+                const fenKayitNo = row['fen kayıt no'];
+                if (fenKayitNo != null && fenKayitNo != 0) {
+                    return `fen_${fenKayitNo}`;
+                }
+                const zemin = row['zemin'];
+                if (zemin) {
+                    return `zemin_${String(zemin).trim().replace(/\s+/g, ' ')}`;
+                }
+                return `row_${Math.random()}`;
+            };
+
             const handleFileChange = (e, fileType) => {
                 const file = e.target.files[0];
                 if (!file) return;
@@ -1936,12 +1948,12 @@ You are an expert data analysis assistant for a Land Registry and Cadastre Direc
                     const combinedHeaders = ALLOWED_COLS.filter(col => oldHeaders.includes(col) || newHeaders.includes(col));
                     setComparisonHeaders(combinedHeaders);
 
-                    const oldFenNos = new Map(oldData.map(row => [row['fen kayıt no'], row]));
-                    const newFenNos = new Set(newData.map(row => row['fen kayıt no']));
+                    const oldDataMap = new Map(oldData.map(row => [getRowIdentifier(row), row]));
+                    const newDataIdentifiers = new Set(newData.map(row => getRowIdentifier(row)));
 
                     const completed = [];
-                    for (const [fenNo, row] of oldFenNos.entries()) {
-                        if (fenNo && !newFenNos.has(fenNo)) {
+                    for (const [identifier, row] of oldDataMap.entries()) {
+                        if (!newDataIdentifiers.has(identifier)) {
                             completed.push(row);
                         }
                     }
@@ -1955,52 +1967,23 @@ You are an expert data analysis assistant for a Land Registry and Cadastre Direc
                 }
             };
 
-            const ComparisonResultTable = ({ title, data, tableId, headers }) => {
-                const exportComparisonToExcel = () => {
-                    const dataToExport = data.map(row => {
-                        const exportedRow = {};
-                        headers.forEach(header => {
-                            exportedRow[header.toLocaleUpperCase('tr-TR')] = row[header];
-                        });
-                        return exportedRow;
-                    });
-
-                    const ws = XLSX.utils.json_to_sheet(dataToExport);
-                    const wb = XLSX.utils.book_new();
-                    XLSX.utils.book_append_sheet(wb, ws, title);
-                    XLSX.writeFile(wb, `${title.replace(/\s/g, '_')}.xlsx`);
-                };
-                
-                if (!headers || headers.length === 0) {
-                    return <div><div className="datatable-header"><h4>{title}</h4></div><p>Görüntülenecek veri yok.</p></div>;
+            const exportComparisonToExcel = (title, data, headers) => {
+                if (!data || data.length === 0) {
+                    alert("Dışa aktarılacak veri yok.");
+                    return;
                 }
+                const dataToExport = data.map(row => {
+                    const exportedRow = {};
+                    headers.forEach(header => {
+                        exportedRow[header.toLocaleUpperCase('tr-TR')] = row[header];
+                    });
+                    return exportedRow;
+                });
 
-                return (
-                    <div>
-                        <div className="datatable-header">
-                            <h4>{title} ({data.length} adet)</h4>
-                            <button className="export-btn" onClick={exportComparisonToExcel}>Excel İndir</button>
-                        </div>
-                        <div className="table-wrapper" style={{maxHeight: '400px'}}>
-                            <table>
-                                <thead>
-                                    <tr>{headers.map(col => <th key={`${tableId}-${col}`}>{col.toLocaleUpperCase('tr-TR')}</th>)}</tr>
-                                </thead>
-                                <tbody>
-                                    {data.length > 0 ? data.map((row, i) => (
-                                        <tr key={`${tableId}-row-${i}`}>
-                                            {headers.map(col => (
-                                                <td key={`${tableId}-col-${col}-${i}`}>{row[col]}</td>
-                                            ))}
-                                        </tr>
-                                    )) : (
-                                        <tr><td colSpan={headers.length} style={{textAlign: 'center'}}>Veri bulunamadı.</td></tr>
-                                    )}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                );
+                const ws = XLSX.utils.json_to_sheet(dataToExport);
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, ws, title);
+                XLSX.writeFile(wb, `${title.replace(/\s/g, '_')}.xlsx`);
             };
 
             return (
@@ -2028,8 +2011,24 @@ You are an expert data analysis assistant for a Land Registry and Cadastre Direc
                     {error && <p className="error-message">{error}</p>}
                     {comparisonResult && (
                         <div className="comparison-results">
-                            <ComparisonResultTable title="Tamamlanan İşler" data={comparisonResult.completed} tableId="completed" headers={comparisonHeaders} />
-                            <ComparisonResultTable title="Halen Devam Eden İşler" data={comparisonResult.ongoing} tableId="ongoing" headers={comparisonHeaders} />
+                            <div>
+                                <h4>Tamamlanan İşler ({comparisonResult.completed.length} adet)</h4>
+                                <button 
+                                    className="export-btn" 
+                                    onClick={() => exportComparisonToExcel('Tamamlanan_Isler', comparisonResult.completed, comparisonHeaders)}
+                                >
+                                    Excel İndir
+                                </button>
+                            </div>
+                            <div>
+                                <h4>Halen Devam Eden İşler ({comparisonResult.ongoing.length} adet)</h4>
+                                <button 
+                                    className="export-btn" 
+                                    onClick={() => exportComparisonToExcel('Devam_Eden_Isler', comparisonResult.ongoing, comparisonHeaders)}
+                                >
+                                    Excel İndir
+                                </button>
+                            </div>
                         </div>
                     )}
                 </div>
