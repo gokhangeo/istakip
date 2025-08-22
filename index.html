@@ -434,8 +434,26 @@
         Chart.register(ChartDataLabels);
 
         const PROVINCES = ["Adana","Adıyaman","Afyonkarahisar","Ağrı","Amasya","Ankara","Antalya","Artvin","Aydın","Balıkesir","Bilecik","Bingöl","Bitlis","Bolu","Burdur","Bursa","Çanakkale","Çankırı","Çorum","Denizli","Diyarbakır","Edirne","Elazığ","Erzincan","Erzurum","Eskişehir","Gaziantep","Giresun","Gümüşhane","Hakkari","Hatay","Isparta","Mersin","İstanbul","İzmir","Kars","Kastamonu","Kayseri","Kırklareli","Kırşehir","Kocaeli","Konya","Kütahya","Malatya","Manisa","Kahramanmaraş","Mardin","Muğla","Muş","Nevşehir","Niğde","Ordu","Rize","Sakarya","Samsun","Siirt","Sinop","Sivas","Tekirdağ","Tokat","Trabzon","Tunceli","Şanlıurfa","Uşak","Van","Yozgat","Zonguldak","Aksaray","Bayburt","Karaman","Kırıkkale","Batman","Şırnak","Bartın","Ardahan","Iğdır","Yalova","Karabük","Kilis","Osmaniye","Düzce"];
-        const ALLOWED_COLS = ["kurum ad","ilçe","başvuru tarihi","fen kayıt tarihi","fen kayıt no","başvuru no","başvuran","işlem","zemin","görevli personel","tescil talep bilgisi","başvuru durumu","başvuru açıklama","iade", "ödeme"];
-        const HEADER_KEYWORDS = {"kurum ad":["kurum","ad"],"ilçe":["ilçe", "ad"],"başvuru tarihi":["başvuru","tarih"],"fen kayıt tarihi":["fen","kayıt","tarih"],"fen kayıt no":["fen","kayıt","no"],"başvuru no":["başvuru","no"],"başvuran":["başvuran"],"işlem":["işlem"],"zemin":["zemin"],"görevli personel":["görevli","personel"],"tescil talep bilgisi":["tescil","talep","bilgi"],"başvuru durumu":["başvuru","durum"],"başvuru açıklama":["başvuru","açıklama"],"iade":["iade"], "ödeme": ["ödeme"]};
+        const ALLOWED_COLS = ["kurum ad","ilçe","il","başvuru tarihi","fen kayıt tarihi","fen kayıt no","başvuru no","başvuran","işlem","zemin","görevli personel","tescil talep bilgisi","başvuru durumu","başvuru açıklama","iade", "ödeme", "bekleme süresi"];
+        const HEADER_KEYWORDS = {
+            "kurum ad":["kurum","ad"],
+            "ilçe":["ilçe"],
+            "il": ["il"],
+            "başvuru tarihi":["başvuru","tarih"],
+            "fen kayıt tarihi":["fen","kayıt","tarih"],
+            "fen kayıt no":["fen","kayıt","no"],
+            "başvuru no":["başvuru","no"],
+            "başvuran":["başvuran"],
+            "işlem":["işlem"],
+            "zemin":["zemin"],
+            "görevli personel":["görevli","personel"],
+            "tescil talep bilgisi":["tescil","talep","bilgi"],
+            "başvuru durumu":["başvuru","durum"],
+            "başvuru açıklama":["başvuru","açıklama"],
+            "iade":["iade"], 
+            "ödeme": ["ödeme"],
+            "bekleme süresi": ["bekleme", "süre"]
+        };
         
         const normalizeHeader = (header) => { if (!header) return ""; let s; try { s = header.normalize('NFD').replace(/[\u0300-\u036f]/g, ''); } catch (e) { s = String(header); } s = s.trim().toLocaleLowerCase('tr').replace(/\s+/g, ' '); s = s.replace(/ı/g, 'i').replace(/İ/g, 'i'); return s; }
         const splitPersonel = (text) => { if (text == null) return []; const str = typeof text === 'string' ? text : String(text); return str.split(/[,;–-]/g).map(s => { let part = s.trim(); const arrowIdx = part.indexOf('=>'); if (arrowIdx !== -1) part = part.slice(0, arrowIdx).trim(); return part; }).filter(Boolean); }
@@ -1921,7 +1939,6 @@ You are an expert data analysis assistant for a Land Registry and Cadastre Direc
                 if (zemin) {
                     return `zemin_${String(zemin).trim().replace(/\s+/g, '')}`;
                 }
-                // Fallback for rows with neither
                 return `row_${JSON.stringify(row)}`;
             };
 
@@ -1986,7 +2003,6 @@ You are an expert data analysis assistant for a Land Registry and Cadastre Direc
 
             const exportComparisonToExcel = (title, data, headers) => {
                 if (!data || data.length === 0) {
-                    // Using a more user-friendly notification instead of alert
                     setError(`${title} için dışa aktarılacak veri bulunamadı.`);
                     setTimeout(() => setError(''), 3000);
                     return;
@@ -2298,6 +2314,7 @@ You are an expert data analysis assistant for a Land Registry and Cadastre Direc
                 {label:'Tescil Edilen', value:'tescile_giden'},
                 {label:'İptal Edilen', value:'iptal_edilen'},
                 {label:'Fen Kayıt Alınmayan', value:'fen_kayit_alinmayan'},
+                {label:'Plan Örneği', value:'plan_ornegi'},
                 {label:'Bekleyen (Eskiden Yeniye)', value:'bekleyen_eski_yeni'},
                 {label:'Bekleyen (Yeniden Eskiye)', value:'bekleyen_yeni_eski'}
             ];
@@ -2344,6 +2361,12 @@ You are an expert data analysis assistant for a Land Registry and Cadastre Direc
                     arr = arr.filter(d => {
                         const odeme = String(d['ödeme'] || '').toLocaleLowerCase('tr');
                         return odeme.includes('ödendi') && (d['fen kayıt no'] === 0 || d['fen kayıt no'] == null);
+                    });
+                } else if (sortField === 'plan_ornegi') {
+                    const planOrnegiTurleri = ['plan örneği', 'mahkeme plan örneği', 'teknik bilgi ve belge örnekleri'];
+                    arr = arr.filter(d => {
+                        const islem = String(d['işlem'] || '').toLocaleLowerCase('tr').trim();
+                        return planOrnegiTurleri.includes(islem);
                     });
                 } else if (sortField === 'bekleyen_eski_yeni') {
                     arr = arr.filter(d => {
