@@ -397,12 +397,18 @@
         }
         .comparison-results {
             display: grid;
-            grid-template-columns: 1fr 1fr;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
             gap: 20px;
         }
         .comparison-results h4 {
             margin: 0 0 10px 0;
             color: #334155;
+        }
+        .comparison-result-item {
+            background: #faf5ff;
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #e9d5ff;
         }
 
         @media (max-width: 900px) {
@@ -1908,14 +1914,15 @@ You are an expert data analysis assistant for a Land Registry and Cadastre Direc
 
             const getRowIdentifier = (row) => {
                 const fenKayitNo = row['fen kayıt no'];
-                if (fenKayitNo != null && fenKayitNo != 0) {
+                if (fenKayitNo != null && fenKayitNo != 0 && fenKayitNo !== "") {
                     return `fen_${fenKayitNo}`;
                 }
                 const zemin = row['zemin'];
                 if (zemin) {
-                    return `zemin_${String(zemin).trim().replace(/\s+/g, ' ')}`;
+                    return `zemin_${String(zemin).trim().replace(/\s+/g, '')}`;
                 }
-                return `row_${Math.random()}`;
+                // Fallback for rows with neither
+                return `row_${JSON.stringify(row)}`;
             };
 
             const handleFileChange = (e, fileType) => {
@@ -1949,16 +1956,26 @@ You are an expert data analysis assistant for a Land Registry and Cadastre Direc
                     setComparisonHeaders(combinedHeaders);
 
                     const oldDataMap = new Map(oldData.map(row => [getRowIdentifier(row), row]));
-                    const newDataIdentifiers = new Set(newData.map(row => getRowIdentifier(row)));
+                    const newDataMap = new Map(newData.map(row => [getRowIdentifier(row), row]));
 
                     const completed = [];
                     for (const [identifier, row] of oldDataMap.entries()) {
-                        if (!newDataIdentifiers.has(identifier)) {
+                        if (!newDataMap.has(identifier)) {
                             completed.push(row);
                         }
                     }
 
-                    setComparisonResult({ completed, ongoing: newData });
+                    const newlyAdded = [];
+                    const ongoing = [];
+                    for (const [identifier, row] of newDataMap.entries()) {
+                        if (oldDataMap.has(identifier)) {
+                            ongoing.push(row);
+                        } else {
+                            newlyAdded.push(row);
+                        }
+                    }
+
+                    setComparisonResult({ completed, ongoing, newlyAdded });
                 } catch (err) {
                     console.error("Karşılaştırma hatası:", err);
                     setError("Raporlar karşılaştırılırken bir hata oluştu: " + err.message);
@@ -1969,7 +1986,9 @@ You are an expert data analysis assistant for a Land Registry and Cadastre Direc
 
             const exportComparisonToExcel = (title, data, headers) => {
                 if (!data || data.length === 0) {
-                    alert("Dışa aktarılacak veri yok.");
+                    // Using a more user-friendly notification instead of alert
+                    setError(`${title} için dışa aktarılacak veri bulunamadı.`);
+                    setTimeout(() => setError(''), 3000);
                     return;
                 }
                 const dataToExport = data.map(row => {
@@ -2011,7 +2030,7 @@ You are an expert data analysis assistant for a Land Registry and Cadastre Direc
                     {error && <p className="error-message">{error}</p>}
                     {comparisonResult && (
                         <div className="comparison-results">
-                            <div>
+                            <div className="comparison-result-item">
                                 <h4>Tamamlanan İşler ({comparisonResult.completed.length} adet)</h4>
                                 <button 
                                     className="export-btn" 
@@ -2020,11 +2039,20 @@ You are an expert data analysis assistant for a Land Registry and Cadastre Direc
                                     Excel İndir
                                 </button>
                             </div>
-                            <div>
+                            <div className="comparison-result-item">
                                 <h4>Halen Devam Eden İşler ({comparisonResult.ongoing.length} adet)</h4>
                                 <button 
                                     className="export-btn" 
                                     onClick={() => exportComparisonToExcel('Devam_Eden_Isler', comparisonResult.ongoing, comparisonHeaders)}
+                                >
+                                    Excel İndir
+                                </button>
+                            </div>
+                            <div className="comparison-result-item">
+                                <h4>Yeni Eklenen İşler ({comparisonResult.newlyAdded.length} adet)</h4>
+                                <button 
+                                    className="export-btn" 
+                                    onClick={() => exportComparisonToExcel('Yeni_Eklenen_Isler', comparisonResult.newlyAdded, comparisonHeaders)}
                                 >
                                     Excel İndir
                                 </button>
