@@ -2264,7 +2264,7 @@ You are an expert data analysis assistant for a Land Registry and Cadastre Direc
                         })
                     },
                     {
-                        title: `Tescil Edilen İşlemlerin Personele Dağılımı ${titleSuffix}`,
+                        title: `Tescil Edilen(Tescilden Geldi Yapılmayan) ${titleSuffix}`,
                         data: currentFilteredData.filter(d => {
                             const status = String(d['başvuru durumu'] || '').toLocaleLowerCase('tr');
                             const aciklama = String(d['başvuru açıklama'] || '').toLocaleLowerCase('tr');
@@ -2272,7 +2272,7 @@ You are an expert data analysis assistant for a Land Registry and Cadastre Direc
                         })
                     },
                     {
-                        title: `İptal Edilen İşlemlerin Personele Dağılımı ${titleSuffix}`,
+                        title: `Tapu İptal Edilen(Tescilden Geldi-Eksiklikten İade Yapılmayan) ${titleSuffix}`,
                         data: currentFilteredData.filter(d => {
                             const status = String(d['başvuru durumu'] || '').toLocaleLowerCase('tr');
                             const aciklama = String(d['başvuru açıklama'] || '').toLocaleLowerCase('tr');
@@ -2280,14 +2280,14 @@ You are an expert data analysis assistant for a Land Registry and Cadastre Direc
                         })
                     },
                     {
-                        title: `Fen Kayıt Alınmayan İşlemlerin Personele Dağılımı ${titleSuffix}`,
+                        title: `Fen Kayıt Alınmayan(Ödemesi Yapılan) ${titleSuffix}`,
                         data: currentFilteredData.filter(d => {
                             const odeme = String(d['ödeme'] || '').toLocaleLowerCase('tr');
                             return odeme.includes('ödendi') && (d['fen kayıt no'] === 0 || d['fen kayıt no'] == null);
                         })
                     },
                     {
-                        title: `Plan Örneği İşlemlerinin Personele Dağılımı ${titleSuffix}`,
+                        title: `Plan Örneği-Teknik Bilgi Belge Bekleyen ${titleSuffix}`,
                         data: currentFilteredData.filter(d => {
                             const planOrnegiTurleri = ['plan örneği', 'mahkeme plan örneği', 'teknik bilgi ve belge örnekleri'];
                             const islem = String(d['işlem'] || '').toLocaleLowerCase('tr').trim();
