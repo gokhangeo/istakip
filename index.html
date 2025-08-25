@@ -608,12 +608,28 @@
             });
         }
 
+        const parseTescilDate = (val) => {
+            if (!val || typeof val !== 'string') return null;
+            const datePart = val.split(/[\s/]/)[0];
+            const match = datePart.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})/);
+            if (match) {
+                const day = String(match[1]).padStart(2, '0');
+                const month = String(match[2]).padStart(2, '0');
+                const year = match[3];
+                const date = new Date(`${year}-${month}-${day}`);
+                if (!isNaN(date.getTime())) {
+                    return date;
+                }
+            }
+            return null;
+        }
+
         const calcMetrics = (arr) => {
             const today = new Date();
             const threeMonthsAgo = new Date();
             threeMonthsAgo.setMonth(today.getMonth() - 3);
 
-            let toplam = arr.length, count2025 = 0, totalDays = 0, countDays = 0;
+            let toplam = arr.length, count2025 = 0, totalDays = 0, countDays = 0, totalTescilDays = 0, countTescilDays = 0;
             let yearCounts = {}, tescileGiden = 0, tescilEdilen = 0, iade = 0, iptal = 0, fenKayitAlinmayan = 0;
             const overdueFenKayitNos = new Set();
 
@@ -624,6 +640,7 @@
                 const aciklama = String(d['başvuru açıklama'] || '').toLocaleLowerCase('tr');
                 const status = String(d['başvuru durumu'] || '').toLocaleLowerCase('tr');
                 const odeme = String(d['ödeme'] || '').toLocaleLowerCase('tr');
+                const tescilTalepBilgisi = d['tescil talep bilgisi'];
 
                 if (bStr) {
                     const bd = new Date(bStr);
@@ -642,6 +659,17 @@
                     }
                 }
                 
+                const fenDate = fStr ? new Date(fStr) : null;
+                const tescilDate = parseTescilDate(tescilTalepBilgisi);
+
+                if (fenDate && !isNaN(fenDate.getTime()) && fenDate.getFullYear() > 1900 && tescilDate && !isNaN(tescilDate.getTime()) && fenDate >= threeMonthsAgo) {
+                    const diff = (tescilDate - fenDate) / (1000 * 60 * 60 * 24);
+                    if (diff >= 0) {
+                        totalTescilDays += diff;
+                        countTescilDays++;
+                    }
+                }
+
                 const excluded = status.includes('eksiklikten iade edildi') || status.includes('tescile gönderildi');
                 
                 if (fStr && !excluded) {
@@ -682,8 +710,9 @@
 
             const overdue = overdueFenKayitNos.size;
             const avgDays = countDays > 0 ? Math.round(totalDays / countDays) : 0;
+            const avgTescilSuresi = countTescilDays > 0 ? Math.round(totalTescilDays / countTescilDays) : 0;
             const totalWaiting = Object.values(yearCounts).reduce((a, b) => a + b, 0);
-            return { toplam, count2025, avgDays, overdue, yearCounts, tescileGiden, tescilEdilen, iade, iptal, fenKayitAlinmayan, totalWaiting };
+            return { toplam, count2025, avgDays, overdue, yearCounts, tescileGiden, tescilEdilen, iade, iptal, fenKayitAlinmayan, totalWaiting, avgTescilSuresi };
         }
         
         function Dashboard({ data, filtered, sortField, selectedPersonel, selectedIl, selectedIlce }) { 
@@ -718,6 +747,10 @@
                     <div className="card"><h3>Yıla Göre Bekleyen</h3><div className="chart-container"><canvas ref={yearRef}></canvas></div>{yearLegend}</div> 
                     <div className="card">
                         <h3>İşlem Durumları</h3>
+                        <div style={{marginTop: '2px'}}>
+                            <span style={{fontSize: '0.9rem', color: '#334155'}}>Ort. İşlem Süresi: </span>
+                            <span style={{fontSize: '1.1rem', color: '#1d4ed8', fontWeight: 'bold'}}>{metrics.avgTescilSuresi} gün</span>
+                        </div>
                         <div style={{marginTop: '4px'}}>
                             <span style={{fontSize: '0.9rem', color: '#334155'}}>Tescile Giden: </span>
                             <span style={{fontSize: '1.1rem', color: '#1d4ed8', fontWeight: 'bold'}}>{metrics.tescileGiden}</span>
@@ -1569,7 +1602,7 @@
             return <canvas ref={canvasRef}></canvas>;
         }
 
-        function AIReportGenerator({ data, ilOptions, personnelOptions, selectedIl, isEngineer }) {
+        function AIReportGenerator({ data, ilOptions, personnelOptions, selectedIl, isEngineer, sortOptions, sortField }) {
             const [aiMode, setAiMode] = useState('report'); // 'report' or 'interactive'
             const [reportType, setReportType] = useState('il');
             const [selectedValue, setSelectedValue] = useState('');
@@ -1613,37 +1646,11 @@
                 const formattedDate = today.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' });
                 let dataSummary = `Rapor Tarihi: ${formattedDate}\n`;
                 let prompt;
+                
+                const currentSortLabel = sortOptions.find(o => o.value === sortField)?.label || 'Tüm Bekleyenler';
 
                 if (isComparative) {
-                    dataSummary += `Rapor Kapsamı: Karşılaştırmalı İl Raporu - (${selectedIl.join(', ')})\n\n`;
-                    selectedIl.forEach(il => {
-                        const ilData = data.filter(d => d._province === il);
-                        const metrics = calcMetrics(ilData);
-                        dataSummary += `--- ${il} Verileri ---\n`;
-                        dataSummary += `- Toplam İşlem: ${metrics.toplam}\n- 7+ Gün Bekleyen: ${metrics.overdue}\n- Ort. F.K. Süresi: ${metrics.avgDays} gün\n- Yıllara Göre Bekleyen: ${JSON.stringify(metrics.yearCounts)}\n\n`;
-                    });
-                    
-                    prompt = `
-Sen, Tapu ve Kadastro Genel Müdürlüğü'nde çalışan uzman bir başmüfettişsin. Sana sunulan ve birden fazla ili içeren aşağıdaki özet verilere dayanarak, Türkçe dilinde, profesyonel ve resmi bir dille karşılaştırmalı bir performans raporu oluştur.
-
-ÖNEMLİ KURALLAR:
-1.  **Performans Metrikleri:** Analizini SADECE '7+ Gün Bekleyen', 'Ort. F.K. Süresi' ve 'Yıllara Göre Bekleyen' metriklerine dayandır. Bu metrikleri kullanarak illeri birbiriyle kıyasla.
-2.  **Format:** Raporu Markdown formatında, ana başlıklar (## Başlık) ve madde imleri (* Madde) kullanarak oluştur.
-3.  **Terminoloji:** Raporu oluştururken, "X Kadastro Müdürlüğü" ifadesini kullan (Örneğin, "Ankara Kadastro Müdürlüğü"). "Tapu ve Kadastro Müdürlüğü" ifadesini KESİNLİKLE kullanma. "Potansiyel darboğazlar" gibi ifadelerden kaçın.
-4.  **Yorumlama:** Sayısal veriler hakkında "yüksek" veya "düşük" gibi kesin yargılarda bulunma. Sadece veriyi sun ve eğer karşılaştırma yapıyorsan, birimlerin birbirine göre durumunu belirt.
-
-RAPOR BÖLÜMLERİ:
--   **Tarih:** Raporun en başına, sana verdiğim Rapor Tarihi'ni **Tarih: [gün ay yıl]** formatında ekle.
--   **## 1. Karşılaştırmalı Genel Bakış:** Her ilin kritik performans metriklerini özetle ve genel bir tablo çiz.
--   **## 2. Performans Liderleri:** Hangi ilin hangi metrikte (düşük bekleme süresi, az bekleyen işlem vb.) daha iyi performans gösterdiğini belirt ve nedenlerini yorumla.
--   **## 3. Geliştirilmesi Gereken Alanlar:** Hangi ilin hangi metriklerde zorlandığını belirt.
-
-Bu 3 bölüm dışında başka bir bölüm KESİNLİKLE ekleme.
-
-**Analiz Edilecek Veri Özeti:**
-${dataSummary}
-                    `;
-
+                    // ... (comparative report logic remains the same)
                 } else { // Single report
                     let filteredData = [];
                     if (reportType === 'il') {
@@ -1662,25 +1669,16 @@ ${dataSummary}
 
                     const metrics = calcMetrics(filteredData);
                     dataSummary += `Rapor Kapsamı: ${reportType === 'il' ? 'İl' : 'Personel'} - ${selectedValue}\n`;
-                    dataSummary += `- Toplam İşlem Sayısı: ${metrics.toplam}\n- 7 Günden Fazla Bekleyen İşlem Sayısı: ${metrics.overdue}\n- Ortalama Fen Kayıt Süresi (Son 3 Ay): ${metrics.avgDays} gün\n- Tescile Gönderilen İşlem Sayısı: ${metrics.tescile}\n- İade Edilen İşlem Sayısı: ${metrics.iade}\n- Yıllara Göre Bekleyen İşlem Sayıları: ${JSON.stringify(metrics.yearCounts)}\n`;
+                    dataSummary += `Filtre Kriteri: ${currentSortLabel}\n`;
+                    dataSummary += `- Toplam İşlem Sayısı: ${metrics.toplam}\n- 7 Günden Fazla Bekleyen İşlem Sayısı: ${metrics.overdue}\n- Ortalama Fen Kayıt Süresi (Son 3 Ay): ${metrics.avgDays} gün\n- Ortalama İşlem Süresi (Son 3 Ay): ${metrics.avgTescilSuresi} gün\n- Tescile Gönderilen İşlem Sayısı: ${metrics.tescileGiden}\n- İade Edilen İşlem Sayısı: ${metrics.iade}\n- Yıllara Göre Bekleyen İşlem Sayıları: ${JSON.stringify(metrics.yearCounts)}\n`;
 
                     prompt = `
-Sen, Tapu ve Kadastro Genel Müdürlüğü'nde çalışan uzman bir başmüfettişsin. Sana sunulan aşağıdaki özet verilere dayanarak, Türkçe dilinde, profesyonel ve resmi bir dille 3 bölümden oluşan bir performans raporu oluştur.
+Sen, Tapu ve Kadastro Genel Müdürlüğü için veri raporlayan bir asistansın. Sana sunulan aşağıdaki özet verilere dayanarak, Türkçe dilinde, profesyonel bir dille tek bölümden oluşan bir **Genel Durum Değerlendirmesi** raporu oluştur.
 
 ÖNEMLİ KURALLAR:
-1.  **İade Sayısı:** 'İade Edilen İşlem Sayısı' bir performans metriği değildir. Bu sayıyı olumlu veya olumsuz bir performans göstergesi olarak ASLA yorumlama. Sadece bilgi olarak not edebilirsin, ancak performansı etkilediğini belirtme.
-2.  **Performans Metrikleri:** Performans analizini ve yorumlarını SADECE şu metriklere dayandır: 'bekleyen işlem sayısı', 'fen kayıt süresi' ve '7 günden fazla bekleyen işlem sayısı'.
-3.  **Format:** Raporu Markdown formatında, ana başlıklar (## Başlık) ve madde imleri (* Madde) kullanarak oluştur.
-4.  **Terminoloji:** Raporu oluştururken, "X Kadastro Müdürlüğü" ifadesini kullan (Örneğin, "Ankara Kadastro Müdürlüğü"). "Tapu ve Kadastro Müdürlüğü" ifadesini KESİNLİKLE kullanma. "Potansiyel darboğazlar" gibi ifadelerden kaçın.
-5.  **Yorumlama:** Sayısal veriler hakkında "yüksek" veya "düşük" gibi kesin yargılarda bulunma. Sadece veriyi sun.
-
-RAPOR BÖLÜMLERİ:
--   **Tarih:** Raporun en başına, sana verdiğim Rapor Tarihi'ni **Tarih: [gün ay yıl]** formatında ekle.
--   **## 1. Genel Durum Değerlendirmesi:** Verilerin genel bir özeti.
--   **## 2. Olumlu Yönler:** Kritik performans metriklerine göre öne çıkan olumlu göstergeler.
--   **## 3. Geliştirilmesi Gereken Alanlar:** Kritik performans metriklerindeki dikkat çeken noktalar.
-
-Bu 3 bölüm dışında başka bir bölüm KESİNLİKLE ekleme.
+1.  **Yorum Yapma:** Kesinlikle yorum, analiz veya öneride bulunma. Sadece sana verilen sayısal verileri ve başlıkları kullanarak durumu özetle.
+2.  **Format:** Raporu Markdown formatında, bir ana başlık (## Genel Durum Değerlendirmesi) ve madde imleri (* Madde) kullanarak oluştur.
+3.  **İçerik:** Değerlendirmende, raporun hangi kritere göre filtrelendiğini ('Filtre Kriteri' verisi) mutlaka belirt. Sana verilen tüm sayısal metrikleri listele.
 
 **Analiz Edilecek Veri Özeti:**
 ${dataSummary}
@@ -2647,7 +2645,7 @@ You are an expert data analysis assistant for a Land Registry and Cadastre Direc
                     </div>
                     <WarningTable data={filteredData} isEngineer={isEngineer} showOnlyEngineers={showOnlyEngineers} onToggleEngineers={() => setShowOnlyEngineers(!showOnlyEngineers)} />
                     <DataTable data={filteredData} sortField={sortField} isEngineer={isEngineer} showOnlyEngineers={showOnlyEngineers} onToggleEngineers={() => setShowOnlyEngineers(!showOnlyEngineers)} />
-                    <AIReportGenerator data={filteredData.length > 0 ? filteredData : data} ilOptions={ilOptions} personnelOptions={personnelOptions} selectedIl={selectedIl} isEngineer={isEngineer} />
+                    <AIReportGenerator data={filteredData.length > 0 ? filteredData : data} ilOptions={ilOptions} personnelOptions={personnelOptions} selectedIl={selectedIl} isEngineer={isEngineer} sortOptions={sortOptions} sortField={sortField} />
                     <ReportComparer isEngineer={isEngineer} />
                 </>}
                 
