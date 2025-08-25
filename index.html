@@ -410,6 +410,27 @@
             border-radius: 8px;
             border: 1px solid #e9d5ff;
         }
+        .engineer-accordion details {
+            margin-bottom: 10px;
+            border: 1px solid #e9d5ff;
+            border-radius: 8px;
+        }
+        .engineer-accordion summary {
+            padding: 10px 15px;
+            background-color: #faf5ff;
+            cursor: pointer;
+            font-weight: bold;
+            color: #581c87;
+        }
+        .engineer-accordion-content {
+            padding: 15px;
+        }
+        .engineer-accordion-content h5 {
+            margin: 0 0 8px 0;
+            color: #334155;
+            border-bottom: 1px solid #e9d5ff;
+            padding-bottom: 5px;
+        }
 
         @media (max-width: 900px) {
             .comparison-results {
@@ -1932,9 +1953,11 @@ You are an expert data analysis assistant for a Land Registry and Cadastre Direc
             const [oldFileName, setOldFileName] = useState('');
             const [newFileName, setNewFileName] = useState('');
             const [comparisonResult, setComparisonResult] = useState(null);
+            const [perEngineerResults, setPerEngineerResults] = useState(null);
             const [comparisonHeaders, setComparisonHeaders] = useState([]);
             const [isLoading, setIsLoading] = useState(false);
             const [error, setError] = useState('');
+            const [analyzeEngineersOnly, setAnalyzeEngineersOnly] = useState(false);
 
             const getRowIdentifier = (row) => {
                 const fenKayitNo = row['fen kayıt no'];
@@ -1970,6 +1993,7 @@ You are an expert data analysis assistant for a Land Registry and Cadastre Direc
                 setIsLoading(true);
                 setError('');
                 setComparisonResult(null);
+                setPerEngineerResults(null);
 
                 try {
                     const { rows: oldData, foundHeaders: oldHeaders } = await readExcelPromise(oldFile, true);
@@ -1978,27 +2002,50 @@ You are an expert data analysis assistant for a Land Registry and Cadastre Direc
                     const combinedHeaders = ALLOWED_COLS.filter(col => oldHeaders.includes(col) || newHeaders.includes(col));
                     setComparisonHeaders(combinedHeaders);
 
-                    const oldDataMap = new Map(oldData.map(row => [getRowIdentifier(row), row]));
-                    const newDataMap = new Map(newData.map(row => [getRowIdentifier(row), row]));
+                    if (analyzeEngineersOnly) {
+                        const engineerAnalysis = {};
+                        const allPersonnel = new Set([...oldData, ...newData].flatMap(r => splitPersonel(r['görevli personel'])));
+                        const engineersInFiles = [...allPersonnel].filter(p => isEngineer(p));
 
-                    const completed = [];
-                    for (const [identifier, row] of oldDataMap.entries()) {
-                        if (!newDataMap.has(identifier)) {
-                            completed.push(row);
+                        engineersInFiles.forEach(eng => {
+                            const oldEngJobs = oldData.filter(r => splitPersonel(r['görevli personel']).includes(eng));
+                            const newEngJobs = newData.filter(r => splitPersonel(r['görevli personel']).includes(eng));
+                            
+                            const oldEngMap = new Map(oldEngJobs.map(row => [getRowIdentifier(row), row]));
+                            const newEngMap = new Map(newEngJobs.map(row => [getRowIdentifier(row), row]));
+
+                            const completed = oldEngJobs.filter(row => !newEngMap.has(getRowIdentifier(row)));
+                            const ongoing = newEngJobs.filter(row => oldEngMap.has(getRowIdentifier(row)));
+                            const newlyAdded = newEngJobs.filter(row => !oldEngMap.has(getRowIdentifier(row)));
+
+                            if(completed.length > 0 || ongoing.length > 0 || newlyAdded.length > 0) {
+                                engineerAnalysis[eng] = { completed, ongoing, newlyAdded };
+                            }
+                        });
+                        setPerEngineerResults(engineerAnalysis);
+
+                    } else {
+                        const oldDataMap = new Map(oldData.map(row => [getRowIdentifier(row), row]));
+                        const newDataMap = new Map(newData.map(row => [getRowIdentifier(row), row]));
+
+                        const completed = [];
+                        for (const [identifier, row] of oldDataMap.entries()) {
+                            if (!newDataMap.has(identifier)) {
+                                completed.push(row);
+                            }
                         }
-                    }
 
-                    const newlyAdded = [];
-                    const ongoing = [];
-                    for (const [identifier, row] of newDataMap.entries()) {
-                        if (oldDataMap.has(identifier)) {
-                            ongoing.push(row);
-                        } else {
-                            newlyAdded.push(row);
+                        const newlyAdded = [];
+                        const ongoing = [];
+                        for (const [identifier, row] of newDataMap.entries()) {
+                            if (oldDataMap.has(identifier)) {
+                                ongoing.push(row);
+                            } else {
+                                newlyAdded.push(row);
+                            }
                         }
+                        setComparisonResult({ completed, ongoing, newlyAdded });
                     }
-
-                    setComparisonResult({ completed, ongoing, newlyAdded });
                 } catch (err) {
                     console.error("Karşılaştırma hatası:", err);
                     setError("Raporlar karşılaştırılırken bir hata oluştu: " + err.message);
@@ -2026,6 +2073,36 @@ You are an expert data analysis assistant for a Land Registry and Cadastre Direc
                 XLSX.utils.book_append_sheet(wb, ws, title);
                 XLSX.writeFile(wb, `${title.replace(/\s/g, '_')}.xlsx`);
             };
+            
+            const exportAllEngineerData = () => {
+                const wb = XLSX.utils.book_new();
+                
+                const summaryData = Object.keys(perEngineerResults).map(eng => ({
+                    'Mühendis': eng,
+                    'Tamamlanan': perEngineerResults[eng].completed.length,
+                    'Devam Eden': perEngineerResults[eng].ongoing.length,
+                    'Yeni Eklenen': perEngineerResults[eng].newlyAdded.length
+                }));
+                const summaryWs = XLSX.utils.json_to_sheet(summaryData);
+                XLSX.utils.book_append_sheet(wb, summaryWs, 'Özet');
+
+                Object.keys(perEngineerResults).forEach(eng => {
+                    const { completed, ongoing, newlyAdded } = perEngineerResults[eng];
+                    const allData = [
+                        ...completed.map(r => ({ ...r, Durum: 'Tamamlandı' })),
+                        ...ongoing.map(r => ({ ...r, Durum: 'Devam Ediyor' })),
+                        ...newlyAdded.map(r => ({ ...r, Durum: 'Yeni Eklendi' }))
+                    ];
+                    
+                    if(allData.length > 0){
+                        const engWs = XLSX.utils.json_to_sheet(allData);
+                        XLSX.utils.book_append_sheet(wb, engWs, eng.substring(0, 30)); // Sheet names can't be too long
+                    }
+                });
+                
+                XLSX.writeFile(wb, 'Muhendis_Performans_Analizi.xlsx');
+            };
+
 
             return (
                 <div className="report-comparer-container">
@@ -2042,6 +2119,12 @@ You are an expert data analysis assistant for a Land Registry and Cadastre Direc
                             <label>Yeni Rapor</label>
                             <input type="file" onChange={(e) => handleFileChange(e, 'new')} accept=".xlsx, .xls" />
                             {newFileName && <span style={{fontSize: '0.8rem', marginTop: '4px'}}>Seçilen: {newFileName}</span>}
+                        </div>
+                        <div className="control-group" style={{justifyContent: 'center'}}>
+                            <label style={{display: 'flex', alignItems: 'center', cursor: 'pointer'}}>
+                                <input type="checkbox" checked={analyzeEngineersOnly} onChange={() => setAnalyzeEngineersOnly(!analyzeEngineersOnly)} />
+                                Sadece Mühendisleri Analiz Et
+                            </label>
                         </div>
                         <div className="control-group">
                             <button onClick={handleCompare} disabled={isLoading || !oldFile || !newFile}>
@@ -2078,6 +2161,33 @@ You are an expert data analysis assistant for a Land Registry and Cadastre Direc
                                 >
                                     Excel İndir
                                 </button>
+                            </div>
+                        </div>
+                    )}
+                    {perEngineerResults && (
+                        <div>
+                            <div className="datatable-header">
+                                <h3>Mühendis Bazlı Analiz</h3>
+                                <button className="export-btn" onClick={exportAllEngineerData}>Tüm Mühendis Verilerini İndir</button>
+                            </div>
+                            <div className="engineer-accordion">
+                                {Object.keys(perEngineerResults).sort().map(eng => (
+                                    <details key={eng}>
+                                        <summary>
+                                            {eng} (Müh.) - Tamamlanan: {perEngineerResults[eng].completed.length}, Devam Eden: {perEngineerResults[eng].ongoing.length}, Yeni: {perEngineerResults[eng].newlyAdded.length}
+                                        </summary>
+                                        <div className="engineer-accordion-content">
+                                            {perEngineerResults[eng].completed.length > 0 && <h5>Tamamlanan İşler</h5>}
+                                            {perEngineerResults[eng].completed.map((job, i) => <p key={i}>{job.işlem} - {job.zemin}</p>)}
+                                            
+                                            {perEngineerResults[eng].ongoing.length > 0 && <h5 style={{marginTop: '15px'}}>Devam Eden İşler</h5>}
+                                            {perEngineerResults[eng].ongoing.map((job, i) => <p key={i}>{job.işlem} - {job.zemin}</p>)}
+
+                                            {perEngineerResults[eng].newlyAdded.length > 0 && <h5 style={{marginTop: '15px'}}>Yeni Eklenen İşler</h5>}
+                                            {perEngineerResults[eng].newlyAdded.map((job, i) => <p key={i}>{job.işlem} - {job.zemin}</p>)}
+                                        </div>
+                                    </details>
+                                ))}
                             </div>
                         </div>
                     )}
