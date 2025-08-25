@@ -787,6 +787,7 @@
                 case 'tescile_giden': dynamicTitle = 'Tescil Edilen(Tescilden Geldi Yapılmayan)'; break;
                 case 'iptal_edilen': dynamicTitle = 'Tapu İptal Edilen(Tescilden Geldi-Eksiklikten İade Yapılmayan)'; break;
                 case 'fen_kayit_alinmayan': dynamicTitle = 'Fen Kayıt Alınmayan(Ödemesi Yapılan)'; break;
+                case 'plan_ornegi': dynamicTitle = 'Plan Örneği-Teknik Bilgi Belge Bekleyen'; break;
             }
 
             useEffect(() => {
@@ -808,6 +809,7 @@
                     const status = String(r['başvuru durumu'] || '').toLocaleLowerCase('tr');
                     const aciklama = String(r['başvuru açıklama'] || '').toLocaleLowerCase('tr');
                     const odeme = String(r['ödeme'] || '').toLocaleLowerCase('tr');
+                    const islem = String(r['işlem'] || '').toLocaleLowerCase('tr').trim();
 
                     switch(sortField) {
                         case 'iade edilen': 
@@ -821,6 +823,10 @@
                             break;
                         case 'fen_kayit_alinmayan':
                             if(odeme.includes('ödendi') && (r['fen kayıt no'] === 0 || r['fen kayıt no'] == null)) conditionMet = true;
+                            break;
+                        case 'plan_ornegi':
+                            const planOrnegiTurleri = ['plan örneği', 'mahkeme plan örneği', 'teknik bilgi ve belge örnekleri'];
+                            if(planOrnegiTurleri.includes(islem)) conditionMet = true;
                             break;
                         default:
                             if(!status.includes('eksiklikten iade edildi') && !status.includes('tescile gönderildi')) conditionMet = true;
