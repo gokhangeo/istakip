@@ -2237,7 +2237,6 @@ You are an expert data analysis assistant for a Land Registry and Cadastre Direc
                 const currentFilteredData = filteredData.length > 0 ? filteredData : data;
                 const titleSuffix = selectedIl.length > 0 ? ` (${selectedIl.join(', ')})` : ` (${[...new Set(currentFilteredData.map(d => d._province).filter(Boolean))].join(', ') || 'Tüm İller'})`;
 
-
                 if (summaryTableRef.current) {
                     const summaryContainer = document.createElement('div');
                     summaryContainer.style.background = '#f1f5f9';
@@ -2252,33 +2251,66 @@ You are an expert data analysis assistant for a Land Registry and Cadastre Direc
                     renderContainer.removeChild(summaryContainer);
                 }
 
-                const personnelStats = { totals: {}, waiting: {} };
-                currentFilteredData.forEach(r => {
-                    const personnel = splitPersonel(r['görevli personel']);
-                    if (personnel.length > 0) {
-                        personnel.forEach(p => {
-                            if (p) personnelStats.totals[p] = (personnelStats.totals[p] || 0) + 1;
-                        });
-                        const status = String(r['başvuru durumu'] || '').toLocaleLowerCase('tr');
-                        const isClosed = status.includes('eksiklikten iade edildi') || status.includes('tescile gönderildi');
-                        if (!isClosed) {
-                            personnel.forEach(p => {
-                                if (p) personnelStats.waiting[p] = (personnelStats.waiting[p] || 0) + 1;
-                            });
-                        }
-                    }
-                });
-
                 const chartConfigs = [
-                    { data: personnelStats.totals, title: `Personel İşlem Dağılımı ${titleSuffix}` },
-                    { data: personnelStats.waiting, title: `Bekleyen İşlem Sayıları ${titleSuffix}` }
+                    { 
+                        title: `Personel İşlem Dağılımı ${titleSuffix}`, 
+                        data: currentFilteredData
+                    },
+                    { 
+                        title: `Bekleyen İşlem Sayıları ${titleSuffix}`, 
+                        data: currentFilteredData.filter(d => {
+                            const status = String(d['başvuru durumu'] || '').toLocaleLowerCase('tr');
+                            return !status.includes('eksiklikten iade edildi') && !status.includes('tescile gönderildi');
+                        })
+                    },
+                    {
+                        title: `Tescil Edilen İşlemlerin Personele Dağılımı ${titleSuffix}`,
+                        data: currentFilteredData.filter(d => {
+                            const status = String(d['başvuru durumu'] || '').toLocaleLowerCase('tr');
+                            const aciklama = String(d['başvuru açıklama'] || '').toLocaleLowerCase('tr');
+                            return status.includes('tescile gönderildi') && aciklama.includes('tescil edildi');
+                        })
+                    },
+                    {
+                        title: `İptal Edilen İşlemlerin Personele Dağılımı ${titleSuffix}`,
+                        data: currentFilteredData.filter(d => {
+                            const status = String(d['başvuru durumu'] || '').toLocaleLowerCase('tr');
+                            const aciklama = String(d['başvuru açıklama'] || '').toLocaleLowerCase('tr');
+                            return status.includes('tescile gönderildi') && aciklama.includes('iptal');
+                        })
+                    },
+                    {
+                        title: `Fen Kayıt Alınmayan İşlemlerin Personele Dağılımı ${titleSuffix}`,
+                        data: currentFilteredData.filter(d => {
+                            const odeme = String(d['ödeme'] || '').toLocaleLowerCase('tr');
+                            return odeme.includes('ödendi') && (d['fen kayıt no'] === 0 || d['fen kayıt no'] == null);
+                        })
+                    },
+                    {
+                        title: `Plan Örneği İşlemlerinin Personele Dağılımı ${titleSuffix}`,
+                        data: currentFilteredData.filter(d => {
+                            const planOrnegiTurleri = ['plan örneği', 'mahkeme plan örneği', 'teknik bilgi ve belge örnekleri'];
+                            const islem = String(d['işlem'] || '').toLocaleLowerCase('tr').trim();
+                            return planOrnegiTurleri.includes(islem);
+                        })
+                    }
                 ];
                 
                 for (const config of chartConfigs) {
-                     if (Object.keys(config.data).length > 0) {
+                    const personnelStats = {};
+                    config.data.forEach(r => {
+                        const personnel = splitPersonel(r['görevli personel']);
+                        if (personnel.length > 0) {
+                            personnel.forEach(p => {
+                                if (p) personnelStats[p] = (personnelStats[p] || 0) + 1;
+                            });
+                        }
+                    });
+
+                     if (Object.keys(personnelStats).length > 0) {
                         const chartContainer = document.createElement('div');
                         
-                        const numItems = Object.keys(config.data).length;
+                        const numItems = Object.keys(personnelStats).length;
                         const chartWidth = Math.max(1200, numItems * 40);
                         const chartHeight = 800;
 
@@ -2290,10 +2322,12 @@ You are an expert data analysis assistant for a Land Registry and Cadastre Direc
                         
                         const tempRoot = ReactDOM.createRoot(chartContainer);
                         await new Promise(resolve => {
-                            tempRoot.render(<ZoomedChart chartData={config.data} title={config.title} onRender={resolve} isForPdf={true} isEngineer={isEngineer} />);
+                            tempRoot.render(<ZoomedChart chartData={personnelStats} title={config.title} onRender={resolve} isForPdf={true} isEngineer={isEngineer} />);
                         });
                         
-                        yPosition = await addElementToPdf(chartContainer, yPosition);
+                        if (yPosition > 10) pdf.addPage();
+                        yPosition = await addElementToPdf(chartContainer, 10);
+                        
                         tempRoot.unmount();
                         renderContainer.removeChild(chartContainer); 
                     }
