@@ -1050,6 +1050,13 @@
             useEffect(() => { 
                 let relevantData = data;
                 
+                if (sortField === 'plan_ornegi') {
+                    relevantData = relevantData.filter(d => {
+                        const islem = String(d['işlem'] || '').toLocaleLowerCase('tr');
+                        return islem.includes('plan örneği') || islem.includes('mahke') || islem.includes('teknik bilgi ve belge örnekleri');
+                    });
+                }
+                
                 const today = new Date(); 
                 const groupedTasks = {}; 
                 const daysThreshold = sortField === 'plan_ornegi' ? 2 : 7;
