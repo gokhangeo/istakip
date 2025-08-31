@@ -7,7 +7,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
     <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://unpkg.com/babel-standalone@6/babel.min.js"></script>
     <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
@@ -602,7 +602,7 @@
                                 let val = idx >= 0 ? row[idx] : null;
                                 if (col==='başvuru tarihi' || col==='fen kayıt tarihi') obj[col]=formatDate(val);
                                 else if(col==='fen kayıt no'||col==='başvuru no') obj[col]=formatFenKayitNo(val);
-                                else obj[col]=val??"";
+                                else obj[col] = val != null ? val : "";
                             });
 
                             let kurumAd = String(obj['kurum ad']||'').trim();
@@ -859,9 +859,10 @@
                             if(odeme.includes('ödendi') && (r['fen kayıt no'] === 0 || r['fen kayıt no'] == null)) conditionMet = true;
                             break;
                         case 'plan_ornegi':
-                            const planOrnegiTerms = ['plan örneği', 'mahke', 'teknik bilgi ve belge örnekleri'];
+                            const planOrnegiTerms = ['plan örneği', 'teknik bilgi ve belge örnekleri'];
+                            const mahkemePlanOrnegiTerms = ['mahke', 'plan örneği'];
                             const isWaiting = !status.includes('eksiklikten iade edildi') && !status.includes('tescile gönderildi');
-                            if (isWaiting && planOrnegiTerms.some(term => islemLower.includes(term))) {
+                            if (isWaiting && (planOrnegiTerms.some(term => islemLower.includes(term)) || mahkemePlanOrnegiTerms.every(term => islemLower.includes(term)))) {
                                  conditionMet = true;
                             }
                             break;
@@ -1053,7 +1054,10 @@
                 if (sortField === 'plan_ornegi') {
                     relevantData = relevantData.filter(d => {
                         const islem = String(d['işlem'] || '').toLocaleLowerCase('tr');
-                        return islem.includes('plan örneği') || islem.includes('mahke') || islem.includes('teknik bilgi ve belge örnekleri');
+                        const planOrnegiTerms = ['plan örneği', 'teknik bilgi ve belge örnekleri'];
+                        const mahkemePlanOrnegiTerms = ['mahke', 'plan örneği'];
+
+                        return planOrnegiTerms.some(term => islem.includes(term)) || mahkemePlanOrnegiTerms.every(term => islem.includes(term));
                     });
                 }
                 
@@ -1644,14 +1648,14 @@
             }
 
             return (
-                 <>
-                    <div className="chart-area">
-                        <canvas ref={canvasRef}></canvas>
-                    </div>
-                    <div className="ai-summary">
-                        {isLoadingSummary ? "Özet oluşturuluyor..." : aiSummary}
-                    </div>
-                </>
+                React.createElement(React.Fragment, null,
+                    React.createElement('div', { className: 'chart-area' },
+                        React.createElement('canvas', { ref: canvasRef })
+                    ),
+                    React.createElement('div', { className: 'ai-summary' },
+                        isLoadingSummary ? "Özet oluşturuluyor..." : aiSummary
+                    )
+                )
             );
         }
 
@@ -1712,7 +1716,8 @@
                 }
                 
                 const metrics = calcMetrics(filteredDataForReport);
-                 const currentFilterName = sortField ? (sortOptions.find(o => o.value === sortField)?.label || 'Tümü') : 'Tümü';
+                 const foundOption = sortOptions.find(o => o.value === sortField);
+                 const currentFilterName = sortField ? (foundOption ? foundOption.label : 'Tümü') : 'Tümü';
                 dataSummary += `Filtre: ${currentFilterName}\n`;
                 dataSummary += `Toplam İşlem: ${metrics.toplam}\nBekleyen İşlem: ${metrics.totalWaiting}\n7+ Gün Bekleyen: ${metrics.overdue}\nOrt. F.K. Süresi: ${metrics.avgDays} gün\nOrt. İşlem Süresi: ${metrics.avgTescilSuresi} gün`;
 
@@ -1894,75 +1899,74 @@ ${dataSummary}
 
                     <div className="ai-reporter-content">
                         {aiMode === 'report' && (
-                            <>
-                                <div className="ai-reporter-controls">
-                                    <div className="control-group">
-                                        <label>Rapor Türü</label>
-                                        <select value={reportType} onChange={e => setReportType(e.target.value)}>
-                                            <option value="il">İl Bazında</option>
-                                            <option value="personel">Personel Bazında</option>
-                                            <option value="karşılaştırmalı">Karşılaştırmalı İl Raporu</option>
-                                        </select>
-                                    </div>
-                                    {!isComparative && (
-                                        <div className="control-group">
-                                            <label>{reportType === 'il' ? 'İl Seçin' : 'Personel Seçin'}</label>
-                                            <select value={selectedValue} onChange={e => setSelectedValue(e.target.value)} disabled={options.length === 0}>
-                                                <option value="">-- Seçim Yapın --</option>
-                                                {options.map(opt => <option key={opt} value={opt}>{opt} {isEngineer(opt) ? '(Müh.)' : ''}</option>)}
-                                            </select>
-                                        </div>
-                                    )}
-                                    <div className="ai-reporter-actions">
-                                         <button onClick={handleGenerateReport} disabled={!canGenerate}>
-                                            {isLoading ? 'Oluşturuluyor...' : 'Rapor Oluştur'}
-                                        </button>
-                                        <button onClick={handleExportToPdf} className="pdf-export" disabled={isLoading || !generatedReport}>
-                                            PDF Olarak İndir
-                                        </button>
-                                    </div>
-                                </div>
-                                {isComparative && <p style={{marginTop: '10px', color: '#0c4a6e'}}><i>Karşılaştırma yapılacak illeri üst menüdeki 'İl Filtresi' butonundan seçebilirsiniz. (En az 2 il seçilmelidir)</i></p>}
-                                <div className="ai-report-display" ref={reportDisplayRef} dangerouslySetInnerHTML={{ __html: reportHtml || '<p>Oluşturulan rapor burada görünecektir.</p>' }}>
-                                </div>
-                            </>
+                            React.createElement(React.Fragment, null,
+                                React.createElement('div', { className: 'ai-reporter-controls' },
+                                    React.createElement('div', { className: 'control-group' },
+                                        React.createElement('label', null, 'Rapor Türü'),
+                                        React.createElement('select', { value: reportType, onChange: e => setReportType(e.target.value) },
+                                            React.createElement('option', { value: 'il' }, 'İl Bazında'),
+                                            React.createElement('option', { value: 'personel' }, 'Personel Bazında'),
+                                            React.createElement('option', { value: 'karşılaştırmalı' }, 'Karşılaştırmalı İl Raporu')
+                                        )
+                                    ),
+                                    !isComparative && (
+                                        React.createElement('div', { className: 'control-group' },
+                                            React.createElement('label', null, reportType === 'il' ? 'İl Seçin' : 'Personel Seçin'),
+                                            React.createElement('select', { value: selectedValue, onChange: e => setSelectedValue(e.target.value), disabled: options.length === 0 },
+                                                React.createElement('option', { value: '' }, '-- Seçim Yapın --'),
+                                                options.map(opt => React.createElement('option', { key: opt, value: opt }, `${opt} ${isEngineer(opt) ? '(Müh.)' : ''}`))
+                                            )
+                                        )
+                                    ),
+                                    React.createElement('div', { className: 'ai-reporter-actions' },
+                                        React.createElement('button', { onClick: handleGenerateReport, disabled: !canGenerate },
+                                            isLoading ? 'Oluşturuluyor...' : 'Rapor Oluştur'
+                                        ),
+                                        React.createElement('button', { onClick: handleExportToPdf, className: 'pdf-export', disabled: isLoading || !generatedReport },
+                                            'PDF Olarak İndir'
+                                        )
+                                    )
+                                ),
+                                isComparative && React.createElement('p', { style: { marginTop: '10px', color: '#0c4a6e' } }, React.createElement('i', null, "Karşılaştırma yapılacak illeri üst menüdeki 'İl Filtresi' butonundan seçebilirsiniz. (En az 2 il seçilmelidir)")),
+                                React.createElement('div', { className: 'ai-report-display', ref: reportDisplayRef, dangerouslySetInnerHTML: { __html: reportHtml || '<p>Oluşturulan rapor burada görünecektir.</p>' } })
+                            )
                         )}
 
                         {aiMode === 'interactive' && (
-                            <>
-                                <div className="interactive-query-builder">
-                                    <div className="query-row">
-                                        <span>NE GÖSTERİLSİN?</span>
-                                        <select value={interactiveMetric} onChange={e => setInteractiveMetric(e.target.value)}>
-                                            <option value="count">Toplam İş Sayısı</option>
-                                            <option value="pending_count">Bekleyen İş Sayısı</option>
-                                            <option value="overdue_count">Süresi Geçen İş Sayısı</option>
-                                        </select>
-                                        <span>NEYE GÖRE GRUPLANSIN?</span>
-                                        <select value={interactiveDimension} onChange={e => setInteractiveDimension(e.target.value)}>
-                                            <option value="_province">İl</option>
-                                            <option value="_district">İlçe</option>
-                                            <option value="görevli personel">Personel</option>
-                                            <option value="işlem">İşlem Türü</option>
-                                            <option value="yıl">Yıl</option>
-                                        </select>
-                                        <span>NASIL GÖRÜNSÜN?</span>
-                                        <select value={interactiveChartType} onChange={e => setInteractiveChartType(e.target.value)}>
-                                            <option value="bar">Bar Grafiği</option>
-                                            <option value="pie">Pasta Grafiği</option>
-                                            <option value="doughnut">Halka Grafik</option>
-                                            <option value="table">Tablo</option>
-                                        </select>
-                                    </div>
-                                    <button onClick={handleGenerateInteractive} disabled={isLoading}>
-                                        {isLoading ? 'Oluşturuluyor...' : 'Grafik/Tablo Oluştur'}
-                                    </button>
-                                </div>
+                            React.createElement(React.Fragment, null,
+                                React.createElement('div', { className: 'interactive-query-builder' },
+                                    React.createElement('div', { className: 'query-row' },
+                                        React.createElement('span', null, 'NE GÖSTERİLSİN?'),
+                                        React.createElement('select', { value: interactiveMetric, onChange: e => setInteractiveMetric(e.target.value) },
+                                            React.createElement('option', { value: 'count' }, 'Toplam İş Sayısı'),
+                                            React.createElement('option', { value: 'pending_count' }, 'Bekleyen İş Sayısı'),
+                                            React.createElement('option', { value: 'overdue_count' }, 'Süresi Geçen İş Sayısı')
+                                        ),
+                                        React.createElement('span', null, 'NEYE GÖRE GRUPLANSIN?'),
+                                        React.createElement('select', { value: interactiveDimension, onChange: e => setInteractiveDimension(e.target.value) },
+                                            React.createElement('option', { value: '_province' }, 'İl'),
+                                            React.createElement('option', { value: '_district' }, 'İlçe'),
+                                            React.createElement('option', { value: 'görevli personel' }, 'Personel'),
+                                            React.createElement('option', { value: 'işlem' }, 'İşlem Türü'),
+                                            React.createElement('option', { value: 'yıl' }, 'Yıl')
+                                        ),
+                                        React.createElement('span', null, 'NASIL GÖRÜNSÜN?'),
+                                        React.createElement('select', { value: interactiveChartType, onChange: e => setInteractiveChartType(e.target.value) },
+                                            React.createElement('option', { value: 'bar' }, 'Bar Grafiği'),
+                                            React.createElement('option', { value: 'pie' }, 'Pasta Grafiği'),
+                                            React.createElement('option', { value: 'doughnut' }, 'Halka Grafik'),
+                                            React.createElement('option', { value: 'table' }, 'Tablo')
+                                        )
+                                    ),
+                                    React.createElement('button', { onClick: handleGenerateInteractive, disabled: isLoading },
+                                        isLoading ? 'Oluşturuluyor...' : 'Grafik/Tablo Oluştur'
+                                    )
+                                ),
                                 
-                                <div className="interactive-display-container">
-                                    {isLoading ? <p>Yükleniyor...</p> : <InteractiveDisplay result={interactiveResult} data={data} />}
-                                </div>
-                            </>
+                                React.createElement('div', { className: 'interactive-display-container' },
+                                    isLoading ? React.createElement('p', null, 'Yükleniyor...') : React.createElement(InteractiveDisplay, { result: interactiveResult, data: data })
+                                )
+                            )
                         )}
                     </div>
                 </div>
@@ -2379,7 +2383,7 @@ ${dataSummary}
                 const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
 
                 const signatureImg = new Image();
-                signatureImg.src = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAARgAAAAsCAYAAAD2B2f5AAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAATYSURBVHhe7Z1fSxtRFMfvzC2b7Ya2SbC0sS19KIKVFJAggiAi+AMMPYgIesgXQfTgF4jgQRB68KCIF1EkRARpD0W0VCxYLJCklhKstLXt2mY3s5NfGXZ3t/M6M3u/8MvMvM+ZO+87c3ZndmCCILgYQ0yQIOjA2yA69lB04L2Q2Nen2NenmLUDBrQDBrQDBrQDBrQDBrQDBrQDBrQDBrQDBrQDBrQDBrQDBrQDBrQDBhL3w1sLw5iGfJ/pI+g/BCFfNq5yI6e3e1J6Wf2p+v/H6Gg1wzO4c2i1h12S4GfI8PuyO2bX7R3/tq6u/kE2z6V0e2Lx+jT5GvjV0H5fR+0Y9T0G87oB560y1n4m9n2b7v2+N8a8L3eM9S3X1q/X05kY4xV2zfY/pLp6a3v0c8SnaT7K8lO0G+T/VWUPG5WjK/T/cM8rT7N/oI8j/5A3kd+QN5Bfn9G0M087f5A3kX+Yp5N/kKezf5Cns3+Qp7N/kKeLd7+FfXj/A9bK+e/Qc5B/vX4vTz3/AUc3+vP6f4c8mzyj/M08hzyD/I08gzyN/IM8jfyDPJv/430dOwfJz+R/yB/359M/oI8+/yFvIv8hTy7/IU8u/yFPLv8hTy7/IU8u/yFPJv8/SyL/P0s8/z9LPP8/SwL/P0si/z/LPP8/SyL/P8s8/z/LPP8/Szj/H0s4/z/LPP8/Sxj/P0s4/z/LPP8/Sxj/H0s4/z/LPP8/Sxj/P0s4/z/LPP8/SzT/H0s0/z9LNP8/SzT/H0s0/z9LNP8/SzT/H0s0/z/LNP8/SzD/P8sw/z/LMP8/yzD/P8sw/z/LMP8/yzD/P8sw/z/LMP8/Sxb/P0sW/z9LFv8/Sxb/P0sW/z9LFv8/Sxb/P0sW/z/LMP8/yzD/P8sw/z9r/v8P0t8/yzD/P8sw/z/LMP8/yzD/P8s4/z87B/n/2T/IPyDP/8/Owf5/9g/yD/D8/+/8B/kH+P/ZP8g/wPP/v/Af5B/j/2T/IP8Dz/7/wH+Qf4/9k/yD/A8/+1cZ/8g/z/7Vxn/yD/P/tXGf/IP8/+1cZ/8g/z/7Vxn/yD/P/tXGf/IP8/+1cZ/8g/z/7Vxn/yD/P/tXGf/IP8/+1cZ/8g/z/7Vxn/yD/P/tXGf/IP8/+1cZ/8g/z/7Vxn/yD/P/tXGf/IP8/9k/yD/P/ZP8g/z/2T/IP8/+yf5B/n/2T/IP8/+yf5B/n/2T/IP8/+yf5B/n/2T/IP8/+yf5B/n/2T/IP8/+yf5B/n/2T/IP8/+yf5B/n/2T/IP8/+yf5B/n/2P/KP8/+yf5B/n/2D/Kv8/+yf5B/n/2D/Kv8/+wf5V/k/2P/KP8/+wf5V/k/2D/Kv8/9k/yD/P/tX+f/ZP8i/z/7V/n/2T/Iv8/9Vf4z/yD/P/tX+f/ZP8i/z/7V/n/2T/Iv8/9Vf4z/yD/P/tX+f/ZP8i/z/7V/n/2T/Iv8/9Vf5n/kD+f/ZP8i/z/5X/mf+QP5/9k/yL/P/lf+Z/5A/n/2T/Iv8/+V/5n/kD+f/ZP8i/z/5H/mf+QP5/9k/yL/P/k/+Z/wB/gG9i2pD/t6f1AAAAABJRU5ErkJggg==';
+                signatureImg.src = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAARgAAAAsCAYAAAD2B2f5AAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAATYSURBVHhe7Z1fSxtRFMfvzC2b7Ya2SbC0sS19KIKVFJAggiAi+AMMPYgIesgXQfTgF4jgQRB68KCIF1EkRARpD0W0VCxYLJCklhKstLXt2mY3s5NfGXZ3t/M6M3u/8MvMvM+ZO+87c3ZndmCCILgYQ0yQIOjA2yA69lB04L2Q2Nen2NenmLUDBrQDBrQDBrQDBrQDBrQDBrQDBrQDBrQDBrQDBrQDBrQDBrQDBrQDBhL3w1sLw5iGfJ/pI+g/BCFfNq5yI6e3e1J6Wf2p+v/H6Gg1wzO4c2i1h12S4GfI8PuyO2bX7R3/tq6u/kE2z6V0e2Lx+jT5GvjV0H5fR+0Y9T0G87oB560y1n4m9n2b7v2+N8a8L3eM9S3X1q/X05kY4xV2zfY/pLp6a3v0c8SnaT7K8lO0G+T/VWUPG5WjK/T/cM8rT7N/oI8j/5A3kd+QN5Bfn9G0M087f5A3kX+Yp5N/kKezf5Cns3+Qp7N/kKeLd7+FfXj/A9bK+e/Qc5B/vX4vTz3/AUc3+vP6f4c8mzyj/M08hzyD/I08gzyN/IM8jfyDPJv/430dOwfJz+R/yB/359M/oI8+/yFvIv8hTy7/IU8u/yFPLv8hTy7/IU8u/yFPJv8/SyL/P0s8/z9LPP8/SwL/P0si/z/LPP8/SyL/P8s8/z/LPP8/Szj/H0s4/z/LPP8/Sxj/P0s4/z/LPP8/Sxj/P0s4/z/LPP8/Sxj/P0s4/z/LPP8/SzT/H0s0/z9LNP8/SzT/H0s0/z9LNP8/SzT/H0s0/z/LNP8/SzD/P8sw/z/LMP8/yzD/P8sw/z/LMP8/yzD/P8sw/z/LMP8/Sxb/P0sW/z9LFv8/Sxb/P0sW/z9LFv8/Sxb/P0sW/z/LMP8/yzD/P8sw/z9r/v8P0t8/yzD/P8sw/z/LMP8/yzD/P8s4/z87B/n/2T/IPyDP/8/Owf5/9g/yD/D8/+/8B/kH+P/ZP8g/wPP/v/Af5B/j/2T/IP8Dz/7/wH+Qf4/9k/yD/A8/+1cZ/8g/z/7Vxn/yD/P/tXGf/IP8/+1cZ/8g/z/7Vxn/yD/P/tXGf/IP8/+1cZ/8g/z/7Vxn/yD/P/tXGf/IP8/+1cZ/8g/z/7Vxn/yD/P/tXGf/IP8/+1cZ/8g/z/7Vxn/yD/P/tXGf/IP8/9k/yD/P/ZP8g/z/2T/IP8/+yf5B/n/2T/IP8/+yf5B/n/2T/IP8/+yf5B/n/2T/IP8/+yf5B/n/2T/IP8/+yf5B/n/2T/IP8/+yf5B/n/2T/IP8/+yf5B/n/2P/KP8/+yf5B/n/2D/Kv8/+yf5B/n/2D/Kv8/+wf5V/k/2P/KP8/+wf5V/k/2D/Kv8/9k/yD/P/tX+f/ZP8i/z/7V/n/2T/Iv8/9Vf4z/yD/P/tX+f/ZP8i/z/7V/n/2T/Iv8/9Vf4z/yD/P/tX+f/ZP8i/z/7V/n/2T/Iv8/9Vf5n/kD+f/ZP8i/z/5X/mf+QP5/9k/yL/P/lf+Z/5A/n/2T/Iv8/+V/5n/kD+f/ZP8i/z/5H/mf+QP5/9k/yL/P/k/+Z/wB/gG9i2pD/t6f0AAAAABJRU5ErkJggg==';
                 signatureImg.onload = async () => {
                     const addElementToPdf = async (element, yPos) => {
                         const canvas = await html2canvas(element, { scale: 2, backgroundColor: '#ffffff' });
@@ -2559,7 +2563,10 @@ ${dataSummary}
                 } else if (sortField === 'plan_ornegi') {
                      arr = arr.filter(d => {
                          const islem = String(d['işlem'] || '').toLocaleLowerCase('tr');
-                         return islem.includes('plan örneği') || islem.includes('mahke') || islem.includes('teknik bilgi ve belge örnekleri');
+                         const planOrnegiTerms = ['plan örneği', 'teknik bilgi ve belge örnekleri'];
+                         const mahkemePlanOrnegiTerms = ['mahke', 'plan örneği'];
+                         
+                         return planOrnegiTerms.some(term => islem.includes(term)) || mahkemePlanOrnegiTerms.every(term => islem.includes(term));
                      });
                 } else if (sortField === 'bekleyen_eski_yeni') {
                     arr = arr.filter(d => {
@@ -2616,7 +2623,7 @@ ${dataSummary}
                 {data.length === 0 && !loading && !errorMsg && <LandingPage onFileChange={handleFile} />}
                 {errorMsg && <p className="error-message">{errorMsg}</p>}
                 
-                {data.length > 0 && <>
+                {data.length > 0 && <React.Fragment>
                     <div className="controls">
                          <div className="control-group">
                             <label>Dosya İşlemleri</label>
@@ -2664,7 +2671,7 @@ ${dataSummary}
                     <DataTable data={filteredData} sortField={sortField} isEngineer={isEngineer} showOnlyEngineers={showOnlyEngineers} onToggleEngineers={() => setShowOnlyEngineers(!showOnlyEngineers)} />
                     <AIReportGenerator data={filteredData.length > 0 ? filteredData : data} ilOptions={ilOptions} personnelOptions={personnelOptions} selectedIl={selectedIl} isEngineer={isEngineer} sortField={sortField} />
                     <ReportComparison engineers={engineers} isEngineer={isEngineer} />
-                </>}
+                </React.Fragment>}
                 
                 {zoomContent && (
                     <div className="modal-overlay" onClick={() => setZoomContent(null)}>
