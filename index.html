@@ -339,15 +339,25 @@
         .ai-report-display ul { padding-left: 20px; margin-bottom: 1em; }
         .ai-report-display li { margin-bottom: 0.5em; }
         .ai-report-display strong { color: #1e40af; }
-        .interactive-query-input {
-            width: 100%;
-            padding: 10px;
-            border-radius: 6px;
-            border: 1px solid #d1d5db;
-            font-size: 1rem;
-            min-height: 80px;
-            margin-bottom: 10px;
+        
+        .interactive-query-builder {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
         }
+
+        .query-row {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .query-row span {
+            font-weight: 500;
+            color: #0c4a6e;
+        }
+
         .interactive-display-container {
             margin-top: 16px;
             padding: 20px;
@@ -356,87 +366,104 @@
             border: 1px solid #e2e8f0;
             min-height: 300px;
             display: flex;
+            flex-direction: column;
             justify-content: center;
             align-items: center;
         }
+        .interactive-display-container .ai-summary {
+            margin-top: 15px;
+            font-style: italic;
+            color: #1e40af;
+            text-align: center;
+            max-width: 80%;
+        }
+
+        .interactive-display-container .chart-area {
+            width: 100%;
+            height: 400px;
+        }
+
         .interactive-display-container table {
             width: 100%;
         }
 
-        /* Report Comparer Styles */
-        .report-comparer-container {
+        /* Report Comparison Styles */
+        .report-comparison-container {
             margin-top: 24px;
             padding: 20px;
             border-radius: 12px;
-            background-color: #fdf4ff;
-            border: 1px solid #f0abfc;
+            background-color: #fdf4ff; /* purple-50 */
+            border: 1px solid #f5d0fe; /* purple-200 */
         }
-        .report-comparer-header h3 {
-            margin: 0 0 16px 0;
-            color: #701a75;
+        .report-comparison-header {
+            text-align: center;
+            margin-bottom: 16px;
+        }
+        .report-comparison-header h3 {
+            margin: 0;
+            color: #701a75; /* purple-800 */
             font-size: 1.3rem;
         }
-        .comparer-controls {
+        .report-comparison-inputs {
             display: flex;
+            justify-content: center;
             gap: 20px;
-            margin-bottom: 20px;
-            align-items: flex-end;
+            align-items: center;
+            margin-bottom: 16px;
             flex-wrap: wrap;
         }
-        .comparer-controls .control-group label {
-            color: #581c87;
+         .report-comparison-inputs .control-group label {
+            color: #581c87; /* purple-900 */
         }
-        .comparer-controls button {
-            background-color: #9333ea;
+        .report-comparison-actions {
+            text-align: center;
+            margin-top: 10px;
+        }
+         .report-comparison-actions button {
+            background-color: #9333ea; /* purple-600 */
             color: white;
             font-weight: 500;
+            padding: 10px 20px;
+         }
+        .report-comparison-actions button:hover {
+            background-color: #7e22ce; /* purple-700 */
         }
-        .comparer-controls button:disabled {
-            background-color: #a8a29e;
-            cursor: not-allowed;
-        }
-        .comparison-results {
+        .report-comparison-results {
+            margin-top: 20px;
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
             gap: 20px;
         }
-        .comparison-results h4 {
-            margin: 0 0 10px 0;
-            color: #334155;
-        }
-        .comparison-result-item {
-            background: #faf5ff;
+        .result-card {
+            background: #fff;
             padding: 15px;
             border-radius: 8px;
-            border: 1px solid #e9d5ff;
+            border: 1px solid #e9d5ff; /* purple-200 */
+            text-align: center;
         }
-        .engineer-accordion details {
-            margin-bottom: 10px;
-            border: 1px solid #e9d5ff;
-            border-radius: 8px;
-        }
-        .engineer-accordion summary {
-            padding: 10px 15px;
-            background-color: #faf5ff;
-            cursor: pointer;
-            font-weight: bold;
+        .result-card h4 {
+            margin: 0 0 10px 0;
             color: #581c87;
         }
-        .engineer-accordion-content {
-            padding: 15px;
+         .result-card p {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #7e22ce;
+            margin: 0 0 15px 0;
         }
-        .engineer-accordion-content h5 {
-            margin: 0 0 8px 0;
-            color: #334155;
-            border-bottom: 1px solid #e9d5ff;
-            padding-bottom: 5px;
+        .result-card .excel-btn {
+            background-color: #166534; /* green-800 */
+            color: white;
+            font-size: 0.9rem;
+            padding: 8px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
         }
-
-        @media (max-width: 900px) {
-            .comparison-results {
-                grid-template-columns: 1fr;
-            }
-        }
+         .result-card .excel-btn:disabled {
+             background-color: #9ca3af;
+             cursor: not-allowed;
+         }
 
         @media (max-width: 600px) {
             .dashboard { grid-template-columns: 1fr; }
@@ -455,31 +482,30 @@
         Chart.register(ChartDataLabels);
 
         const PROVINCES = ["Adana","Adıyaman","Afyonkarahisar","Ağrı","Amasya","Ankara","Antalya","Artvin","Aydın","Balıkesir","Bilecik","Bingöl","Bitlis","Bolu","Burdur","Bursa","Çanakkale","Çankırı","Çorum","Denizli","Diyarbakır","Edirne","Elazığ","Erzincan","Erzurum","Eskişehir","Gaziantep","Giresun","Gümüşhane","Hakkari","Hatay","Isparta","Mersin","İstanbul","İzmir","Kars","Kastamonu","Kayseri","Kırklareli","Kırşehir","Kocaeli","Konya","Kütahya","Malatya","Manisa","Kahramanmaraş","Mardin","Muğla","Muş","Nevşehir","Niğde","Ordu","Rize","Sakarya","Samsun","Siirt","Sinop","Sivas","Tekirdağ","Tokat","Trabzon","Tunceli","Şanlıurfa","Uşak","Van","Yozgat","Zonguldak","Aksaray","Bayburt","Karaman","Kırıkkale","Batman","Şırnak","Bartın","Ardahan","Iğdır","Yalova","Karabük","Kilis","Osmaniye","Düzce"];
-        const ALLOWED_COLS = ["kurum ad","ilçe","il","başvuru tarihi","fen kayıt tarihi","fen kayıt no","başvuru no","başvuran","işlem","zemin","görevli personel","tescil talep bilgisi","başvuru durumu","başvuru açıklama","iade", "ödeme", "bekleme süresi"];
-        const HEADER_KEYWORDS = {
-            "kurum ad":["kurum","ad"],
-            "ilçe":["ilçe"],
-            "il": ["il"],
-            "başvuru tarihi":["başvuru","tarih"],
-            "fen kayıt tarihi":["fen","kayıt","tarih"],
-            "fen kayıt no":["fen","kayıt","no"],
-            "başvuru no":["başvuru","no"],
-            "başvuran":["başvuran"],
-            "işlem":["işlem"],
-            "zemin":["zemin"],
-            "görevli personel":["personel"],
-            "tescil talep bilgisi":["tescil","talep","bilgi"],
-            "başvuru durumu":["başvuru","durum"],
-            "başvuru açıklama":["başvuru","açıklama"],
-            "iade":["iade"], 
-            "ödeme": ["ödeme"],
-            "bekleme süresi": ["bekleme", "süre"]
-        };
+        const ALLOWED_COLS = ["kurum ad","ilçe","başvuru tarihi","fen kayıt tarihi","fen kayıt no","başvuru no","başvuran","işlem","zemin","görevli personel","tescil talep bilgisi","başvuru durumu","başvuru açıklama","iade", "ödeme"];
+        const HEADER_KEYWORDS = {"kurum ad":["kurum","ad"],"ilçe":["ilçe", "ad"],"başvuru tarihi":["başvuru","tarih"],"fen kayıt tarihi":["fen","kayıt","tarih"],"fen kayıt no":["fen","kayıt","no"],"başvuru no":["başvuru","no"],"başvuran":["başvuran"],"işlem":["işlem"],"zemin":["zemin"],"görevli personel":["personel"],"tescil talep bilgisi":["tescil","talep","bilgi"],"başvuru durumu":["başvuru","durum"],"başvuru açıklama":["başvuru","açıklama"],"iade":["iade"], "ödeme": ["ödeme"]};
         
         const normalizeHeader = (header) => { if (!header) return ""; let s; try { s = header.normalize('NFD').replace(/[\u0300-\u036f]/g, ''); } catch (e) { s = String(header); } s = s.trim().toLocaleLowerCase('tr').replace(/\s+/g, ' '); s = s.replace(/ı/g, 'i').replace(/İ/g, 'i'); return s; }
-        const splitPersonel = (text) => { if (text == null) return []; const str = typeof text === 'string' ? text : String(text); return str.split(/[,;–-]/g).map(s => { let part = s.trim(); const arrowIdx = part.indexOf('=>'); if (arrowIdx !== -1) part = part.slice(0, arrowIdx).trim(); return part; }).filter(Boolean); }
+        const splitPersonel = (text) => { if (text == null) return []; const str = typeof text === 'string' ? text : String(text); return str.split(/[,;–-]/g).map(s => { let part = s.trim(); const arrowIdx = part.indexOf('=>'); if (arrowIdx !== -1) part = part.slice(0, arrowIdx).trim(); return part.replace(/\s*\(Müh\.\)\s*/, '').trim(); }).filter(Boolean); }
         const formatDate = (val) => { if (!val) return ""; if (typeof val === 'number') { const date = XLSX.SSF.parse_date_code(val); if (!date) return ""; return `${date.y}-${String(date.m).padStart(2,'0')}-${String(date.d).padStart(2,'0')}`; } if (typeof val === 'string') { let match = val.match(/^(\d{4}-\d{2}-\d{2})/); if (match) return match[1]; match = val.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})/); if (match) { const day = String(match[1]).padStart(2, '0'); const month = String(match[2]).padStart(2, '0'); const year = match[3]; return `${year}-${month}-${day}`; } const part = val.split(" ")[0]; const m2 = part.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})/); if (m2) { const day = String(m2[1]).padStart(2, '0'); const month = String(m2[2]).padStart(2, '0'); const year = m2[3]; return `${year}-${month}-${day}`; } return part; } return val; }
         const formatFenKayitNo = (val) => { if (val == null) return ""; if (typeof val === 'number') return val; if (typeof val === 'string') { const num = parseInt(val.replace(/\D/g,''),10); if (!isNaN(num)) return num; return val; } return val; }
+        
+        const parseTescilDate = (val) => {
+            if (!val || typeof val !== 'string') return null;
+            const datePart = val.split(/[\s/]/)[0];
+            const match = datePart.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})/);
+            if (match) {
+                const day = String(match[1]).padStart(2, '0');
+                const month = String(match[2]).padStart(2, '0');
+                const year = match[3];
+                const date = new Date(`${year}-${month}-${day}`);
+                if (!isNaN(date.getTime())) {
+                    return date;
+                }
+            }
+            return null;
+        }
+
         const detectProvinceAndDistrict = (rawKurumAd) => {
             if (!rawKurumAd) return { province: null, district: null };
             const normRaw = normalizeHeader(rawKurumAd);
@@ -515,22 +541,9 @@
 
             return { province, district };
         }
-        const normalizeName = (name) => { 
-            if (!name) return ""; 
-            return name.toString()
-                       .replace(/\(müh\.\)/i, '') 
-                       .trim()
-                       .toLocaleLowerCase('tr')
-                       .replace(/\s+/g, '')
-                       .replace(/ı/g, 'i')
-                       .replace(/ö/g, 'o')
-                       .replace(/ü/g, 'u')
-                       .replace(/ş/g, 's')
-                       .replace(/ç/g, 'c')
-                       .replace(/ğ/g, 'g');
-        }
+        const normalizeName = (name) => { if (!name) return ""; return name.toString().trim().toLocaleLowerCase('tr').replace(/\s*\(müh\.\)\s*/g, '').replace(/\s+/g, '').replace(/ı/g, 'i').replace(/ö/g, 'o').replace(/ü/g, 'u').replace(/ş/g, 's').replace(/ç/g, 'c').replace(/ğ/g, 'g');}
 
-        const readExcelPromise = (file, forComparer = false) => {
+        const readExcelPromise = (file, isComparison = false) => {
             return new Promise((resolve, reject) => {
                 if (!file) { reject(new Error("Dosya yüklenmedi veya geçersiz dosya.")); return; }
                 const validTypes = ['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet','application/vnd.ms-excel'];
@@ -542,29 +555,41 @@
                         const workbook = XLSX.read(data, { type: 'array' });
                         const ws = workbook.Sheets[workbook.SheetNames[0]];
                         let json = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true });
-                        if (!json.length) { resolve(forComparer ? {rows: [], foundHeaders: []} : []); return; }
+                        if (!json.length) { resolve({rows: [], headers: []}); return; }
                         
                         const rawHeaders = json[0].map(h => h == null ? "" : String(h));
+                        
+                        if (isComparison) {
+                             const rowsAsObjects = XLSX.utils.sheet_to_json(ws);
+                             resolve({rows: rowsAsObjects, headers: rawHeaders.filter(h => h)});
+                             return;
+                        }
+
                         const headersNorm = rawHeaders.map(h => normalizeHeader(h));
                         const colIndexes = {};
-                        const foundHeaders = [];
-
-                        ALLOWED_COLS.forEach(col => { colIndexes[col] = -1; });
                         
-                        headersNorm.forEach((hNorm, idx) => { 
-                            for (const canonical of ALLOWED_COLS) { 
-                                const keywords = HEADER_KEYWORDS[canonical] || []; 
-                                const allMatch = keywords.every(k => normalizeHeader(k) && hNorm.includes(normalizeHeader(k))); 
-                                if (allMatch && colIndexes[canonical] === -1) { 
-                                    colIndexes[canonical] = idx;
-                                    if (!foundHeaders.includes(canonical)) {
-                                        foundHeaders.push(canonical);
-                                    }
-                                    break; 
-                                } 
-                            } 
+                        const allAllowedCols = [...ALLOWED_COLS, "personel", "bekleme süresi (gün)"];
+                        const allHeaderKeywords = {...HEADER_KEYWORDS, "personel": ["personel"], "bekleme süresi (gün)": ["bekleme", "süre"]};
+
+                        allAllowedCols.forEach(col => { colIndexes[col] = -1; });
+                        
+                        headersNorm.forEach((hNorm, idx) => {
+                             for (const canonical of allAllowedCols) {
+                                 const keywords = allHeaderKeywords[canonical] || [canonical];
+                                 const allMatch = keywords.every(k => normalizeHeader(k) && hNorm.includes(normalizeHeader(k)));
+                                 if (allMatch && colIndexes[canonical] === -1) {
+                                     colIndexes[canonical] = idx;
+                                     break; 
+                                 }
+                             }
                         });
                         
+                        // Handle "Personel" vs "Görevli Personel"
+                        if (colIndexes["görevli personel"] === -1 && colIndexes["personel"] !== -1) {
+                            colIndexes["görevli personel"] = colIndexes["personel"];
+                        }
+
+
                         const allKurumAd = json.slice(1).map(row => { const idx = colIndexes["kurum ad"]; return idx >= 0 ? String(row[idx] || "") : ""; });
                         let provincesInFile = new Set();
                         for (let kurum of allKurumAd) { const {province} = detectProvinceAndDistrict(kurum); if (province) provincesInFile.add(province); }
@@ -572,7 +597,7 @@
                         
                         const rows = json.slice(1).map(row => {
                             const obj = {};
-                            ALLOWED_COLS.forEach(col => {
+                            allAllowedCols.forEach(col => {
                                 const idx = colIndexes[col];
                                 let val = idx >= 0 ? row[idx] : null;
                                 if (col==='başvuru tarihi' || col==='fen kayıt tarihi') obj[col]=formatDate(val);
@@ -580,27 +605,28 @@
                                 else obj[col]=val??"";
                             });
 
-                            if(!forComparer){
-                                let kurumAd = String(obj['kurum ad']||'').trim();
-                                const { province, district: districtFromKurumAd } = detectProvinceAndDistrict(kurumAd);
-                                obj._province = province || (singleProvince || null);
-                                let finalDistrict = "";
-                                const districtFromIlceCol = obj['ilçe'] ? String(obj['ilçe']).trim() : null;
-                                if (districtFromIlceCol) { finalDistrict = districtFromIlceCol; } 
-                                else if (districtFromKurumAd) { finalDistrict = districtFromKurumAd; }
-                                if (finalDistrict) { finalDistrict = finalDistrict.charAt(0).toLocaleUpperCase('tr') + finalDistrict.slice(1).toLocaleLowerCase('tr'); }
-                                obj._district = finalDistrict;
+                            let kurumAd = String(obj['kurum ad']||'').trim();
+                            const { province, district: districtFromKurumAd } = detectProvinceAndDistrict(kurumAd);
+
+                            obj._province = province || (singleProvince || null);
+
+                            let finalDistrict = "";
+                            const districtFromIlceCol = obj['ilçe'] ? String(obj['ilçe']).trim() : null;
+
+                            if (districtFromIlceCol) {
+                                finalDistrict = districtFromIlceCol;
+                            } else if (districtFromKurumAd) {
+                                finalDistrict = districtFromKurumAd;
                             }
+
+                            if (finalDistrict) {
+                                finalDistrict = finalDistrict.charAt(0).toLocaleUpperCase('tr') + finalDistrict.slice(1).toLocaleLowerCase('tr');
+                            }
+                            obj._district = finalDistrict;
                             
                             return obj;
                         });
-
-                        if (forComparer) {
-                            const orderedFoundHeaders = ALLOWED_COLS.filter(col => foundHeaders.includes(col));
-                            resolve({ rows, foundHeaders: orderedFoundHeaders });
-                        } else {
-                            resolve(rows);
-                        }
+                        resolve({rows, headers: rawHeaders.filter(h => h)});
                     } catch(err) { console.error("readExcelPromise hata:", err); reject(new Error("Dosya okunurken hata oluştu.")); }
                 };
                 reader.onerror = () => reject(new Error("Dosya okunamadı."));
@@ -608,30 +634,17 @@
             });
         }
 
-        const parseTescilDate = (val) => {
-            if (!val || typeof val !== 'string') return null;
-            const datePart = val.split(/[\s/]/)[0];
-            const match = datePart.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})/);
-            if (match) {
-                const day = String(match[1]).padStart(2, '0');
-                const month = String(match[2]).padStart(2, '0');
-                const year = match[3];
-                const date = new Date(`${year}-${month}-${day}`);
-                if (!isNaN(date.getTime())) {
-                    return date;
-                }
-            }
-            return null;
-        }
-
         const calcMetrics = (arr) => {
             const today = new Date();
             const threeMonthsAgo = new Date();
             threeMonthsAgo.setMonth(today.getMonth() - 3);
 
-            let toplam = arr.length, count2025 = 0, totalDays = 0, countDays = 0, totalTescilDays = 0, countTescilDays = 0;
+            let toplam = arr.length, count2025 = 0, totalDays = 0, countDays = 0;
             let yearCounts = {}, tescileGiden = 0, tescilEdilen = 0, iade = 0, iptal = 0, fenKayitAlinmayan = 0;
             const overdueFenKayitNos = new Set();
+            
+            let totalTescilDays = 0;
+            let countTescilDays = 0;
 
             arr.forEach(d => {
                 const bStr = d['başvuru tarihi'];
@@ -646,9 +659,9 @@
                     const bd = new Date(bStr);
                     if (!isNaN(bd.getTime())) {
                         if (bd.getFullYear() === 2025) count2025++;
-                        if (bd >= threeMonthsAgo && fStr) {
-                            const fd = new Date(fStr);
-                            if (!isNaN(fd.getTime()) && fd.getFullYear() > 1900) {
+                        if (fStr) {
+                             const fd = new Date(fStr);
+                             if (!isNaN(fd.getTime()) && fd.getFullYear() > 1900 && fd >= threeMonthsAgo) {
                                 const diff = (fd - bd) / (1000 * 60 * 60 * 24);
                                 if (!isNaN(diff) && diff >= 0) {
                                     totalDays += diff;
@@ -710,8 +723,8 @@
 
             const overdue = overdueFenKayitNos.size;
             const avgDays = countDays > 0 ? Math.round(totalDays / countDays) : 0;
-            const avgTescilSuresi = countTescilDays > 0 ? Math.round(totalTescilDays / countTescilDays) : 0;
             const totalWaiting = Object.values(yearCounts).reduce((a, b) => a + b, 0);
+            const avgTescilSuresi = countTescilDays > 0 ? Math.round(totalTescilDays / countTescilDays) : 0;
             return { toplam, count2025, avgDays, overdue, yearCounts, tescileGiden, tescilEdilen, iade, iptal, fenKayitAlinmayan, totalWaiting, avgTescilSuresi };
         }
         
@@ -747,10 +760,6 @@
                     <div className="card"><h3>Yıla Göre Bekleyen</h3><div className="chart-container"><canvas ref={yearRef}></canvas></div>{yearLegend}</div> 
                     <div className="card">
                         <h3>İşlem Durumları</h3>
-                        <div style={{marginTop: '2px'}}>
-                            <span style={{fontSize: '0.9rem', color: '#334155'}}>Ort. İşlem Süresi: </span>
-                            <span style={{fontSize: '1.1rem', color: '#1d4ed8', fontWeight: 'bold'}}>{metrics.avgTescilSuresi} gün</span>
-                        </div>
                         <div style={{marginTop: '4px'}}>
                             <span style={{fontSize: '0.9rem', color: '#334155'}}>Tescile Giden: </span>
                             <span style={{fontSize: '1.1rem', color: '#1d4ed8', fontWeight: 'bold'}}>{metrics.tescileGiden}</span>
@@ -771,82 +780,24 @@
                             <span style={{fontSize: '0.9rem', color: '#334155'}}>F.K. Alınmayan: </span>
                             <span style={{fontSize: '1.1rem', color: '#1d4ed8', fontWeight: 'bold'}}>{metrics.fenKayitAlinmayan}</span>
                         </div>
+                        <div style={{marginTop: '2px'}}>
+                            <span style={{fontSize: '0.9rem', color: '#334155'}}>Ort. İşlem Süresi: </span>
+                            <span style={{fontSize: '1.1rem', color: '#1d4ed8', fontWeight: 'bold'}}>{metrics.avgTescilSuresi > 0 ? `${metrics.avgTescilSuresi} gün` : 'N/A'}</span>
+                        </div>
                     </div>
                 </div>
             ); 
         }
-
-        function IslemSayılarıChart({ data, onZoom }) {
-            const canvasRef = useRef(null);
-            const chartRef = useRef(null);
-            const [chartData, setChartData] = useState({});
-
-            useEffect(() => {
-                const işlemCounts = {};
-                data.forEach(row => {
-                    let işlem = row['işlem'] ? String(row['işlem']).trim() : '(Boş)';
-
-                    // Gruplama kuralları
-                    if (işlem === 'Mahkeme Plan Örneği' || işlem === 'Plan Örneği') {
-                        işlem = 'Plan Örneği';
-                    } else if (işlem.startsWith('Ayırma Ve Yola / Yeşil Alana Terk')) {
-                        işlem = 'Ayırma Ve Yola / Yeşil Alana Terk';
-                    }
-
-                    işlemCounts[işlem] = (işlemCounts[işlem] || 0) + 1;
-                });
-                setChartData(işlemCounts);
-            }, [data]);
-
-            useEffect(() => {
-                if (canvasRef.current && Object.keys(chartData).length > 0) {
-                    const sortedData = Object.entries(chartData).sort(([, a], [, b]) => b - a);
-                    const labels = sortedData.map(d => d[0]);
-                    const dataValues = sortedData.map(d => d[1]);
-
-                    if (chartRef.current) chartRef.current.destroy();
-
-                    chartRef.current = new Chart(canvasRef.current, {
-                        type: 'bar',
-                        data: {
-                            labels,
-                            datasets: [{
-                                label: 'İşlem Sayısı',
-                                data: dataValues,
-                                backgroundColor: labels.map((_, i) => `hsl(${(i * 360 / labels.length)}, 70%, 60%)`)
-                            }]
-                        },
-                        options: {
-                            indexAxis: 'y',
-                            responsive: true,
-                            plugins: {
-                                legend: { display: false },
-                                datalabels: { anchor: 'end', align: 'right', color: '#444', font: { weight: 'bold' } }
-                            },
-                            scales: { x: { beginAtZero: true } },
-                            maintainAspectRatio: false
-                        }
-                    });
-                }
-            }, [chartData]);
-            
-            const title = `İşlem Sayıları (${[...new Set(data.map(d => d._province).filter(Boolean))].join(', ') || 'Tüm İller'})`;
-
-            return (
-                <div className="chart-card">
-                    <button className="zoom-btn" title="Büyüt" onClick={() => onZoom({ type: 'chart', data: chartData, title: title })}>🔍</button>
-                    <div className="chart-title">{title}</div>
-                    <div className="chart-wrapper" style={{height: '250px'}}><canvas ref={canvasRef}></canvas></div>
-                </div>
-            );
-        }
         
-        function ChartsBelow({ data, onZoom, personnelChartCardRef, waitingChartCardRef, selectedIl, isEngineer, showOnlyEngineers, onToggleEngineers, sortField }) {
+        function ChartsBelow({ data, onZoom, personnelChartCardRef, waitingChartCardRef, islemChartCardRef, selectedIl, isEngineer, showOnlyEngineers, onToggleEngineers, sortField }) {
             const totalRef = useRef();
             const dynamicRef = useRef();
+            const islemRef = useRef();
             const totalChartRef = useRef(null);
             const dynamicChartRef = useRef(null);
+            const islemChartRef = useRef(null);
             const [personnelStats, setPersonnelStats] = useState({ totals: {}, dynamic: {} });
+            const [islemStats, setIslemStats] = useState({});
             
             let dynamicTitle = "Bekleyen İşlem Sayıları";
             switch(sortField) {
@@ -860,24 +811,40 @@
             useEffect(() => {
                 if (!data || data.length === 0) {
                     setPersonnelStats({ totals: {}, dynamic: {} });
+                    setIslemStats({});
                     return;
                 }
                 const totalsMap = {};
                 const dynamicMap = {};
+                const islemMap = {};
+
                 data.forEach(r => {
                     const personnel = splitPersonel(r['görevli personel']);
-                    if (personnel.length === 0) return;
+                     if (personnel.length > 0) {
+                         personnel.forEach(p => {
+                            if (p) totalsMap[p] = (totalsMap[p] || 0) + 1;
+                        });
+                    }
                     
-                    personnel.forEach(p => {
-                        if (p) totalsMap[p] = (totalsMap[p] || 0) + 1;
-                    });
-                    
-                    let conditionMet = false;
                     const status = String(r['başvuru durumu'] || '').toLocaleLowerCase('tr');
                     const aciklama = String(r['başvuru açıklama'] || '').toLocaleLowerCase('tr');
                     const odeme = String(r['ödeme'] || '').toLocaleLowerCase('tr');
-                    const islem = String(r['işlem'] || '').toLocaleLowerCase('tr').trim();
+                    const islem = String(r['işlem'] || '').trim();
+                    const islemLower = islem.toLowerCase();
+                    
+                    // Populate islemMap with grouping
+                    let groupedIslem = islem;
+                    if ((islemLower.includes('mahke') && islemLower.includes('plan örneği')) || islemLower.includes('teknik bilgi ve belge örnekleri')) {
+                        groupedIslem = 'Plan Örneği';
+                    } else if (islemLower.startsWith('ayırma ve yola / yeşil alana terk')) {
+                        groupedIslem = 'Ayırma Ve Yola / Yeşil Alana Terk';
+                    }
+                    if (groupedIslem) {
+                        islemMap[groupedIslem] = (islemMap[groupedIslem] || 0) + 1;
+                    }
 
+                    // Populate dynamicMap based on sortField
+                    let conditionMet = false;
                     switch(sortField) {
                         case 'iade edilen': 
                             if(status.includes('eksiklikten iade edildi')) conditionMet = true;
@@ -892,29 +859,46 @@
                             if(odeme.includes('ödendi') && (r['fen kayıt no'] === 0 || r['fen kayıt no'] == null)) conditionMet = true;
                             break;
                         case 'plan_ornegi':
-                            const planOrnegiTurleri = ['plan örneği', 'mahkeme plan örneği', 'teknik bilgi ve belge örnekleri'];
-                            if(planOrnegiTurleri.includes(islem)) conditionMet = true;
+                            const planOrnegiTerms = ['plan örneği', 'mahke', 'teknik bilgi ve belge örnekleri'];
+                            const isWaiting = !status.includes('eksiklikten iade edildi') && !status.includes('tescile gönderildi');
+                            if (isWaiting && planOrnegiTerms.some(term => islemLower.includes(term))) {
+                                 conditionMet = true;
+                            }
                             break;
                         default:
                             if(!status.includes('eksiklikten iade edildi') && !status.includes('tescile gönderildi')) conditionMet = true;
                             break;
                     }
 
-                    if (conditionMet) {
+                    if (conditionMet && personnel.length > 0) {
                         personnel.forEach(p => {
                             if (p) dynamicMap[p] = (dynamicMap[p] || 0) + 1;
                         });
                     }
                 });
+                
                 setPersonnelStats({ totals: totalsMap, dynamic: dynamicMap });
+                setIslemStats(islemMap);
             }, [data, sortField]);
 
-            const createSortedChart = (canvasRef, chartRef, chartData, label) => {
+            const createSortedChart = (canvasRef, chartRef, chartData, label, isIslemChart = false) => {
                 try {
                     if (canvasRef.current) {
                         const sortedData = Object.entries(chartData).sort(([, a], [, b]) => b - a);
-                        const labels = sortedData.map(d => isEngineer(d[0]) ? `${d[0]} (Müh.)` : d[0]);
-                        const dataValues = sortedData.map(d => d[1]);
+                        
+                        let labels, dataValues;
+
+                        if (isIslemChart) {
+                            labels = sortedData.map(d => d[0]);
+                            dataValues = sortedData.map(d => d[1]);
+                        } else {
+                            const filteredSortedData = showOnlyEngineers 
+                                ? sortedData.filter(([name]) => isEngineer(name)) 
+                                : sortedData;
+                            
+                            labels = filteredSortedData.map(d => isEngineer(d[0]) ? `${d[0]} (Müh.)` : d[0]);
+                            dataValues = filteredSortedData.map(d => d[1]);
+                        }
 
                         if (chartRef.current) chartRef.current.destroy();
                         
@@ -939,6 +923,7 @@
                                     y: {
                                         ticks: {
                                             color: (context) => {
+                                                if (isIslemChart) return '#666';
                                                 const originalName = context.tick.label.replace(' (Müh.)', '');
                                                 return isEngineer(originalName) ? 'red' : '#666';
                                             }
@@ -956,32 +941,31 @@
             };
 
             useEffect(() => {
-                const filteredTotals = showOnlyEngineers
-                    ? Object.fromEntries(Object.entries(personnelStats.totals).filter(([name]) => isEngineer(name)))
-                    : personnelStats.totals;
-                createSortedChart(totalRef, totalChartRef, filteredTotals, 'Toplam İşlem Sayısı');
+                createSortedChart(totalRef, totalChartRef, personnelStats.totals, 'Toplam İşlem Sayısı');
             }, [personnelStats.totals, isEngineer, showOnlyEngineers]);
 
             useEffect(() => {
-                const filteredDynamic = showOnlyEngineers
-                    ? Object.fromEntries(Object.entries(personnelStats.dynamic).filter(([name]) => isEngineer(name)))
-                    : personnelStats.dynamic;
-                createSortedChart(dynamicRef, dynamicChartRef, filteredDynamic, dynamicTitle);
+                createSortedChart(dynamicRef, dynamicChartRef, personnelStats.dynamic, dynamicTitle);
             }, [personnelStats.dynamic, isEngineer, showOnlyEngineers, dynamicTitle]);
+
+            useEffect(() => {
+                createSortedChart(islemRef, islemChartRef, islemStats, 'İşlem Sayıları', true);
+            }, [islemStats]);
+
 
             if (!data || data.length === 0) return null;
 
             const title = selectedIl.length > 0 ? selectedIl.join(' - ') : ([...new Set(data.map(d => d._province).filter(Boolean))].join(' - ') || 'Tüm İller');
 
             return (
-                 <div style={{flex: 3, display: 'flex', flexDirection: 'column', gap: '10px', minWidth: '1086px'}}>
+                 <div style={{flex: 3, display: 'flex', flexDirection: 'column', gap: '10px', minWidth: '1050px'}}>
                     <div style={{alignSelf: 'center'}}>
                         <label style={{display: 'flex', alignItems: 'center', cursor: 'pointer', fontSize: '0.9rem'}}>
                             <input type="checkbox" checked={showOnlyEngineers} onChange={onToggleEngineers} />
                             Grafiklerde Sadece Mühendisleri Göster
                         </label>
                     </div>
-                    <div style={{display: 'flex', gap: '24px'}}>
+                    <div style={{display: 'flex', gap: '24px', flexWrap: 'nowrap', overflowX: 'auto'}}>
                         <div className="chart-card" ref={personnelChartCardRef}>
                             <button className="zoom-btn" title="Büyüt" onClick={() => onZoom({ type: 'chart', data: showOnlyEngineers ? Object.fromEntries(Object.entries(personnelStats.totals).filter(([name]) => isEngineer(name))) : personnelStats.totals, title: `Personel İşlem Dağılımı (${title})` })}>🔍</button>
                             <div className="chart-title">Personel İşlem Dağılımı ({title})</div>
@@ -992,7 +976,11 @@
                             <div className="chart-title">{dynamicTitle} ({title})</div>
                             <div className="chart-wrapper" style={{height: '250px'}}><canvas ref={dynamicRef}></canvas></div>
                         </div>
-                        <IslemSayılarıChart data={data} onZoom={onZoom} />
+                         <div className="chart-card" ref={islemChartCardRef}>
+                             <button className="zoom-btn" title="Büyüt" onClick={() => onZoom({ type: 'chart', data: islemStats, title: `İşlem Sayıları (${title})` })}>🔍</button>
+                            <div className="chart-title">İşlem Sayıları ({title})</div>
+                            <div className="chart-wrapper" style={{height: '250px'}}><canvas ref={islemRef}></canvas></div>
+                        </div>
                     </div>
                 </div>
             );
@@ -1064,7 +1052,6 @@
                 
                 const today = new Date(); 
                 const groupedTasks = {}; 
-
                 const daysThreshold = sortField === 'plan_ornegi' ? 2 : 7;
 
                 relevantData.forEach(task => { 
@@ -1133,17 +1120,16 @@
                 XLSX.utils.book_append_sheet(wb, ws, 'Uyari Raporu'); 
                 XLSX.writeFile(wb, 'uyari_raporu.xlsx'); 
             }; 
-
             if (warningRows.length === 0) { return null; } 
-
-            const title = sortField === 'plan_ornegi' 
-                ? '2 Günden Fazla Bekleyen İşlemler (Uyarı)' 
-                : '7 Günden Fazla Bekleyen İşlemler (Uyarı)';
-
+            
+            const warningTitle = sortField === 'plan_ornegi' 
+                ? `2 Günden Fazla Bekleyen İşlemler (Uyarı) (Toplam: ${warningRows.length})`
+                : `7 Günden Fazla Bekleyen İşlemler (Uyarı) (Toplam: ${warningRows.length})`;
+            
             return ( 
                 <div className="warning-table-container"> 
                     <div className="warning-table-header"> 
-                        <h3>{title} (Toplam: {warningRows.length})</h3> 
+                        <h3>{warningTitle}</h3> 
                         <div className="button-group"> 
                              <label style={{display: 'flex', alignItems: 'center', cursor: 'pointer', marginRight: '10px'}}>
                                 <input type="checkbox" checked={showOnlyEngineers} onChange={onToggleEngineers} />
@@ -1215,7 +1201,7 @@
             
             const exportToExcel=()=>{ 
                 try {
-                    if (sortField === 'tescile_giden' || sortField === 'iade edilen' || sortField === 'iptal_edilen' || sortField === 'fen_kayit_alinmayan') {
+                    if (sortField === 'tescile_giden' || sortField === 'iade edilen' || sortField === 'iptal_edilen' || sortField === 'fen_kayit_alinmayan' || sortField === 'plan_ornegi') {
                         const customHeaders = sortField === 'fen_kayit_alinmayan'
                             ? ['İLÇE', 'BAŞVURU TARİHİ', 'FEN KAYIT NO', 'İŞLEM', 'ZEMİN', 'GÖREVLİ PERSONEL', 'BAŞVURU AÇIKLAMA', 'ÖDEME']
                             : ['İLÇE', 'FEN KAYIT TARİHİ', 'FEN KAYIT NO', 'İŞLEM', 'ZEMİN', 'GÖREVLİ PERSONEL', 'BAŞVURU AÇIKLAMA'];
@@ -1394,7 +1380,10 @@
                         chartRef.current.destroy();
                     }
                     const sortedData = Object.entries(chartData).sort(([, a], [, b]) => b - a);
-                    const labels = sortedData.map(d => isEngineer && isEngineer(d[0]) ? `${d[0]} (Müh.)` : d[0]);
+                    
+                    const isPersonnelChart = title.toLowerCase().includes('personel') || title.toLowerCase().includes('bekleyen');
+
+                    const labels = sortedData.map(d => isPersonnelChart && isEngineer(d[0]) ? `${d[0]} (Müh.)` : d[0]);
                     const data = sortedData.map(d => d[1]);
                     
                     chartRef.current = new Chart(canvasRef.current, {
@@ -1430,7 +1419,7 @@
                                         maxRotation: 90,
                                         minRotation: 45,
                                         color: (context) => {
-                                            if (!isEngineer) return '#666';
+                                            if (!isPersonnelChart) return '#666';
                                             const originalName = context.tick.label.replace(' (Müh.)', '');
                                             return isEngineer(originalName) ? 'red' : '#666';
                                         }
@@ -1511,14 +1500,50 @@
         function InteractiveDisplay({ result, data }) {
             const canvasRef = useRef(null);
             const chartInstanceRef = useRef(null);
+            const [aiSummary, setAiSummary] = useState('');
+            const [isLoadingSummary, setIsLoadingSummary] = useState(false);
+
+            const API_KEY = "AIzaSyB_k4I2yXNG_mxMSX4jAY5Y8tb6z_uIjiQ";
 
             useEffect(() => {
+                const generateSummary = async (config, processedData) => {
+                    if (!config || !processedData || processedData.length === 0) {
+                        setAiSummary('');
+                        return;
+                    }
+
+                    setIsLoadingSummary(true);
+                    const topItem = processedData[0];
+                    const prompt = `Aşağıdaki veri ve grafik bilgisine dayanarak tek cümlelik, profesyonel bir Türkçe özet oluştur:
+                    - Grafik Başlığı: "${config.title}"
+                    - En Yüksek Değer: "${topItem.label}" (${topItem.value} adet)
+                    Örnek: "İlçe bazında en çok bekleyen iş Silifke ilçesindedir."`;
+
+                     try {
+                        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${API_KEY}`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
+                        });
+                        if (!response.ok) throw new Error("API request failed");
+                        const result = await response.json();
+                        const summaryText = result.candidates[0].content.parts[0].text;
+                        setAiSummary(summaryText);
+                    } catch (error) {
+                        console.error("AI Summary Error:", error);
+                        setAiSummary("Özet oluşturulurken bir hata oluştu.");
+                    } finally {
+                        setIsLoadingSummary(false);
+                    }
+                };
+
                 if (chartInstanceRef.current) {
                     chartInstanceRef.current.destroy();
                     chartInstanceRef.current = null;
                 }
 
                 if (!result || !result.processedData || !canvasRef.current) {
+                    setAiSummary('');
                     return;
                 }
 
@@ -1527,8 +1552,11 @@
                 const values = processedData.map(d => d.value);
 
                 if (config.chartType === 'table') {
-                    return; // Handled by JSX below
+                    setAiSummary('');
+                    return; 
                 }
+                
+                generateSummary(config, processedData);
 
                 chartInstanceRef.current = new Chart(canvasRef.current, {
                     type: config.chartType,
@@ -1552,7 +1580,7 @@
                                 font: { size: 16 }
                             },
                             legend: {
-                                display: config.chartType === 'pie',
+                                display: config.chartType === 'pie' || config.chartType === 'doughnut',
                                 position: 'bottom'
                             },
                             datalabels: {
@@ -1571,7 +1599,7 @@
             }, [result]);
 
             if (!result) {
-                return <p>Grafik veya tablo oluşturmak için yukarıya bir sorgu yazın.</p>;
+                return <p>Grafik veya tablo oluşturmak için yukarıdan seçim yapın.</p>;
             }
             if (result.error) {
                 return <p style={{color: 'red'}}>{result.error}</p>;
@@ -1608,10 +1636,19 @@
                 );
             }
 
-            return <canvas ref={canvasRef}></canvas>;
+            return (
+                 <>
+                    <div className="chart-area">
+                        <canvas ref={canvasRef}></canvas>
+                    </div>
+                    <div className="ai-summary">
+                        {isLoadingSummary ? "Özet oluşturuluyor..." : aiSummary}
+                    </div>
+                </>
+            );
         }
 
-        function AIReportGenerator({ data, ilOptions, personnelOptions, selectedIl, isEngineer, sortOptions, sortField }) {
+        function AIReportGenerator({ data, ilOptions, personnelOptions, selectedIl, isEngineer, sortField }) {
             const [aiMode, setAiMode] = useState('report'); // 'report' or 'interactive'
             const [reportType, setReportType] = useState('il');
             const [selectedValue, setSelectedValue] = useState('');
@@ -1620,10 +1657,11 @@
             const [reportHtml, setReportHtml] = useState('');
             const reportDisplayRef = useRef(null);
 
-            // New states for interactive mode
-            const [interactiveQuery, setInteractiveQuery] = useState('');
+            // States for interactive mode v2
+            const [interactiveMetric, setInteractiveMetric] = useState('count');
+            const [interactiveDimension, setInteractiveDimension] = useState('_province');
+            const [interactiveChartType, setInteractiveChartType] = useState('bar');
             const [interactiveResult, setInteractiveResult] = useState(null);
-
 
             const API_KEY = "AIzaSyB_k4I2yXNG_mxMSX4jAY5Y8tb6z_uIjiQ";
             const markdownConverter = new showdown.Converter();
@@ -1655,47 +1693,41 @@
                 const formattedDate = today.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' });
                 let dataSummary = `Rapor Tarihi: ${formattedDate}\n`;
                 let prompt;
-                
-                const currentSortLabel = sortOptions.find(o => o.value === sortField)?.label || 'Tüm Bekleyenler';
 
-                if (isComparative) {
-                    // ... (comparative report logic remains the same)
-                } else { // Single report
-                    let filteredData = [];
-                    if (reportType === 'il') {
-                        filteredData = data.filter(d => d._province === selectedValue);
-                    } else {
-                        const normalizedSelectedValue = normalizeName(selectedValue);
-                        filteredData = data.filter(d => splitPersonel(d['görevli personel']).some(p => normalizeName(p) === normalizedSelectedValue));
-                    }
-                    
-                    if (filteredData.length === 0) {
-                        setGeneratedReport(`Seçilen kriter için veri bulunamadı: ${selectedValue}`);
-                        setReportHtml(`<p>Seçilen kriter için veri bulunamadı: ${selectedValue}</p>`);
-                        setIsLoading(false);
-                        return;
-                    }
-
-                    const metrics = calcMetrics(filteredData);
-                    dataSummary += `Rapor Kapsamı: ${reportType === 'il' ? 'İl' : 'Personel'} - ${selectedValue}\n`;
-                    dataSummary += `Filtre Kriteri: ${currentSortLabel}\n`;
-                    dataSummary += `- Toplam İşlem Sayısı: ${metrics.toplam}\n- 7 Günden Fazla Bekleyen İşlem Sayısı: ${metrics.overdue}\n- Ortalama Fen Kayıt Süresi (Son 3 Ay): ${metrics.avgDays} gün\n- Ortalama İşlem Süresi (Son 3 Ay): ${metrics.avgTescilSuresi} gün\n- Tescile Gönderilen İşlem Sayısı: ${metrics.tescileGiden}\n- İade Edilen İşlem Sayısı: ${metrics.iade}\n- Yıllara Göre Bekleyen İşlem Sayıları: ${JSON.stringify(metrics.yearCounts)}\n`;
-
-                    prompt = `
-Sen, Tapu ve Kadastro Genel Müdürlüğü için veri raporlayan bir asistansın. Sana sunulan aşağıdaki özet verilere dayanarak, Türkçe dilinde, profesyonel bir dille tek bölümden oluşan bir **Genel Durum Değerlendirmesi** raporu oluştur.
-
-ÖNEMLİ KURALLAR:
-1.  **Yorum Yapma:** Kesinlikle yorum, analiz veya öneride bulunma. Sadece sana verilen sayısal verileri ve başlıkları kullanarak durumu özetle.
-2.  **Format:** Raporu Markdown formatında, bir ana başlık (## Genel Durum Değerlendirmesi) ve madde imleri (* Madde) kullanarak oluştur.
-3.  **İçerik:** Değerlendirmende, raporun hangi kritere göre filtrelendiğini ('Filtre Kriteri' verisi) mutlaka belirt. Sana verilen tüm sayısal metrikleri listele.
-
-**Analiz Edilecek Veri Özeti:**
-${dataSummary}
-                    `;
+                let filteredDataForReport = [];
+                 if (isComparative) {
+                    filteredDataForReport = data.filter(d => selectedIl.includes(d._province));
+                } else if (reportType === 'il') {
+                    filteredDataForReport = data.filter(d => d._province === selectedValue);
+                } else {
+                    const normalizedSelectedValue = normalizeName(selectedValue);
+                    filteredDataForReport = data.filter(d => splitPersonel(d['görevli personel']).some(p => normalizeName(p) === normalizedSelectedValue));
                 }
+                
+                const metrics = calcMetrics(filteredDataForReport);
+                 const currentFilterName = sortField ? (sortOptions.find(o => o.value === sortField)?.label || 'Tümü') : 'Tümü';
+                dataSummary += `Filtre: ${currentFilterName}\n`;
+                dataSummary += `Toplam İşlem: ${metrics.toplam}\nBekleyen İşlem: ${metrics.totalWaiting}\n7+ Gün Bekleyen: ${metrics.overdue}\nOrt. F.K. Süresi: ${metrics.avgDays} gün\nOrt. İşlem Süresi: ${metrics.avgTescilSuresi} gün`;
+
+                prompt = `
+You are a data analyst assistant for the Turkish Land Registry and Cadastre. Your task is to generate a professional, data-driven "Genel Durum Değerlendirmesi" (General Situation Assessment) in Turkish based on the provided data summary.
+
+**Strict Rules:**
+1.  **NO INTERPRETATION:** Do NOT interpret, comment on, or add any qualitative judgment (like "good", "bad", "high", "low") to the data.
+2.  **DATA ONLY:** Your entire response must ONLY consist of the data points from the summary, presented in a list format under a single main heading.
+3.  **FORMAT:**
+    * Start with the main heading: "## Genel Durum Değerlendirmesi"
+    * List each data point using markdown bullet points (*).
+    * Use the exact metric names provided in the summary.
+4.  **LANGUAGE:** The entire output must be in Turkish.
+
+**Data Summary to Use:**
+${dataSummary}
+                `;
+
 
                 try {
-                    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${API_KEY}`, {
+                    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${API_KEY}`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
@@ -1757,89 +1789,30 @@ ${dataSummary}
                 });
             };
 
-            const handleGenerateInteractive = async () => {
-                if (!interactiveQuery) {
-                    setInteractiveResult({ error: "Lütfen bir sorgu girin." });
-                    return;
-                }
+            const handleGenerateInteractive = () => {
                 setIsLoading(true);
                 setInteractiveResult(null);
 
-                const prompt = `
-You are an expert data analysis assistant for a Land Registry and Cadastre Directorate. Your task is to interpret a user's natural language query in Turkish and convert it into a structured JSON object.
-
-**Available Data Fields (Dimension):**
-- "Personel", "görevli", "çalışan" -> "görevli personel"
-- "İl", "şehir", "müdürlük" -> "_province"
-- "İlçe" -> "_district"
-- "İşlem türü" -> "işlem"
-- "Durum", "başvuru durumu" -> "başvuru durumu"
-- "Yıl", "sene" -> "yıl" (Derived from 'başvuru tarihi')
-
-**Available Metrics:**
-1.  **count**: Total number of tasks. Keywords: "İş sayısı", "adet", "sayısı", "toplam iş".
-2.  **pending_count**: Number of tasks that are not closed (not 'tescile gönderildi' or 'iade edildi'). Keywords: "bekleyen iş", "beklemedeki", "açık iş".
-3.  **overdue_count**: Number of tasks waiting longer than a specific period. Keywords: "X günden fazla bekleyen", "gecikmiş", "uyarıdaki".
-
-**Available Chart Types:**
-- "Bar grafiği", "çubuk grafik" -> "bar"
-- "Pasta grafiği", "daire grafik" -> "pie"
-- "Çizgi grafiği" -> "line"
-- "Tablo" -> "table"
-
-**Rules:**
-1.  Analyze the user's query: "${interactiveQuery}".
-2.  Determine the **dimension**, **metric**, and **chartType**.
-3.  If the metric is **overdue_count**, you MUST extract the number of days from the query (e.g., from "10 günden fazla", extract 10). If no number is specified, default to 7.
-4.  Create a suitable **title** in Turkish.
-5.  Respond with ONLY the JSON object. Do not add any extra text or markdown.
-`;
-
-                const payload = {
-                    contents: [{ parts: [{ text: prompt }] }],
-                    generationConfig: {
-                        responseMimeType: "application/json",
-                        responseSchema: {
-                            type: "OBJECT",
-                            properties: {
-                                "chartType": { "type": "STRING", "enum": ["bar", "pie", "line", "table"] },
-                                "title": { "type": "STRING" },
-                                "dimension": { "type": "STRING", "enum": ["görevli personel", "_province", "_district", "işlem", "başvuru durumu", "yıl"] },
-                                "metric": { "type": "STRING", "enum": ["count", "pending_count", "overdue_count"] },
-                                "days": { "type": "NUMBER" }
-                            },
-                            required: ["chartType", "dimension", "metric", "title"]
-                        }
-                    }
+                const config = {
+                    chartType: interactiveChartType,
+                    title: `${interactiveDimension} bazında ${interactiveMetric} dağılımı`,
+                    dimension: interactiveDimension,
+                    metric: interactiveMetric
                 };
 
                 try {
-                    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${API_KEY}`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload),
-                    });
-
-                    if (!response.ok) throw new Error(`API request failed with status ${response.status}`);
-                    
-                    const result = await response.json();
-                    const configText = result.candidates[0].content.parts[0].text;
-                    const config = JSON.parse(configText);
-
-                    // Process data based on AI config
                     const processedData = processDataForInteractive(data, config);
                     setInteractiveResult({ config, processedData });
-
-                } catch (error) {
-                    console.error("Interactive AI error:", error);
-                    setInteractiveResult({ error: `Sorgu işlenirken bir hata oluştu: ${error.message}` });
+                } catch(e) {
+                    setInteractiveResult({ error: `Grafik oluşturulurken hata: ${e.message}`});
                 } finally {
                     setIsLoading(false);
                 }
             };
-
+            
             const processDataForInteractive = (sourceData, config) => {
                 const results = {};
+                const today = new Date();
 
                 sourceData.forEach(row => {
                     let keys = [];
@@ -1850,50 +1823,52 @@ You are an expert data analysis assistant for a Land Registry and Cadastre Direc
                             const year = new Date(row['başvuru tarihi']).getFullYear();
                             if(year) keys = [String(year)];
                         }
-                    } else {
+                    } else if (config.dimension === 'işlem') {
+                        let islem = String(row['işlem'] || '').trim();
+                        const islemLower = islem.toLowerCase();
+                        if ((islemLower.includes('mahke') && islemLower.includes('plan örneği')) || islemLower.includes('teknik bilgi ve belge örnekleri')) {
+                            islem = 'Plan Örneği';
+                        } else if (islemLower.startsWith('ayırma ve yola / yeşil alana terk')) {
+                            islem = 'Ayırma Ve Yola / Yeşil Alana Terk';
+                        }
+                        keys = [islem];
+                    }
+                    else {
                         const key = row[config.dimension];
-                        if (key) keys = [key];
+                        if (key) keys = [String(key)];
                     }
 
                     if (keys.length === 0) keys = ["(Belirtilmemiş)"];
 
                     keys.forEach(key => {
                         if (!results[key]) {
-                            results[key] = { count: 0, pendingCount: 0, overdueCount: 0 };
+                            results[key] = { value: 0 };
                         }
                         
                         const status = String(row['başvuru durumu'] || '').toLocaleLowerCase('tr');
                         const isClosed = status.includes('eksiklikten iade edildi') || status.includes('tescile gönderildi');
 
+                        let shouldCount = false;
                         if (config.metric === 'count') {
-                            results[key].count++;
+                            shouldCount = true;
                         } else if (config.metric === 'pending_count') {
-                            if (!isClosed) {
-                                results[key].pendingCount++;
-                            }
+                            if (!isClosed) shouldCount = true;
                         } else if (config.metric === 'overdue_count') {
-                             const fStr = row['fen kayıt tarihi'];
-                             const daysThreshold = config.days || 7;
+                            const fStr = row['fen kayıt tarihi'];
+                             const daysThreshold = sortField === 'plan_ornegi' ? 2 : 7;
                              if (fStr && !isClosed) {
-                                 const diff = (new Date() - new Date(fStr)) / (1000 * 60 * 60 * 24);
-                                 if (diff >= daysThreshold) {
-                                     results[key].overdueCount++;
-                                 }
+                                  const diff = (today - new Date(fStr)) / (1000 * 60 * 60 * 24);
+                                  if (diff >= daysThreshold) shouldCount = true;
                              }
                         }
+                        if (shouldCount) results[key].value++;
                     });
                 });
                 
                 return Object.entries(results).map(([label, values]) => {
-                    let value;
-                    if (config.metric === 'count') value = values.count;
-                    else if (config.metric === 'pending_count') value = values.pendingCount;
-                    else if (config.metric === 'overdue_count') value = values.overdueCount;
-                    else value = 0;
-                    return { label, value };
-                }).sort((a, b) => b.value - a.value);
+                    return { label, value: values.value };
+                }).filter(item => item.value > 0).sort((a, b) => b.value - a.value);
             };
-
 
             const options = reportType === 'il' ? ilOptions : personnelOptions;
             const isComparative = reportType === 'karşılaştırmalı';
@@ -1948,15 +1923,35 @@ You are an expert data analysis assistant for a Land Registry and Cadastre Direc
 
                         {aiMode === 'interactive' && (
                             <>
-                                <textarea
-                                    className="interactive-query-input"
-                                    placeholder="Örn: Personel bazında 7 günden fazla bekleyen işleri pasta grafiği olarak göster"
-                                    value={interactiveQuery}
-                                    onChange={e => setInteractiveQuery(e.target.value)}
-                                />
-                                <button onClick={handleGenerateInteractive} disabled={isLoading}>
-                                    {isLoading ? 'Oluşturuluyor...' : 'Grafik/Tablo Oluştur'}
-                                </button>
+                                <div className="interactive-query-builder">
+                                    <div className="query-row">
+                                        <span>NE GÖSTERİLSİN?</span>
+                                        <select value={interactiveMetric} onChange={e => setInteractiveMetric(e.target.value)}>
+                                            <option value="count">Toplam İş Sayısı</option>
+                                            <option value="pending_count">Bekleyen İş Sayısı</option>
+                                            <option value="overdue_count">Süresi Geçen İş Sayısı</option>
+                                        </select>
+                                        <span>NEYE GÖRE GRUPLANSIN?</span>
+                                        <select value={interactiveDimension} onChange={e => setInteractiveDimension(e.target.value)}>
+                                            <option value="_province">İl</option>
+                                            <option value="_district">İlçe</option>
+                                            <option value="görevli personel">Personel</option>
+                                            <option value="işlem">İşlem Türü</option>
+                                            <option value="yıl">Yıl</option>
+                                        </select>
+                                        <span>NASIL GÖRÜNSÜN?</span>
+                                        <select value={interactiveChartType} onChange={e => setInteractiveChartType(e.target.value)}>
+                                            <option value="bar">Bar Grafiği</option>
+                                            <option value="pie">Pasta Grafiği</option>
+                                            <option value="doughnut">Halka Grafik</option>
+                                            <option value="table">Tablo</option>
+                                        </select>
+                                    </div>
+                                    <button onClick={handleGenerateInteractive} disabled={isLoading}>
+                                        {isLoading ? 'Oluşturuluyor...' : 'Grafik/Tablo Oluştur'}
+                                    </button>
+                                </div>
+                                
                                 <div className="interactive-display-container">
                                     {isLoading ? <p>Yükleniyor...</p> : <InteractiveDisplay result={interactiveResult} data={data} />}
                                 </div>
@@ -1967,251 +1962,261 @@ You are an expert data analysis assistant for a Land Registry and Cadastre Direc
             );
         }
 
-        function ReportComparer({ isEngineer }) {
-            const [oldFile, setOldFile] = useState(null);
-            const [newFile, setNewFile] = useState(null);
-            const [oldFileName, setOldFileName] = useState('');
-            const [newFileName, setNewFileName] = useState('');
+        function ReportComparison({ engineers, isEngineer }) {
+            const [oldReport, setOldReport] = useState({ data: [], headers: [], name: '' });
+            const [newReport, setNewReport] = useState({ data: [], headers: [], name: '' });
             const [comparisonResult, setComparisonResult] = useState(null);
-            const [perEngineerResults, setPerEngineerResults] = useState(null);
-            const [comparisonHeaders, setComparisonHeaders] = useState([]);
             const [isLoading, setIsLoading] = useState(false);
-            const [error, setError] = useState('');
             const [analyzeEngineersOnly, setAnalyzeEngineersOnly] = useState(false);
 
-            const getRowIdentifier = (row) => {
-                const fenKayitNo = row['fen kayıt no'];
-                if (fenKayitNo != null && fenKayitNo != 0 && fenKayitNo !== "") {
-                    return `fen_${fenKayitNo}`;
-                }
-                const zemin = row['zemin'];
-                if (zemin) {
-                    return `zemin_${String(zemin).trim().replace(/\s+/g, '')}`;
-                }
-                return `row_${JSON.stringify(row)}`;
-            };
-
-            const handleFileChange = (e, fileType) => {
+            const handleFileChange = async (e, reportType) => {
                 const file = e.target.files[0];
                 if (!file) return;
-
-                if (fileType === 'old') {
-                    setOldFile(file);
-                    setOldFileName(file.name);
-                } else {
-                    setNewFile(file);
-                    setNewFileName(file.name);
-                }
-                 e.target.value = null;
-            };
-
-            const handleCompare = async () => {
-                if (!oldFile || !newFile) {
-                    setError("Lütfen karşılaştırma için her iki rapor dosyasını da seçin.");
-                    return;
-                }
                 setIsLoading(true);
-                setError('');
-                setComparisonResult(null);
-                setPerEngineerResults(null);
-
                 try {
-                    const { rows: oldData, foundHeaders: oldHeaders } = await readExcelPromise(oldFile, true);
-                    const { rows: newData, foundHeaders: newHeaders } = await readExcelPromise(newFile, true);
-                    
-                    const combinedHeaders = ALLOWED_COLS.filter(col => oldHeaders.includes(col) || newHeaders.includes(col));
-                    setComparisonHeaders(combinedHeaders);
-
-                    if (analyzeEngineersOnly) {
-                        const engineerAnalysis = {};
-                        const allPersonnel = new Set([...oldData, ...newData].flatMap(r => splitPersonel(r['görevli personel'])));
-                        const engineersInFiles = [...allPersonnel].filter(p => isEngineer(p));
-
-                        engineersInFiles.forEach(eng => {
-                            const oldEngJobs = oldData.filter(r => splitPersonel(r['görevli personel']).includes(eng));
-                            const newEngJobs = newData.filter(r => splitPersonel(r['görevli personel']).includes(eng));
-                            
-                            const oldEngMap = new Map(oldEngJobs.map(row => [getRowIdentifier(row), row]));
-                            const newEngMap = new Map(newEngJobs.map(row => [getRowIdentifier(row), row]));
-
-                            const completed = oldEngJobs.filter(row => !newEngMap.has(getRowIdentifier(row)));
-                            const ongoing = newEngJobs.filter(row => oldEngMap.has(getRowIdentifier(row)));
-                            const newlyAdded = newEngJobs.filter(row => !oldEngMap.has(getRowIdentifier(row)));
-
-                            if(completed.length > 0 || ongoing.length > 0 || newlyAdded.length > 0) {
-                                engineerAnalysis[eng] = { completed, ongoing, newlyAdded };
-                            }
-                        });
-                        setPerEngineerResults(engineerAnalysis);
-
+                    const { rows, headers } = await readExcelPromise(file, true);
+                    const reportData = { data: rows, headers, name: file.name };
+                    if (reportType === 'old') {
+                        setOldReport(reportData);
                     } else {
-                        const oldDataMap = new Map(oldData.map(row => [getRowIdentifier(row), row]));
-                        const newDataMap = new Map(newData.map(row => [getRowIdentifier(row), row]));
-
-                        const completed = [];
-                        for (const [identifier, row] of oldDataMap.entries()) {
-                            if (!newDataMap.has(identifier)) {
-                                completed.push(row);
-                            }
-                        }
-
-                        const newlyAdded = [];
-                        const ongoing = [];
-                        for (const [identifier, row] of newDataMap.entries()) {
-                            if (oldDataMap.has(identifier)) {
-                                ongoing.push(row);
-                            } else {
-                                newlyAdded.push(row);
-                            }
-                        }
-                        setComparisonResult({ completed, ongoing, newlyAdded });
+                        setNewReport(reportData);
                     }
                 } catch (err) {
-                    console.error("Karşılaştırma hatası:", err);
-                    setError("Raporlar karşılaştırılırken bir hata oluştu: " + err.message);
+                    alert(`Hata: ${err.message}`);
                 } finally {
                     setIsLoading(false);
+                    e.target.value = null;
                 }
-            };
-
-            const exportComparisonToExcel = (title, data, headers) => {
-                if (!data || data.length === 0) {
-                    setError(`${title} için dışa aktarılacak veri bulunamadı.`);
-                    setTimeout(() => setError(''), 3000);
-                    return;
-                }
-                const dataToExport = data.map(row => {
-                    const exportedRow = {};
-                    headers.forEach(header => {
-                        exportedRow[header.toLocaleUpperCase('tr-TR')] = row[header];
-                    });
-                    return exportedRow;
-                });
-
-                const ws = XLSX.utils.json_to_sheet(dataToExport);
-                const wb = XLSX.utils.book_new();
-                XLSX.utils.book_append_sheet(wb, ws, title);
-                XLSX.writeFile(wb, `${title.replace(/\s/g, '_')}.xlsx`);
             };
             
-            const exportAllEngineerData = () => {
-                const wb = XLSX.utils.book_new();
-                
-                const summaryData = Object.keys(perEngineerResults).map(eng => ({
-                    'Mühendis': eng,
-                    'Tamamlanan': perEngineerResults[eng].completed.length,
-                    'Devam Eden': perEngineerResults[eng].ongoing.length,
-                    'Yeni Eklenen': perEngineerResults[eng].newlyAdded.length
-                }));
-                const summaryWs = XLSX.utils.json_to_sheet(summaryData);
-                XLSX.utils.book_append_sheet(wb, summaryWs, 'Özet');
+            const findHeader = (headers, keywords) => {
+                const normalizedKeywords = keywords.map(k => normalizeHeader(k));
+                for (const header of headers) {
+                    const normalizedHeader = normalizeHeader(header);
+                    if (normalizedKeywords.every(kw => normalizedHeader.includes(kw))) {
+                        return header;
+                    }
+                }
+                return null;
+            }
 
-                Object.keys(perEngineerResults).forEach(eng => {
-                    const { completed, ongoing, newlyAdded } = perEngineerResults[eng];
-                    const allData = [
-                        ...completed.map(r => ({ ...r, Durum: 'Tamamlandı' })),
-                        ...ongoing.map(r => ({ ...r, Durum: 'Devam Ediyor' })),
-                        ...newlyAdded.map(r => ({ ...r, Durum: 'Yeni Eklendi' }))
-                    ];
-                    
-                    if(allData.length > 0){
-                        const engWs = XLSX.utils.json_to_sheet(allData);
-                        XLSX.utils.book_append_sheet(wb, engWs, eng.substring(0, 30)); // Sheet names can't be too long
+            const handleCompare = () => {
+                if (oldReport.data.length === 0 || newReport.data.length === 0) {
+                    alert("Lütfen her iki raporu da yükleyin.");
+                    return;
+                }
+                
+                const fenKayitNoHeaderOld = findHeader(oldReport.headers, ['fen', 'kayıt', 'no']);
+                const zeminHeaderOld = findHeader(oldReport.headers, ['zemin']);
+                const personelHeaderOld = findHeader(oldReport.headers, ['personel']);
+
+                const oldReportMap = new Map();
+                oldReport.data.forEach(row => {
+                    const key = (row[fenKayitNoHeaderOld] != null && row[fenKayitNoHeaderOld] != 0) 
+                        ? String(row[fenKayitNoHeaderOld])
+                        : String(row[zeminHeaderOld] || '');
+                    if (key) oldReportMap.set(key, row);
+                });
+
+                const fenKayitNoHeaderNew = findHeader(newReport.headers, ['fen', 'kayıt', 'no']);
+                const zeminHeaderNew = findHeader(newReport.headers, ['zemin']);
+
+                const newReportMap = new Map();
+                newReport.data.forEach(row => {
+                     const key = (row[fenKayitNoHeaderNew] != null && row[fenKayitNoHeaderNew] != 0) 
+                        ? String(row[fenKayitNoHeaderNew])
+                        : String(row[zeminHeaderNew] || '');
+                    if (key) newReportMap.set(key, row);
+                });
+
+                const completed = [];
+                const ongoing = [];
+                const added = [];
+
+                oldReportMap.forEach((row, key) => {
+                    if (!newReportMap.has(key)) {
+                        completed.push(row);
+                    } else {
+                        ongoing.push(newReportMap.get(key));
+                    }
+                });
+
+                newReportMap.forEach((row, key) => {
+                    if (!oldReportMap.has(key)) {
+                        added.push(row);
                     }
                 });
                 
-                XLSX.writeFile(wb, 'Muhendis_Performans_Analizi.xlsx');
+                if (analyzeEngineersOnly) {
+                    const engineerAnalysis = {};
+                    const allEngineers = new Set(engineers.map(normalizeName));
+
+                    const processReportForEngineers = (reportData, reportHeaders, targetObject, status) => {
+                         const personelHeader = findHeader(reportHeaders, ['personel']);
+                         if (!personelHeader) return;
+
+                        reportData.forEach(row => {
+                            const personnel = splitPersonel(row[personelHeader]);
+                            personnel.forEach(pName => {
+                                const normPName = normalizeName(pName);
+                                if (allEngineers.has(normPName)) {
+                                    if (!targetObject[pName]) {
+                                        targetObject[pName] = { completed: [], ongoing: [], added: [] };
+                                    }
+                                    targetObject[pName][status].push(row);
+                                }
+                            });
+                        });
+                    };
+                    
+                    processReportForEngineers(completed, oldReport.headers, engineerAnalysis, 'completed');
+                    processReportForEngineers(ongoing, newReport.headers, engineerAnalysis, 'ongoing');
+                    processReportForEngineers(added, newReport.headers, engineerAnalysis, 'added');
+                    
+                    setComparisonResult({ engineerAnalysis });
+                } else {
+                     setComparisonResult({
+                        completed: { data: completed, headers: oldReport.headers },
+                        ongoing: { data: ongoing, headers: newReport.headers },
+                        added: { data: added, headers: newReport.headers }
+                    });
+                }
+            };
+            
+            const exportComparisonToExcel = (data, headers, fileName) => {
+                if (data.length === 0) {
+                    alert("Dışa aktarılacak veri yok.");
+                    return;
+                }
+                const ws = XLSX.utils.json_to_sheet(data, { header: headers });
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, ws, "Rapor");
+                XLSX.writeFile(wb, `${fileName}.xlsx`);
             };
 
+            const exportEngineerAnalysisToExcel = () => {
+                if (!comparisonResult || !comparisonResult.engineerAnalysis) return;
+                const wb = XLSX.utils.book_new();
+                
+                Object.keys(comparisonResult.engineerAnalysis).forEach(engineerName => {
+                    const analysis = comparisonResult.engineerAnalysis[engineerName];
+                    const sheetData = [];
+
+                    const headers = new Set([...oldReport.headers, ...newReport.headers]);
+
+                    if(analysis.completed.length > 0) {
+                        sheetData.push(["--- TAMAMLANAN İŞLER ---"]);
+                        sheetData.push(Array.from(headers));
+                        analysis.completed.forEach(row => {
+                            const rowData = Array.from(headers).map(h => row[h] || "");
+                            sheetData.push(rowData);
+                        });
+                        sheetData.push([]); // Spacer
+                    }
+                    if(analysis.ongoing.length > 0) {
+                        sheetData.push(["--- DEVAM EDEN İŞLER ---"]);
+                        sheetData.push(Array.from(headers));
+                        analysis.ongoing.forEach(row => {
+                            const rowData = Array.from(headers).map(h => row[h] || "");
+                            sheetData.push(rowData);
+                        });
+                         sheetData.push([]); // Spacer
+                    }
+                     if(analysis.added.length > 0) {
+                        sheetData.push(["--- YENİ EKLENEN İŞLER ---"]);
+                        sheetData.push(Array.from(headers));
+                        analysis.added.forEach(row => {
+                            const rowData = Array.from(headers).map(h => row[h] || "");
+                            sheetData.push(rowData);
+                        });
+                    }
+                    
+                    if (sheetData.length > 0) {
+                        const ws = XLSX.utils.aoa_to_sheet(sheetData);
+                        XLSX.utils.book_append_sheet(wb, ws, engineerName.substring(0, 31));
+                    }
+                });
+
+                XLSX.writeFile(wb, "Muhendis_Performans_Analizi.xlsx");
+            }
 
             return (
-                <div className="report-comparer-container">
-                    <div className="report-comparer-header">
+                 <div className="report-comparison-container">
+                    <div className="report-comparison-header">
                         <h3>Rapor Karşılaştırma</h3>
                     </div>
-                    <div className="comparer-controls">
+                    <div className="report-comparison-inputs">
                         <div className="control-group">
                             <label>Eski Rapor</label>
                             <input type="file" onChange={(e) => handleFileChange(e, 'old')} accept=".xlsx, .xls" />
-                            {oldFileName && <span style={{fontSize: '0.8rem', marginTop: '4px'}}>Seçilen: {oldFileName}</span>}
+                            <span>Seçilen: {oldReport.name}</span>
                         </div>
                         <div className="control-group">
                             <label>Yeni Rapor</label>
                             <input type="file" onChange={(e) => handleFileChange(e, 'new')} accept=".xlsx, .xls" />
-                            {newFileName && <span style={{fontSize: '0.8rem', marginTop: '4px'}}>Seçilen: {newFileName}</span>}
-                        </div>
-                        <div className="control-group" style={{justifyContent: 'center'}}>
-                            <label style={{display: 'flex', alignItems: 'center', cursor: 'pointer'}}>
-                                <input type="checkbox" checked={analyzeEngineersOnly} onChange={() => setAnalyzeEngineersOnly(!analyzeEngineersOnly)} />
-                                Sadece Mühendisleri Analiz Et
-                            </label>
-                        </div>
-                        <div className="control-group">
-                            <button onClick={handleCompare} disabled={isLoading || !oldFile || !newFile}>
-                                {isLoading ? 'Karşılaştırılıyor...' : 'Karşılaştır'}
-                            </button>
+                             <span>Seçilen: {newReport.name}</span>
                         </div>
                     </div>
-                    {error && <p className="error-message">{error}</p>}
+                     <div style={{textAlign: 'center', margin: '15px 0'}}>
+                        <label style={{display: 'inline-flex', alignItems: 'center', cursor: 'pointer'}}>
+                            <input type="checkbox" checked={analyzeEngineersOnly} onChange={() => setAnalyzeEngineersOnly(!analyzeEngineersOnly)} />
+                            Sadece Mühendisleri Analiz Et
+                        </label>
+                    </div>
+                    <div className="report-comparison-actions">
+                        <button onClick={handleCompare} disabled={isLoading || oldReport.data.length === 0 || newReport.data.length === 0}>
+                            {isLoading ? 'Yükleniyor...' : 'Karşılaştır'}
+                        </button>
+                    </div>
                     {comparisonResult && (
-                        <div className="comparison-results">
-                            <div className="comparison-result-item">
-                                <h4>Tamamlanan İşler ({comparisonResult.completed.length} adet)</h4>
-                                <button 
-                                    className="export-btn" 
-                                    onClick={() => exportComparisonToExcel('Tamamlanan_Isler', comparisonResult.completed, comparisonHeaders)}
-                                >
-                                    Excel İndir
+                        analyzeEngineersOnly ? (
+                            <div style={{textAlign: 'center', marginTop: '20px'}}>
+                                <button className="excel-btn" style={{backgroundColor: '#7e22ce', padding: '10px 20px'}} onClick={exportEngineerAnalysisToExcel}>
+                                    Mühendis Performans Raporunu İndir
                                 </button>
+                                <p style={{fontSize: '0.9rem', color: '#581c87', marginTop: '10px'}}>
+                                    Excel dosyasında her mühendis için ayrı bir sayfa oluşturulacaktır.
+                                </p>
                             </div>
-                            <div className="comparison-result-item">
-                                <h4>Halen Devam Eden İşler ({comparisonResult.ongoing.length} adet)</h4>
-                                <button 
-                                    className="export-btn" 
-                                    onClick={() => exportComparisonToExcel('Devam_Eden_Isler', comparisonResult.ongoing, comparisonHeaders)}
-                                >
-                                    Excel İndir
-                                </button>
+                        ) : (
+                            <div className="report-comparison-results">
+                                <div className="result-card">
+                                    <h4>Tamamlanan İşler</h4>
+                                    <p>{comparisonResult.completed.data.length} adet</p>
+                                    <button 
+                                        className="excel-btn"
+                                        disabled={comparisonResult.completed.data.length === 0}
+                                        onClick={() => exportComparisonToExcel(comparisonResult.completed.data, comparisonResult.completed.headers, 'Tamamlanan_Isler')}
+                                    >
+                                        Excel İndir
+                                    </button>
+                                </div>
+                                <div className="result-card">
+                                    <h4>Yeni Eklenen İşler</h4>
+                                    <p>{comparisonResult.added.data.length} adet</p>
+                                     <button 
+                                        className="excel-btn"
+                                        disabled={comparisonResult.added.data.length === 0}
+                                        onClick={() => exportComparisonToExcel(comparisonResult.added.data, comparisonResult.added.headers, 'Yeni_Eklenen_Isler')}
+                                    >
+                                        Excel İndir
+                                    </button>
+                                </div>
+                                <div className="result-card">
+                                    <h4>Halen Devam Eden İşler</h4>
+                                    <p>{comparisonResult.ongoing.data.length} adet</p>
+                                    <button 
+                                        className="excel-btn"
+                                        disabled={comparisonResult.ongoing.data.length === 0}
+                                        onClick={() => exportComparisonToExcel(comparisonResult.ongoing.data, comparisonResult.ongoing.headers, 'Devam_Eden_Isler')}
+                                    >
+                                        Excel İndir
+                                    </button>
+                                </div>
                             </div>
-                            <div className="comparison-result-item">
-                                <h4>Yeni Eklenen İşler ({comparisonResult.newlyAdded.length} adet)</h4>
-                                <button 
-                                    className="export-btn" 
-                                    onClick={() => exportComparisonToExcel('Yeni_Eklenen_Isler', comparisonResult.newlyAdded, comparisonHeaders)}
-                                >
-                                    Excel İndir
-                                </button>
-                            </div>
-                        </div>
+                        )
                     )}
-                    {perEngineerResults && (
-                        <div>
-                            <div className="datatable-header">
-                                <h3>Mühendis Bazlı Analiz</h3>
-                                <button className="export-btn" onClick={exportAllEngineerData}>Tüm Mühendis Verilerini İndir</button>
-                            </div>
-                            <div className="engineer-accordion">
-                                {Object.keys(perEngineerResults).sort().map(eng => (
-                                    <details key={eng}>
-                                        <summary>
-                                            {eng} (Müh.) - Tamamlanan: {perEngineerResults[eng].completed.length}, Devam Eden: {perEngineerResults[eng].ongoing.length}, Yeni: {perEngineerResults[eng].newlyAdded.length}
-                                        </summary>
-                                        <div className="engineer-accordion-content">
-                                            {perEngineerResults[eng].completed.length > 0 && <h5>Tamamlanan İşler</h5>}
-                                            {perEngineerResults[eng].completed.map((job, i) => <p key={i}>{job.işlem} - {job.zemin}</p>)}
-                                            
-                                            {perEngineerResults[eng].ongoing.length > 0 && <h5 style={{marginTop: '15px'}}>Devam Eden İşler</h5>}
-                                            {perEngineerResults[eng].ongoing.map((job, i) => <p key={i}>{job.işlem} - {job.zemin}</p>)}
-
-                                            {perEngineerResults[eng].newlyAdded.length > 0 && <h5 style={{marginTop: '15px'}}>Yeni Eklenen İşler</h5>}
-                                            {perEngineerResults[eng].newlyAdded.map((job, i) => <p key={i}>{job.işlem} - {job.zemin}</p>)}
-                                        </div>
-                                    </details>
-                                ))}
-                            </div>
-                        </div>
-                    )}
-                </div>
+                 </div>
             );
         }
 
@@ -2235,11 +2240,13 @@ You are an expert data analysis assistant for a Land Registry and Cadastre Direc
             const summaryTableRef = useRef(null);
             const personnelChartRef = useRef(null);
             const waitingChartRef = useRef(null);
+            const islemChartRef = useRef(null);
             
             const readExcelFromUrl = async (url) => {
                 try {
                     const response = await fetch(url);
                     if (!response.ok) {
+                        // Silently fail as requested
                         return [];
                     }
                     const arrayBuffer = await response.arrayBuffer();
@@ -2249,6 +2256,7 @@ You are an expert data analysis assistant for a Land Registry and Cadastre Direc
                     const json = XLSX.utils.sheet_to_json(ws, { header: 1 });
                     return json.flat().filter(name => name != null && name.toString().trim() !== '');
                 } catch (error) {
+                    // Silently fail as requested
                     return [];
                 }
             };
@@ -2299,12 +2307,14 @@ You are an expert data analysis assistant for a Land Registry and Cadastre Direc
                 const files=Array.from(e.target.files||[]);
                 if(!files.length) return;
                 setLoading(true); setErrorMsg("");
-                const newRows = await Promise.all(files.map(f => readExcelPromise(f).catch(err => {
+                const newRowsPromises = files.map(f => readExcelPromise(f).catch(err => {
                     console.error('Excel okuma hatası:',err); 
                     setErrorMsg(err.message);
-                    return [];
-                })));
-                setData(prevData => [...prevData, ...newRows.flat()]); 
+                    return {rows: []};
+                }));
+                const results = await Promise.all(newRowsPromises);
+                const allNewRows = results.flatMap(res => res.rows);
+                setData(prevData => [...prevData, ...allNewRows]); 
                 e.target.value = null;
                 setLoading(false);
             };
@@ -2317,7 +2327,7 @@ You are an expert data analysis assistant for a Land Registry and Cadastre Direc
                         const url = canvas.toDataURL('image/jpeg', 1.0);
                         const a = document.createElement('a');
                         a.href = url;
-                        a.download = `${zoomContent.type}_gorunumu.jpg`;
+                        a.download = `${zoomContent.title.replace(/[^a-z0-9]/gi, '_')}.jpg`;
                         a.click();
                     }).finally(() => setLoading(false));
                 }
@@ -2339,151 +2349,118 @@ You are an expert data analysis assistant for a Land Registry and Cadastre Direc
                 const { jsPDF } = window.jspdf;
                 const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
 
-                const renderContainer = document.createElement('div');
-                renderContainer.style.position = 'absolute';
-                renderContainer.style.left = '-9999px';
-                renderContainer.style.top = '-9999px';
-                document.body.appendChild(renderContainer);
-
-                const addElementToPdf = async (element, yPos) => {
-                    const canvas = await html2canvas(element, { scale: 2, backgroundColor: '#ffffff' });
-                    const imgData = canvas.toDataURL('image/png');
-                    const pageWidth = pdf.internal.pageSize.getWidth();
-                    const pageHeight = pdf.internal.pageSize.getHeight();
-                    const margin = 10;
-                    const imgWidth = pageWidth - (margin * 2);
-                    const imgHeight = (canvas.height * imgWidth) / canvas.width;
-                    
-                    if (yPos + imgHeight + margin > pageHeight && yPos > 10) {
-                        pdf.addPage();
-                        yPos = margin;
-                    }
-                    pdf.addImage(imgData, 'PNG', margin, yPos, imgWidth, imgHeight);
-                    return yPos + imgHeight + margin;
-                };
-
-                let yPosition = 10;
-                
-                const currentFilteredData = filteredData.length > 0 ? filteredData : data;
-                const titleSuffix = selectedIl.length > 0 ? ` (${selectedIl.join(', ')})` : ` (${[...new Set(currentFilteredData.map(d => d._province).filter(Boolean))].join(', ') || 'Tüm İller'})`;
-
-                if (summaryTableRef.current) {
-                    const summaryContainer = document.createElement('div');
-                    summaryContainer.style.background = '#f1f5f9';
-                    summaryContainer.style.padding = '15px';
-                    const titleElement = document.createElement('h3');
-                    titleElement.innerText = `Özet Tablo ${titleSuffix}`;
-                    titleElement.style.textAlign = 'center';
-                    titleElement.style.marginBottom = '10px';
-                    summaryContainer.appendChild(summaryTableRef.current.cloneNode(true));
-                    renderContainer.appendChild(summaryContainer);
-                    yPosition = await addElementToPdf(summaryContainer, yPosition);
-                    renderContainer.removeChild(summaryContainer);
-                }
-
-                const chartConfigs = [
-                    { 
-                        title: `Personel İşlem Dağılımı ${titleSuffix}`, 
-                        data: currentFilteredData
-                    },
-                    { 
-                        title: `Bekleyen İşlem Sayıları ${titleSuffix}`, 
-                        data: currentFilteredData.filter(d => {
-                            const status = String(d['başvuru durumu'] || '').toLocaleLowerCase('tr');
-                            return !status.includes('eksiklikten iade edildi') && !status.includes('tescile gönderildi');
-                        })
-                    },
-                    {
-                        title: `Tescil Edilen(Tescilden Geldi Yapılmayan) ${titleSuffix}`,
-                        data: currentFilteredData.filter(d => {
-                            const status = String(d['başvuru durumu'] || '').toLocaleLowerCase('tr');
-                            const aciklama = String(d['başvuru açıklama'] || '').toLocaleLowerCase('tr');
-                            return status.includes('tescile gönderildi') && aciklama.includes('tescil edildi');
-                        })
-                    },
-                    {
-                        title: `Tapu İptal Edilen(Tescilden Geldi-Eksiklikten İade Yapılmayan) ${titleSuffix}`,
-                        data: currentFilteredData.filter(d => {
-                            const status = String(d['başvuru durumu'] || '').toLocaleLowerCase('tr');
-                            const aciklama = String(d['başvuru açıklama'] || '').toLocaleLowerCase('tr');
-                            return status.includes('tescile gönderildi') && aciklama.includes('iptal');
-                        })
-                    },
-                    {
-                        title: `Fen Kayıt Alınmayan(Ödemesi Yapılan) ${titleSuffix}`,
-                        data: currentFilteredData.filter(d => {
-                            const odeme = String(d['ödeme'] || '').toLocaleLowerCase('tr');
-                            return odeme.includes('ödendi') && (d['fen kayıt no'] === 0 || d['fen kayıt no'] == null);
-                        })
-                    },
-                    {
-                        title: `Plan Örneği-Teknik Bilgi Belge Bekleyen ${titleSuffix}`,
-                        data: currentFilteredData.filter(d => {
-                            const planOrnegiTurleri = ['plan örneği', 'mahkeme plan örneği', 'teknik bilgi ve belge örnekleri'];
-                            const islem = String(d['işlem'] || '').toLocaleLowerCase('tr').trim();
-                            return planOrnegiTurleri.includes(islem);
-                        })
-                    }
-                ];
-                
-                for (const config of chartConfigs) {
-                    const personnelStats = {};
-                    config.data.forEach(r => {
-                        const personnel = splitPersonel(r['görevli personel']);
-                        if (personnel.length > 0) {
-                            personnel.forEach(p => {
-                                if (p) personnelStats[p] = (personnelStats[p] || 0) + 1;
-                            });
+                const signatureImg = new Image();
+                signatureImg.src = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAARgAAAAsCAYAAAD2B2f5AAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAATYSURBVHhe7Z1fSxtRFMfvzC2b7Ya2SbC0sS19KIKVFJAggiAi+AMMPYgIesgXQfTgF4jgQRB68KCIF1EkRARpD0W0VCxYLJCklhKstLXt2mY3s5NfGXZ3t/M6M3u/8MvMvM+ZO+87c3ZndmCCILgYQ0yQIOjA2yA69lB04L2Q2Nen2NenmLUDBrQDBrQDBrQDBrQDBrQDBrQDBrQDBrQDBrQDBrQDBrQDBrQDBrQDBhL3w1sLw5iGfJ/pI+g/BCFfNq5yI6e3e1J6Wf2p+v/H6Gg1wzO4c2i1h12S4GfI8PuyO2bX7R3/tq6u/kE2z6V0e2Lx+jT5GvjV0H5fR+0Y9T0G87oB560y1n4m9n2b7v2+N8a8L3eM9S3X1q/X05kY4xV2zfY/pLp6a3v0c8SnaT7K8lO0G+T/VWUPG5WjK/T/cM8rT7N/oI8j/5A3kd+QN5Bfn9G0M087f5A3kX+Yp5N/kKezf5Cns3+Qp7N/kKeLd7+FfXj/A9bK+e/Qc5B/vX4vTz3/AUc3+vP6f4c8mzyj/M08hzyD/I08gzyN/IM8jfyDPJv/430dOwfJz+R/yB/359M/oI8+/yFvIv8hTy7/IU8u/yFPLv8hTy7/IU8u/yFPJv8/SyL/P0s8/z9LPP8/SwL/P0si/z/LPP8/SyL/P8s8/z/LPP8/Szj/H0s4/z/LPP8/Sxj/P0s4/z/LPP8/Sxj/H0s4/z/LPP8/Sxj/P0s4/z/LPP8/SzT/H0s0/z9LNP8/SzT/H0s0/z9LNP8/SzT/H0s0/z/LNP8/SzD/P8sw/z/LMP8/yzD/P8sw/z/LMP8/yzD/P8sw/z/LMP8/Sxb/P0sW/z9LFv8/Sxb/P0sW/z9LFv8/Sxb/P0sW/z/LMP8/yzD/P8sw/z9r/v8P0t8/yzD/P8sw/z/LMP8/yzD/P8s4/z87B/n/2T/IPyDP/8/Owf5/9g/yD/D8/+/8B/kH+P/ZP8g/wPP/v/Af5B/j/2T/IP8Dz/7/wH+Qf4/9k/yD/A8/+1cZ/8g/z/7Vxn/yD/P/tXGf/IP8/+1cZ/8g/z/7Vxn/yD/P/tXGf/IP8/+1cZ/8g/z/7Vxn/yD/P/tXGf/IP8/+1cZ/8g/z/7Vxn/yD/P/tXGf/IP8/+1cZ/8g/z/7Vxn/yD/P/tXGf/IP8/9k/yD/P/ZP8g/z/2T/IP8/+yf5B/n/2T/IP8/+yf5B/n/2T/IP8/+yf5B/n/2T/IP8/+yf5B/n/2T/IP8/+yf5B/n/2T/IP8/+yf5B/n/2T/IP8/+yf5B/n/2P/KP8/+yf5B/n/2D/Kv8/+yf5B/n/2D/Kv8/+wf5V/k/2P/KP8/+wf5V/k/2D/Kv8/9k/yD/P/tX+f/ZP8i/z/7V/n/2T/Iv8/9Vf4z/yD/P/tX+f/ZP8i/z/7V/n/2T/Iv8/9Vf4z/yD/P/tX+f/ZP8i/z/7V/n/2T/Iv8/9Vf5n/kD+f/ZP8i/z/5X/mf+QP5/9k/yL/P/lf+Z/5A/n/2T/Iv8/+V/5n/kD+f/ZP8i/z/5H/mf+QP5/9k/yL/P/k/+Z/wB/gG9i2pD/t6f1AAAAABJRU5ErkJggg==';
+                signatureImg.onload = async () => {
+                    const addElementToPdf = async (element, yPos) => {
+                        const canvas = await html2canvas(element, { scale: 2, backgroundColor: '#ffffff' });
+                        const imgData = canvas.toDataURL('image/png');
+                        const pageWidth = pdf.internal.pageSize.getWidth();
+                        const pageHeight = pdf.internal.pageSize.getHeight();
+                        const margin = 10;
+                        const imgWidth = pageWidth - (margin * 2);
+                        const imgHeight = (canvas.height * imgWidth) / canvas.width;
+                        
+                        if (yPos + imgHeight + margin + 10 > pageHeight && yPos > margin) { // +10 for signature
+                            pdf.addPage();
+                            yPos = margin;
                         }
-                    });
+                        pdf.addImage(imgData, 'PNG', margin, yPos, imgWidth, imgHeight);
+                        return yPos + imgHeight + 5; // 5 margin after element
+                    };
 
-                     if (Object.keys(personnelStats).length > 0) {
-                        const chartContainer = document.createElement('div');
-                        
-                        const numItems = Object.keys(personnelStats).length;
-                        const chartWidth = Math.max(1200, numItems * 40);
-                        const chartHeight = 800;
+                    const addSignature = (y) => {
+                         const pageHeight = pdf.internal.pageSize.getHeight();
+                         const sigHeight = 10;
+                         const sigWidth = 60;
+                         const sigY = pageHeight - sigHeight - 5; // 5mm from bottom
+                         pdf.addImage(signatureImg, 'PNG', 10, sigY, sigWidth, sigHeight);
+                    };
 
-                        chartContainer.style.width = `${chartWidth}px`;
-                        chartContainer.style.height = `${chartHeight}px`;
-                        chartContainer.style.background = '#ffffff';
-                        chartContainer.style.padding = '20px';
-                        renderContainer.appendChild(chartContainer);
-                        
-                        const tempRoot = ReactDOM.createRoot(chartContainer);
-                        await new Promise(resolve => {
-                            tempRoot.render(<ZoomedChart chartData={personnelStats} title={config.title} onRender={resolve} isForPdf={true} isEngineer={isEngineer} />);
+                    let yPosition = 10;
+                    
+                    const currentFilteredData = filteredData.length > 0 ? filteredData : data;
+                    const titleSuffix = selectedIl.length > 0 ? ` (${selectedIl.join(', ')})` : ` (${[...new Set(currentFilteredData.map(d => d._province).filter(Boolean))].join(', ') || 'Tüm İller'})`;
+                    
+                    if (summaryTableRef.current) {
+                         yPosition = await addElementToPdf(summaryTableRef.current, yPosition);
+                    }
+                    
+                    const chartsContainer = document.createElement('div');
+                    chartsContainer.style.display = 'flex';
+                    chartsContainer.style.gap = '20px';
+                    if (personnelChartRef.current) chartsContainer.appendChild(personnelChartRef.current.cloneNode(true));
+                    if (waitingChartRef.current) chartsContainer.appendChild(waitingChartRef.current.cloneNode(true));
+                    if (islemChartRef.current) chartsContainer.appendChild(islemChartRef.current.cloneNode(true));
+
+                    if (chartsContainer.hasChildNodes()) {
+                       yPosition = await addElementToPdf(chartsContainer, yPosition);
+                    }
+
+                    addSignature(); // Add signature to the first page
+
+                    const dynamicChartConfigs = [
+                        { filter: 'tescile_giden', title: `Tescil Edilen(Tescilden Geldi Yapılmayan) ${titleSuffix}` },
+                        { filter: 'iptal_edilen', title: `Tapu İptal Edilen(Tescilden Geldi-Eksiklikten İade Yapılmayan) ${titleSuffix}` },
+                        { filter: 'fen_kayit_alinmayan', title: `Fen Kayıt Alınmayan(Ödemesi Yapılan) ${titleSuffix}` },
+                        { filter: 'plan_ornegi', title: `Plan Örneği-Teknik Bilgi Belge Bekleyen ${titleSuffix}` }
+                    ];
+
+                    for (const config of dynamicChartConfigs) {
+                        const tempChartContainer = document.createElement('div');
+                        tempChartContainer.style.position = 'absolute';
+                        tempChartContainer.style.left = '-9999px';
+                        tempChartContainer.style.width = '1200px';
+                        tempChartContainer.style.height = '800px';
+                        tempChartContainer.style.background = '#ffffff';
+                        tempChartContainer.style.padding = '20px';
+                        document.body.appendChild(tempChartContainer);
+
+                        const chartData = {};
+                        const filteredChartData = currentFilteredData.filter(d => {
+                            const status = String(d['başvuru durumu'] || '').toLocaleLowerCase('tr');
+                            const aciklama = String(d['başvuru açıklama'] || '').toLocaleLowerCase('tr');
+                            const odeme = String(d['ödeme'] || '').toLocaleLowerCase('tr');
+                            const islem = String(d['işlem'] || '').toLocaleLowerCase('tr');
+                            switch(config.filter) {
+                                case 'tescile_giden': return status.includes('tescile gönderildi') && aciklama.includes('tescil edildi');
+                                case 'iptal_edilen': return status.includes('tescile gönderildi') && aciklama.includes('iptal');
+                                case 'fen_kayit_alinmayan': return odeme.includes('ödendi') && (d['fen kayıt no'] === 0 || d['fen kayıt no'] == null);
+                                case 'plan_ornegi': 
+                                    const planOrnegiTerms = ['plan örneği', 'mahke', 'teknik bilgi ve belge örnekleri'];
+                                     const isWaiting = !status.includes('eksiklikten iade edildi') && !status.includes('tescile gönderildi');
+                                    return isWaiting && planOrnegiTerms.some(term => islem.includes(term));
+                                default: return false;
+                            }
                         });
                         
-                        if (yPosition > 10) pdf.addPage();
-                        yPosition = await addElementToPdf(chartContainer, 10);
+                        filteredChartData.forEach(r => {
+                            const personnel = splitPersonel(r['görevli personel']);
+                            personnel.forEach(p => {
+                                if(p) chartData[p] = (chartData[p] || 0) + 1;
+                            });
+                        });
                         
-                        tempRoot.unmount();
-                        renderContainer.removeChild(chartContainer); 
+                        if (Object.keys(chartData).length > 0) {
+                            const tempRoot = ReactDOM.createRoot(tempChartContainer);
+                            await new Promise(resolve => {
+                                tempRoot.render(<ZoomedChart chartData={chartData} title={config.title} onRender={resolve} isForPdf={true} isEngineer={isEngineer} />);
+                            });
+
+                            pdf.addPage();
+                            const canvas = await html2canvas(tempChartContainer, { scale: 2 });
+                            const imgData = canvas.toDataURL('image/png');
+                            pdf.addImage(imgData, 'PNG', 10, 10, pdf.internal.pageSize.getWidth() - 20, pdf.internal.pageSize.getHeight() - 30);
+                            addSignature();
+                            tempRoot.unmount();
+                        }
+
+                        document.body.removeChild(tempChartContainer);
                     }
-                }
 
-                document.body.removeChild(renderContainer);
-                
-                const signatureCanvas = document.createElement('canvas');
-                signatureCanvas.width = 300;
-                signatureCanvas.height = 20;
-                const ctx = signatureCanvas.getContext('2d');
-                ctx.fillStyle = "#969696"; // gray color
-                ctx.font = "10px Arial";
-                ctx.fillText("© Gökhan ELGÜL tarafından tasarlanmıştır.", 0, 10);
-                const signatureImage = signatureCanvas.toDataURL('image/png');
-
-                const pageCount = pdf.internal.getNumberOfPages();
-                for (let i = 1; i <= pageCount; i++) {
-                    pdf.setPage(i);
-                    const textX = (pdf.internal.pageSize.getWidth() - 50) / 2;
-                    const textY = pdf.internal.pageSize.getHeight() - 10;
-                    pdf.addImage(signatureImage, 'PNG', textX, textY, 50, 4);
-                }
-                
-                pdf.save('Genel_Rapor.pdf');
-                setLoading(false);
+                    pdf.save('Genel_Rapor.pdf');
+                    setLoading(false);
+                };
             };
 
             const ilOptions = Array.from(new Set(data.map(d=>d._province).filter(p=>p))).sort((a,b)=>a.localeCompare(b,'tr'));
@@ -2551,11 +2528,10 @@ You are an expert data analysis assistant for a Land Registry and Cadastre Direc
                         return odeme.includes('ödendi') && (d['fen kayıt no'] === 0 || d['fen kayıt no'] == null);
                     });
                 } else if (sortField === 'plan_ornegi') {
-                    const planOrnegiTurleri = ['plan örneği', 'mahkeme plan örneği', 'teknik bilgi ve belge örnekleri'];
-                    arr = arr.filter(d => {
-                        const islem = String(d['işlem'] || '').toLocaleLowerCase('tr').trim();
-                        return planOrnegiTurleri.includes(islem);
-                    });
+                     arr = arr.filter(d => {
+                         const islem = String(d['işlem'] || '').toLocaleLowerCase('tr');
+                         return islem.includes('plan örneği') || islem.includes('mahke') || islem.includes('teknik bilgi ve belge örnekleri');
+                     });
                 } else if (sortField === 'bekleyen_eski_yeni') {
                     arr = arr.filter(d => {
                         const status = String(d['başvuru durumu'] || '').toLocaleLowerCase('tr');
@@ -2608,9 +2584,7 @@ You are an expert data analysis assistant for a Land Registry and Cadastre Direc
                 </div>
                 
                 {loading && <div style={{position:'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', zIndex: 3000, background: 'rgba(0,0,0,0.7)', color: 'white', padding: '20px', borderRadius: '10px'}}>Yükleniyor...</div>}
-                
                 {data.length === 0 && !loading && !errorMsg && <LandingPage onFileChange={handleFile} />}
-                
                 {errorMsg && <p className="error-message">{errorMsg}</p>}
                 
                 {data.length > 0 && <>
@@ -2651,7 +2625,7 @@ You are an expert data analysis assistant for a Land Registry and Cadastre Direc
                     <Dashboard data={data} filtered={filteredData} sortField={sortField} selectedPersonel={selectedPersonel} selectedIl={selectedIl} selectedIlce={selectedIlce} />
                     <div>
                         <div className="charts-below">
-                            <ChartsBelow data={filteredData} onZoom={setZoomContent} personnelChartCardRef={personnelChartRef} waitingChartCardRef={waitingChartRef} selectedIl={selectedIl} isEngineer={isEngineer} showOnlyEngineers={showOnlyEngineers} onToggleEngineers={() => setShowOnlyEngineers(!showOnlyEngineers)} sortField={sortField} />
+                            <ChartsBelow data={filteredData} onZoom={setZoomContent} personnelChartCardRef={personnelChartRef} waitingChartCardRef={waitingChartRef} islemChartCardRef={islemChartRef} selectedIl={selectedIl} isEngineer={isEngineer} showOnlyEngineers={showOnlyEngineers} onToggleEngineers={() => setShowOnlyEngineers(!showOnlyEngineers)} sortField={sortField} />
                         </div>
                         <div style={{marginTop: '24px'}}>
                             <SummaryTable data={data} selectedIl={selectedIl} onZoom={() => setZoomContent({type: 'summary'})} summaryTableRef={summaryTableRef} />
@@ -2659,8 +2633,8 @@ You are an expert data analysis assistant for a Land Registry and Cadastre Direc
                     </div>
                     <WarningTable data={filteredData} isEngineer={isEngineer} showOnlyEngineers={showOnlyEngineers} onToggleEngineers={() => setShowOnlyEngineers(!showOnlyEngineers)} sortField={sortField} />
                     <DataTable data={filteredData} sortField={sortField} isEngineer={isEngineer} showOnlyEngineers={showOnlyEngineers} onToggleEngineers={() => setShowOnlyEngineers(!showOnlyEngineers)} />
-                    <AIReportGenerator data={filteredData.length > 0 ? filteredData : data} ilOptions={ilOptions} personnelOptions={personnelOptions} selectedIl={selectedIl} isEngineer={isEngineer} sortOptions={sortOptions} sortField={sortField} />
-                    <ReportComparer isEngineer={isEngineer} />
+                    <AIReportGenerator data={filteredData.length > 0 ? filteredData : data} ilOptions={ilOptions} personnelOptions={personnelOptions} selectedIl={selectedIl} isEngineer={isEngineer} sortField={sortField} />
+                    <ReportComparison engineers={engineers} isEngineer={isEngineer} />
                 </>}
                 
                 {zoomContent && (
@@ -2671,7 +2645,7 @@ You are an expert data analysis assistant for a Land Registry and Cadastre Direc
                                 <button className="close-btn" onClick={() => setZoomContent(null)}>×</button>
                            </div>
                            <div className="modal-content" ref={modalContentRef}>
-                                {zoomContent.type === 'chart' && <ZoomedChart chartData={zoomContent.data} title={zoomContent.title} isEngineer={isEngineer} isFullscreen={isFullscreen} />}
+                                {zoomContent.type === 'chart' && <ZoomedChart chartData={zoomContent.data} title={zoomContent.title} isEngineer={isEngineer} />}
                                 {zoomContent.type === 'summary' && <ZoomedSummary data={filteredData} selectedIl={selectedIl} />}
                                 {zoomContent.type === 'waitingList' && <ZoomedWaitingList data={zoomContent.data} title={zoomContent.title} />}
                            </div>
@@ -2749,5 +2723,4 @@ You are an expert data analysis assistant for a Land Registry and Cadastre Direc
     </script>
 </body>
 </html>
-```eof
 
