@@ -1056,7 +1056,7 @@
             ); 
         }
         
-        function WarningTable({ data, isEngineer, showOnlyEngineers, onToggleEngineers }) { 
+        function WarningTable({ data, isEngineer, showOnlyEngineers, onToggleEngineers, sortField }) { 
             const [warningRows, setWarningRows] = useState([]); 
             
             useEffect(() => { 
@@ -1064,6 +1064,9 @@
                 
                 const today = new Date(); 
                 const groupedTasks = {}; 
+
+                const daysThreshold = sortField === 'plan_ornegi' ? 2 : 7;
+
                 relevantData.forEach(task => { 
                     const fStr = task['fen kayıt tarihi']; 
                     if (fStr) { 
@@ -1074,7 +1077,7 @@
                             const isClosed = status.includes('eksiklikten iade edildi') || status.includes('tescile gönderildi'); 
                             const fenKayitNo = task['fen kayıt no']; 
                             const hasValidFenKayitNo = fenKayitNo != null && fenKayitNo != 0; 
-                            if (diffDays >= 7 && !isClosed && hasValidFenKayitNo) {
+                            if (diffDays >= daysThreshold && !isClosed && hasValidFenKayitNo) {
                                 if (!groupedTasks[fenKayitNo]) { 
                                     groupedTasks[fenKayitNo] = { 
                                         fenKayitNo: fenKayitNo, 
@@ -1097,7 +1100,7 @@
                 }
 
                 setWarningRows(finalRows); 
-            }, [data, isEngineer, showOnlyEngineers]); 
+            }, [data, isEngineer, showOnlyEngineers, sortField]); 
 
             const handleExportWarningExcel = () => { 
                 const dataToExport = warningRows.map(row => {
@@ -1130,11 +1133,17 @@
                 XLSX.utils.book_append_sheet(wb, ws, 'Uyari Raporu'); 
                 XLSX.writeFile(wb, 'uyari_raporu.xlsx'); 
             }; 
+
             if (warningRows.length === 0) { return null; } 
+
+            const title = sortField === 'plan_ornegi' 
+                ? '2 Günden Fazla Bekleyen İşlemler (Uyarı)' 
+                : '7 Günden Fazla Bekleyen İşlemler (Uyarı)';
+
             return ( 
                 <div className="warning-table-container"> 
                     <div className="warning-table-header"> 
-                        <h3>7 Günden Fazla Bekleyen İşlemler (Uyarı) (Toplam: {warningRows.length})</h3> 
+                        <h3>{title} (Toplam: {warningRows.length})</h3> 
                         <div className="button-group"> 
                              <label style={{display: 'flex', alignItems: 'center', cursor: 'pointer', marginRight: '10px'}}>
                                 <input type="checkbox" checked={showOnlyEngineers} onChange={onToggleEngineers} />
@@ -2455,17 +2464,22 @@ You are an expert data analysis assistant for a Land Registry and Cadastre Direc
                 }
 
                 document.body.removeChild(renderContainer);
+                
+                const signatureCanvas = document.createElement('canvas');
+                signatureCanvas.width = 300;
+                signatureCanvas.height = 20;
+                const ctx = signatureCanvas.getContext('2d');
+                ctx.fillStyle = "#969696"; // gray color
+                ctx.font = "10px Arial";
+                ctx.fillText("© Gökhan ELGÜL tarafından tasarlanmıştır.", 0, 10);
+                const signatureImage = signatureCanvas.toDataURL('image/png');
 
                 const pageCount = pdf.internal.getNumberOfPages();
                 for (let i = 1; i <= pageCount; i++) {
                     pdf.setPage(i);
-                    pdf.setFontSize(8);
-                    pdf.setTextColor(150);
-                    const text = "© Gökhan ELGÜL tarafindan tasarlanmistir.";
-                    const textWidth = pdf.getStringUnitWidth(text) * pdf.getFontSize() / pdf.internal.scaleFactor;
-                    const textX = (pdf.internal.pageSize.getWidth() - textWidth) / 2;
-                    const textY = pdf.internal.pageSize.getHeight() - 7;
-                    pdf.text(text, textX, textY);
+                    const textX = (pdf.internal.pageSize.getWidth() - 50) / 2;
+                    const textY = pdf.internal.pageSize.getHeight() - 10;
+                    pdf.addImage(signatureImage, 'PNG', textX, textY, 50, 4);
                 }
                 
                 pdf.save('Genel_Rapor.pdf');
@@ -2643,7 +2657,7 @@ You are an expert data analysis assistant for a Land Registry and Cadastre Direc
                             <SummaryTable data={data} selectedIl={selectedIl} onZoom={() => setZoomContent({type: 'summary'})} summaryTableRef={summaryTableRef} />
                         </div>
                     </div>
-                    <WarningTable data={filteredData} isEngineer={isEngineer} showOnlyEngineers={showOnlyEngineers} onToggleEngineers={() => setShowOnlyEngineers(!showOnlyEngineers)} />
+                    <WarningTable data={filteredData} isEngineer={isEngineer} showOnlyEngineers={showOnlyEngineers} onToggleEngineers={() => setShowOnlyEngineers(!showOnlyEngineers)} sortField={sortField} />
                     <DataTable data={filteredData} sortField={sortField} isEngineer={isEngineer} showOnlyEngineers={showOnlyEngineers} onToggleEngineers={() => setShowOnlyEngineers(!showOnlyEngineers)} />
                     <AIReportGenerator data={filteredData.length > 0 ? filteredData : data} ilOptions={ilOptions} personnelOptions={personnelOptions} selectedIl={selectedIl} isEngineer={isEngineer} sortOptions={sortOptions} sortField={sortField} />
                     <ReportComparer isEngineer={isEngineer} />
@@ -2735,3 +2749,5 @@ You are an expert data analysis assistant for a Land Registry and Cadastre Direc
     </script>
 </body>
 </html>
+```eof
+
