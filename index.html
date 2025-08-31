@@ -2159,7 +2159,10 @@ ${dataSummary}
                     </div>
                      <div style={{textAlign: 'center', margin: '15px 0'}}>
                         <label style={{display: 'inline-flex', alignItems: 'center', cursor: 'pointer'}}>
-                            <input type="checkbox" checked={analyzeEngineersOnly} onChange={() => setAnalyzeEngineersOnly(!analyzeEngineersOnly)} />
+                            <input type="checkbox" checked={analyzeEngineersOnly} onChange={() => {
+                                setAnalyzeEngineersOnly(!analyzeEngineersOnly);
+                                setComparisonResult(null);
+                            }} />
                             Sadece Mühendisleri Analiz Et
                         </label>
                     </div>
@@ -2719,6 +2722,18 @@ ${dataSummary}
                 )}
             </div>);
         }
+        const sortOptions=[
+                {label:'Sıralama Yok',value:''},
+                {label:'Başvuru Tarihine Göre',value:'başvuru tarihi'},
+                {label:'Fen Kayıt Tarihine Göre',value:'fen kayıt tarihi'},
+                {label:'İade Edilen',value:'iade edilen'},
+                {label:'Tescil Edilen', value:'tescile_giden'},
+                {label:'İptal Edilen', value:'iptal_edilen'},
+                {label:'Fen Kayıt Alınmayan', value:'fen_kayit_alinmayan'},
+                {label:'Plan Örneği', value:'plan_ornegi'},
+                {label:'Bekleyen (Eskiden Yeniye)', value:'bekleyen_eski_yeni'},
+                {label:'Bekleyen (Yeniden Eskiye)', value:'bekleyen_yeni_eski'}
+            ];
         ReactDOM.createRoot(document.getElementById('root')).render(<App />);
     </script>
 </body>
