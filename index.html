@@ -2298,7 +2298,7 @@ ${dataSummary}
                 setFileName(file.name);
                 try {
                     const { rows } = await readExcelPromise(file, true);
-                    const personnelHeader = Object.keys(rows[0]).find(h => normalizeHeader(h).includes('bekleyen') && normalizeHeader(h).includes('kullanıcı'));
+                    const personnelHeader = Object.keys(rows[0]).find(h => normalizeHeader(h).includes('bekleyen') && (normalizeHeader(h).includes('kullanıcı') || normalizeHeader(h).includes('kullanici')));
                     
                     if (!personnelHeader) {
                         alert("Raporda 'İşlemde Bekleyen Kullanıcı' sütunu bulunamadı.");
@@ -2327,7 +2327,7 @@ ${dataSummary}
             
              useEffect(() => {
                 if (reportReady) {
-                    const personnelHeader = Object.keys(ebysData[0]).find(h => normalizeHeader(h).includes('bekleyen') && normalizeHeader(h).includes('kullanıcı'));
+                    const personnelHeader = Object.keys(ebysData[0]).find(h => normalizeHeader(h).includes('bekleyen') && (normalizeHeader(h).includes('kullanıcı') || normalizeHeader(h).includes('kullanici')));
                     const dateHeader = Object.keys(ebysData[0]).find(h => normalizeHeader(h) === 'tarih');
 
                     let filteredData = ebysData.filter(row => selectedPersonnel.includes(row[personnelHeader]));
