@@ -464,6 +464,35 @@
              background-color: #9ca3af;
              cursor: not-allowed;
          }
+        
+        /* EBYS Reporter Styles */
+        .ebys-reporter-container {
+            margin-top: 24px;
+            padding: 20px;
+            border-radius: 12px;
+            background-color: #fff7ed; /* orange-50 */
+            border: 1px solid #fed7aa; /* orange-200 */
+        }
+
+        .ebys-reporter-header h3 {
+            margin: 0;
+            color: #9a3412; /* orange-800 */
+            font-size: 1.3rem;
+            text-align: center;
+            margin-bottom: 16px;
+        }
+        
+        .ebys-controls {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            align-items: flex-end;
+            flex-wrap: wrap;
+        }
+        
+        .ebys-results {
+            margin-top: 20px;
+        }
 
         @media (max-width: 600px) {
             .dashboard { grid-template-columns: 1fr; }
@@ -1900,7 +1929,7 @@ ${dataSummary}
 
                     <div className="ai-reporter-content">
                         {aiMode === 'report' && (
-                            React.createElement('div', null,
+                           React.createElement('div', null,
                                 React.createElement('div', { className: 'ai-reporter-controls' },
                                     React.createElement('div', { className: 'control-group' },
                                         React.createElement('label', null, 'Rapor Türü'),
@@ -1934,7 +1963,7 @@ ${dataSummary}
                         )}
 
                         {aiMode === 'interactive' && (
-                            React.createElement('div', null,
+                             React.createElement('div', null,
                                 React.createElement('div', { className: 'interactive-query-builder' },
                                     React.createElement('div', { className: 'query-row' },
                                         React.createElement('span', null, 'NE GÖSTERİLSİN?'),
@@ -2254,6 +2283,119 @@ ${dataSummary}
             );
         }
 
+         function EbysReporter() {
+            const [ebysData, setEbysData] = useState([]);
+            const [personnelOptions, setPersonnelOptions] = useState([]);
+            const [selectedPersonnel, setSelectedPersonnel] = useState([]);
+            const [isLoading, setIsLoading] = useState(false);
+            const [reportReady, setReportReady] = useState(false);
+            const [fileName, setFileName] = useState('');
+
+            const handleFileChange = async (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                setIsLoading(true);
+                setFileName(file.name);
+                try {
+                    const { rows } = await readExcelPromise(file, true);
+                    const personnelHeader = Object.keys(rows[0]).find(h => normalizeHeader(h).includes('bekleyen') && normalizeHeader(h).includes('kullanıcı'));
+                    
+                    if (!personnelHeader) {
+                        alert("Raporda 'İşlemde Bekleyen Kullanıcı' sütunu bulunamadı.");
+                        throw new Error("Required column not found");
+                    }
+                    
+                    const uniquePersonnel = [...new Set(rows.map(r => r[personnelHeader]).filter(Boolean))].sort((a,b) => a.localeCompare(b,'tr'));
+                    setPersonnelOptions(uniquePersonnel);
+                    setEbysData(rows);
+                } catch (err) {
+                    alert(`Hata: ${err.message}`);
+                    setFileName('');
+                } finally {
+                    setIsLoading(false);
+                     e.target.value = null;
+                }
+            };
+
+            const generateReport = () => {
+                if (selectedPersonnel.length === 0) {
+                    alert("Lütfen en az bir personel seçin.");
+                    return;
+                }
+                 setReportReady(true); // This will trigger the download in the effect
+            };
+            
+             useEffect(() => {
+                if (reportReady) {
+                    const personnelHeader = Object.keys(ebysData[0]).find(h => normalizeHeader(h).includes('bekleyen') && normalizeHeader(h).includes('kullanıcı'));
+                    const dateHeader = Object.keys(ebysData[0]).find(h => normalizeHeader(h) === 'tarih');
+
+                    let filteredData = ebysData.filter(row => selectedPersonnel.includes(row[personnelHeader]));
+                    
+                    filteredData.sort((a, b) => {
+                        const dateA = new Date(formatDate(a[dateHeader]));
+                        const dateB = new Date(formatDate(b[dateHeader]));
+                        if (isNaN(dateA.getTime()) || isNaN(dateB.getTime())) return 0;
+                        return dateA - dateB;
+                    });
+                    
+                    const wb = XLSX.utils.book_new();
+                    const ws = XLSX.utils.json_to_sheet(filteredData);
+                    XLSX.utils.book_append_sheet(wb, ws, "EBYS Raporu");
+                    XLSX.writeFile(wb, "EBYS_Personel_Raporu.xlsx");
+                    
+                    setReportReady(false); // Reset for next report
+                }
+            }, [reportReady, ebysData, selectedPersonnel]);
+
+
+            return (
+                <div className="ebys-reporter-container">
+                    <div className="ebys-reporter-header">
+                        <h3>EBYS Raporlama</h3>
+                    </div>
+                    <div className="ebys-controls">
+                        <div className="control-group">
+                            <label>EBYS Excel Raporu Yükle</label>
+                             <input type="file" onChange={handleFileChange} accept=".xlsx, .xls" />
+                             {fileName && <span>Seçilen: {fileName}</span>}
+                        </div>
+                        {personnelOptions.length > 0 &&
+                             <div className="control-group">
+                                <label>Personel Seç</label>
+                                <button onClick={() => document.getElementById('ebys-personnel-modal').style.display = 'flex'}>
+                                    {selectedPersonnel.length ? `${selectedPersonnel.length} personel seçili` : 'Personel Seç'}
+                                </button>
+                            </div>
+                        }
+                        <button onClick={generateReport} disabled={isLoading || selectedPersonnel.length === 0}>
+                            Rapor Oluştur ve İndir
+                        </button>
+                    </div>
+
+                     <div id="ebys-personnel-modal" className="modal-overlay" style={{display: 'none'}} onClick={() => document.getElementById('ebys-personnel-modal').style.display = 'none'}>
+                        <div className="modal" onClick={e => e.stopPropagation()}>
+                            <div className="modal-header"><h3>Personel Seç</h3><button className="close-btn" onClick={()=> document.getElementById('ebys-personnel-modal').style.display = 'none'}>×</button></div>
+                            <div className="modal-content">
+                                <div className="filter-list">
+                                    {personnelOptions.map(p => <div className="filter-item" key={p}><label>
+                                        <input type="checkbox" checked={selectedPersonnel.includes(p)} onChange={e=>{
+                                            if(e.target.checked) setSelectedPersonnel([...selectedPersonnel,p]);
+                                            else setSelectedPersonnel(selectedPersonnel.filter(sp=>sp!==p));
+                                        }}/> {p}
+                                    </label></div>)}
+                                </div>
+                            </div>
+                            <div className="modal-footer">
+                                <button className="download-btn" onClick={()=>{setSelectedPersonnel([]); document.getElementById('ebys-personnel-modal').style.display = 'none';}}>Temizle</button>
+                                <button className="download-btn" style={{backgroundColor: '#16a34a'}} onClick={()=> document.getElementById('ebys-personnel-modal').style.display = 'none'}>Kapat</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
         function App(){
             const [data,setData]=useState([]);
             const [engineers, setEngineers] = useState([]);
@@ -2564,10 +2706,10 @@ ${dataSummary}
                 } else if (sortField === 'plan_ornegi') {
                      arr = arr.filter(d => {
                          const islem = String(d['işlem'] || '').toLocaleLowerCase('tr');
-                         const planOrnegiTerms = ['plan örneği', 'teknik bilgi ve belge örnekleri'];
-                         const mahkemePlanOrnegiTerms = ['mahke', 'plan örneği'];
-                         
-                         return planOrnegiTerms.some(term => islem.includes(term)) || mahkemePlanOrnegiTerms.every(term => islem.includes(term));
+                         const isPlanOrnegi = islem === 'plan örneği';
+                         const isMahkemePlanOrnegi = islem === 'mahkeme plan örneği';
+                         const isTeknikBilgi = islem === 'teknik bilgi ve belge örnekleri';
+                         return isPlanOrnegi || isMahkemePlanOrnegi || isTeknikBilgi;
                      });
                 } else if (sortField === 'bekleyen_eski_yeni') {
                     arr = arr.filter(d => {
@@ -2672,6 +2814,7 @@ ${dataSummary}
                     <DataTable data={filteredData} sortField={sortField} isEngineer={isEngineer} showOnlyEngineers={showOnlyEngineers} onToggleEngineers={() => setShowOnlyEngineers(!showOnlyEngineers)} />
                     <AIReportGenerator data={filteredData.length > 0 ? filteredData : data} ilOptions={ilOptions} personnelOptions={personnelOptions} selectedIl={selectedIl} isEngineer={isEngineer} sortField={sortField} />
                     <ReportComparison engineers={engineers} isEngineer={isEngineer} />
+                    <EbysReporter />
                 </React.Fragment>}
                 
                 {zoomContent && (
