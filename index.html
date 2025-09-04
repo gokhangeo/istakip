@@ -2290,6 +2290,7 @@ ${dataSummary}
             const [isLoading, setIsLoading] = useState(false);
             const [reportReady, setReportReady] = useState(false);
             const [fileName, setFileName] = useState('');
+            const [totalEbysDocs, setTotalEbysDocs] = useState(0);
 
             const handleFileChange = async (e) => {
                 const file = e.target.files[0];
@@ -2308,9 +2309,11 @@ ${dataSummary}
                     const uniquePersonnel = [...new Set(rows.map(r => r[personnelHeader]).filter(Boolean))].sort((a,b) => a.localeCompare(b,'tr'));
                     setPersonnelOptions(uniquePersonnel);
                     setEbysData(rows);
+                    setTotalEbysDocs(rows.length);
                 } catch (err) {
                     alert(`Hata: ${err.message}`);
                     setFileName('');
+                    setTotalEbysDocs(0);
                 } finally {
                     setIsLoading(false);
                      e.target.value = null;
@@ -2329,19 +2332,24 @@ ${dataSummary}
                 if (reportReady) {
                     const personnelHeader = Object.keys(ebysData[0]).find(h => normalizeHeader(h).includes('bekleyen') && (normalizeHeader(h).includes('kullanıcı') || normalizeHeader(h).includes('kullanici')));
                     const dateHeader = Object.keys(ebysData[0]).find(h => normalizeHeader(h) === 'tarih');
-
-                    let filteredData = ebysData.filter(row => selectedPersonnel.includes(row[personnelHeader]));
-                    
-                    filteredData.sort((a, b) => {
-                        const dateA = new Date(formatDate(a[dateHeader]));
-                        const dateB = new Date(formatDate(b[dateHeader]));
-                        if (isNaN(dateA.getTime()) || isNaN(dateB.getTime())) return 0;
-                        return dateA - dateB;
-                    });
                     
                     const wb = XLSX.utils.book_new();
-                    const ws = XLSX.utils.json_to_sheet(filteredData);
-                    XLSX.utils.book_append_sheet(wb, ws, "EBYS Raporu");
+
+                    selectedPersonnel.forEach(personel => {
+                        let filteredData = ebysData.filter(row => row[personnelHeader] === personel);
+                        
+                        filteredData.sort((a, b) => {
+                            const dateA = new Date(formatDate(a[dateHeader]));
+                            const dateB = new Date(formatDate(b[dateHeader]));
+                            if (isNaN(dateA.getTime()) || isNaN(dateB.getTime())) return 0;
+                            return dateA - dateB;
+                        });
+
+                        const ws = XLSX.utils.json_to_sheet(filteredData);
+                        const sheetName = personel.replace(/[\\/*?:]/g, "").substring(0, 31);
+                        XLSX.utils.book_append_sheet(wb, ws, sheetName);
+                    });
+                    
                     XLSX.writeFile(wb, "EBYS_Personel_Raporu.xlsx");
                     
                     setReportReady(false); // Reset for next report
@@ -2358,7 +2366,8 @@ ${dataSummary}
                         <div className="control-group">
                             <label>EBYS Excel Raporu Yükle</label>
                              <input type="file" onChange={handleFileChange} accept=".xlsx, .xls" />
-                             {fileName && <span>Seçilen: {fileName}</span>}
+                             {fileName && <span style={{marginTop: '5px'}}>Seçilen: {fileName}</span>}
+                             {totalEbysDocs > 0 && <span style={{fontSize: '0.9rem', color: '#78716c', marginTop: '5px'}}>Toplam Bekleyen Evrak: {totalEbysDocs}</span>}
                         </div>
                         {personnelOptions.length > 0 &&
                              <div className="control-group">
@@ -2378,6 +2387,22 @@ ${dataSummary}
                             <div className="modal-header"><h3>Personel Seç</h3><button className="close-btn" onClick={()=> document.getElementById('ebys-personnel-modal').style.display = 'none'}>×</button></div>
                             <div className="modal-content">
                                 <div className="filter-list">
+                                    <div className="filter-item" key="select-all">
+                                        <label>
+                                            <input
+                                                type="checkbox"
+                                                checked={selectedPersonnel.length === personnelOptions.length}
+                                                onChange={e => {
+                                                    if (e.target.checked) {
+                                                        setSelectedPersonnel(personnelOptions);
+                                                    } else {
+                                                        setSelectedPersonnel([]);
+                                                    }
+                                                }}
+                                            />
+                                            <b>Tümünü Seç/Bırak</b>
+                                        </label>
+                                    </div>
                                     {personnelOptions.map(p => <div className="filter-item" key={p}><label>
                                         <input type="checkbox" checked={selectedPersonnel.includes(p)} onChange={e=>{
                                             if(e.target.checked) setSelectedPersonnel([...selectedPersonnel,p]);
