@@ -22,6 +22,64 @@
             padding: 0;
             background: #f8fafc;
         }
+        #root {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background: #e0f2fe;
+        }
+        .login-container {
+            background: white;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            width: 100%;
+            max-width: 400px;
+            text-align: center;
+        }
+        .login-container h2 {
+            color: #0c4a6e;
+            margin-bottom: 10px;
+        }
+        .login-container p {
+            color: #64748b;
+            margin-bottom: 30px;
+        }
+        .login-container input[type="text"],
+        .login-container input[type="password"] {
+            width: 100%;
+            padding: 12px;
+            margin-bottom: 15px;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            box-sizing: border-box;
+        }
+        .login-container button {
+            width: 100%;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            background-color: #22c55e;
+            color: white;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .login-container button:hover {
+            background-color: #16a34a;
+        }
+        .login-container .error {
+            color: #dc2626;
+            margin-bottom: 15px;
+        }
+        .login-container .footer {
+            margin-top: 20px;
+            font-size: 0.8rem;
+            color: #94a3b8;
+        }
+
         .container {
             max-width: 1400px;
             margin: 20px auto;
@@ -2391,7 +2449,7 @@ ${dataSummary}
                                         <label>
                                             <input
                                                 type="checkbox"
-                                                checked={selectedPersonnel.length === personnelOptions.length}
+                                                checked={selectedPersonnel.length === personnelOptions.length && personnelOptions.length > 0}
                                                 onChange={e => {
                                                     if (e.target.checked) {
                                                         setSelectedPersonnel(personnelOptions);
@@ -2436,6 +2494,7 @@ ${dataSummary}
             const [zoomContent, setZoomContent] = useState(null);
             const [showOnlyEngineers, setShowOnlyEngineers] = useState(false);
             const [isFullscreen, setIsFullscreen] = useState(false);
+            const [isLoggedIn, setIsLoggedIn] = useState(false);
 
             const modalContentRef = useRef(null);
             const summaryTableRef = useRef(null);
@@ -2778,6 +2837,10 @@ ${dataSummary}
                     <input id="file-upload-landing" type="file" multiple onChange={onFileChange} accept=".xlsx, .xls" style={{display: 'none'}} />
                 </div>
             );
+            
+            if (!isLoggedIn) {
+                return <LoginScreen onLogin={() => setIsLoggedIn(true)} />;
+            }
 
             return (<div className="container">
                 <div className="header-center">
@@ -2924,6 +2987,52 @@ ${dataSummary}
                 )}
             </div>);
         }
+
+        const LoginScreen = ({ onLogin }) => {
+            const [username, setUsername] = useState('');
+            const [password, setPassword] = useState('');
+            const [error, setError] = useState('');
+
+            const users = {
+                "MERSİNKM": "503344",
+                "HATAYBM": "334450",
+                "ELAZIĞKM": "232323"
+            };
+
+            const handleLogin = () => {
+                if (users[username] && users[username] === password) {
+                    onLogin();
+                } else {
+                    setError('Kullanıcı adı veya şifre hatalı.');
+                }
+            };
+
+            return (
+                <div className="login-container">
+                    <h2>MEGSİS İŞ TAKİP</h2>
+                    <p>Devam etmek için lütfen giriş yapın.</p>
+                    <input 
+                        type="text" 
+                        placeholder="Kullanıcı Adı" 
+                        value={username} 
+                        onChange={e => setUsername(e.target.value.toUpperCase())} 
+                    />
+                    <input 
+                        type="password" 
+                        placeholder="Şifre" 
+                        value={password}
+                        onChange={e => setPassword(e.target.value)}
+                        onKeyPress={e => e.key === 'Enter' && handleLogin()}
+                    />
+                    {error && <p className="error">{error}</p>}
+                    <button onClick={handleLogin}>Giriş Yap</button>
+                    <div className="footer">
+                        © Gökhan ELGÜL tarafından tasarlanmıştır.
+                    </div>
+                </div>
+            );
+        };
+        
         const sortOptions=[
                 {label:'Sıralama Yok',value:''},
                 {label:'Başvuru Tarihine Göre',value:'başvuru tarihi'},
