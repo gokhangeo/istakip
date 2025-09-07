@@ -803,7 +803,7 @@
                 if (status.includes('eksiklikten iade edildi')) {
                     iade++;
                 }
-                if (odeme.includes('ödendi') && (fenKayitNo === 0 || fenKayitNo == null)) {
+                if (odeme.includes('ödendi') && !odeme.includes('ödenmedi') && (fenKayitNo === 0 || fenKayitNo == null)) {
                     fenKayitAlinmayan++;
                 }
             });
@@ -943,7 +943,7 @@
                             if(status.includes('tescile gönderildi') && aciklama.includes('iptal')) conditionMet = true;
                             break;
                         case 'fen_kayit_alinmayan':
-                            if(odeme.includes('ödendi') && (r['fen kayıt no'] === 0 || r['fen kayıt no'] == null)) conditionMet = true;
+                            if(odeme.includes('ödendi') && !odeme.includes('ödenmedi') && (r['fen kayıt no'] === 0 || r['fen kayıt no'] == null)) conditionMet = true;
                             break;
                         case 'plan_ornegi':
                             const planOrnegiTerms = ['plan örneği', 'teknik bilgi ve belge örnekleri'];
@@ -2785,7 +2785,7 @@ ${dataSummary}
                 } else if (sortField === 'fen_kayit_alinmayan') {
                     arr = arr.filter(d => {
                         const odeme = String(d['ödeme'] || '').toLocaleLowerCase('tr');
-                        return odeme.includes('ödendi') && (d['fen kayıt no'] === 0 || d['fen kayıt no'] == null);
+                        return odeme.includes('ödendi') && !odeme.includes('ödenmedi') && (d['fen kayıt no'] === 0 || d['fen kayıt no'] == null);
                     });
                 } else if (sortField === 'plan_ornegi') {
                      arr = arr.filter(d => {
@@ -2996,7 +2996,8 @@ ${dataSummary}
             const users = {
                 "MERSİNKM": "503344",
                 "HATAYBM": "334450",
-                "ELAZIĞKM": "232323"
+                "ELAZIĞKM": "232323",
+                "ELAZIĞBM": "232323"
             };
 
             const handleLogin = () => {
