@@ -2347,30 +2347,38 @@ ${dataSummary}
             const [selectedPersonnel, setSelectedPersonnel] = useState([]);
             const [isLoading, setIsLoading] = useState(false);
             const [reportReady, setReportReady] = useState(false);
-            const [fileName, setFileName] = useState('');
+            const [fileNames, setFileNames] = useState([]);
             const [totalEbysDocs, setTotalEbysDocs] = useState(0);
 
             const handleFileChange = async (e) => {
-                const file = e.target.files[0];
-                if (!file) return;
+                const files = Array.from(e.target.files);
+                if (files.length === 0) return;
                 setIsLoading(true);
-                setFileName(file.name);
+                setFileNames(files.map(f => f.name));
                 try {
-                    const { rows } = await readExcelPromise(file, true);
-                    const personnelHeader = Object.keys(rows[0]).find(h => normalizeHeader(h).includes('bekleyen') && (normalizeHeader(h).includes('kullanıcı') || normalizeHeader(h).includes('kullanici')));
+                    const fileReadPromises = files.map(file => readExcelPromise(file, true));
+                    const allReports = await Promise.all(fileReadPromises);
+
+                    const combinedRows = allReports.flatMap(report => report.rows);
+                    if (combinedRows.length === 0) {
+                         throw new Error("Dosyalarda veri bulunamadı.");
+                    }
                     
+                    const firstReportHeaders = allReports[0].headers;
+                    const personnelHeader = Object.keys(combinedRows[0]).find(h => normalizeHeader(h).includes('bekleyen') && (normalizeHeader(h).includes('kullanıcı') || normalizeHeader(h).includes('kullanici')));
+
                     if (!personnelHeader) {
-                        alert("Raporda 'İşlemde Bekleyen Kullanıcı' sütunu bulunamadı.");
+                        alert("Raporlarda 'İşlemde Bekleyen Kullanıcı' sütunu bulunamadı.");
                         throw new Error("Required column not found");
                     }
                     
-                    const uniquePersonnel = [...new Set(rows.map(r => r[personnelHeader]).filter(Boolean))].sort((a,b) => a.localeCompare(b,'tr'));
+                    const uniquePersonnel = [...new Set(combinedRows.map(r => r[personnelHeader]).filter(Boolean))].sort((a,b) => a.localeCompare(b,'tr'));
                     setPersonnelOptions(uniquePersonnel);
-                    setEbysData(rows);
-                    setTotalEbysDocs(rows.length);
+                    setEbysData(combinedRows);
+                    setTotalEbysDocs(combinedRows.length);
                 } catch (err) {
                     alert(`Hata: ${err.message}`);
-                    setFileName('');
+                    setFileNames([]);
                     setTotalEbysDocs(0);
                 } finally {
                     setIsLoading(false);
@@ -2383,11 +2391,11 @@ ${dataSummary}
                     alert("Lütfen en az bir personel seçin.");
                     return;
                 }
-                 setReportReady(true); // This will trigger the download in the effect
+                 setReportReady(true);
             };
             
              useEffect(() => {
-                if (reportReady) {
+                if (reportReady && ebysData.length > 0) {
                     const personnelHeader = Object.keys(ebysData[0]).find(h => normalizeHeader(h).includes('bekleyen') && (normalizeHeader(h).includes('kullanıcı') || normalizeHeader(h).includes('kullanici')));
                     const dateHeader = Object.keys(ebysData[0]).find(h => normalizeHeader(h) === 'tarih');
                     
@@ -2423,8 +2431,8 @@ ${dataSummary}
                     <div className="ebys-controls">
                         <div className="control-group">
                             <label>EBYS Excel Raporu Yükle</label>
-                             <input type="file" onChange={handleFileChange} accept=".xlsx, .xls" />
-                             {fileName && <span style={{marginTop: '5px'}}>Seçilen: {fileName}</span>}
+                             <input type="file" multiple onChange={handleFileChange} accept=".xlsx, .xls" />
+                             {fileNames.length > 0 && <span style={{marginTop: '5px'}}>Seçilen: {fileNames.join(', ')}</span>}
                              {totalEbysDocs > 0 && <span style={{fontSize: '0.9rem', color: '#78716c', marginTop: '5px'}}>Toplam Bekleyen Evrak: {totalEbysDocs}</span>}
                         </div>
                         {personnelOptions.length > 0 &&
