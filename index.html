@@ -2354,36 +2354,53 @@ ${dataSummary}
                 const files = Array.from(e.target.files);
                 if (files.length === 0) return;
                 setIsLoading(true);
-                setFileNames(files.map(f => f.name));
+
                 try {
-                    const fileReadPromises = files.map(file => readExcelPromise(file, true));
+                    const fileReadPromises = files.map(file => readExcelPromise(file, true).then(result => ({...result, fileName: file.name })));
                     const allReports = await Promise.all(fileReadPromises);
 
-                    const combinedRows = allReports.flatMap(report => report.rows);
-                    if (combinedRows.length === 0) {
-                         throw new Error("Dosyalarda veri bulunamadı.");
-                    }
-                    
-                    const firstReportHeaders = allReports[0].headers;
-                    const personnelHeader = Object.keys(combinedRows[0]).find(h => normalizeHeader(h).includes('bekleyen') && (normalizeHeader(h).includes('kullanıcı') || normalizeHeader(h).includes('kullanici')));
+                    let currentPersonnel = new Set(personnelOptions);
+                    let newRows = [];
 
-                    if (!personnelHeader) {
-                        alert("Raporlarda 'İşlemde Bekleyen Kullanıcı' sütunu bulunamadı.");
-                        throw new Error("Required column not found");
-                    }
+                    allReports.forEach(report => {
+                        if (report.rows.length === 0) return;
+
+                        const personnelHeader = Object.keys(report.rows[0]).find(h => normalizeHeader(h).includes('bekleyen') && (normalizeHeader(h).includes('kullanıcı') || normalizeHeader(h).includes('kullanici')));
+                        
+                        if (!personnelHeader) {
+                            throw new Error(`"${report.fileName}" dosyasında 'İşlemde Bekleyen Kullanıcı' sütunu bulunamadı.`);
+                        }
+
+                        report.rows.forEach(row => {
+                            const personnelName = row[personnelHeader];
+                            if (personnelName) {
+                                currentPersonnel.add(personnelName);
+                            }
+                        });
+                        newRows.push(...report.rows);
+                    });
                     
-                    const uniquePersonnel = [...new Set(combinedRows.map(r => r[personnelHeader]).filter(Boolean))].sort((a,b) => a.localeCompare(b,'tr'));
+                    const uniquePersonnel = [...currentPersonnel].sort((a,b) => a.localeCompare(b,'tr'));
+                    
                     setPersonnelOptions(uniquePersonnel);
-                    setEbysData(combinedRows);
-                    setTotalEbysDocs(combinedRows.length);
+                    setEbysData(currentData => [...currentData, ...newRows]);
+                    setTotalEbysDocs(currentDocs => currentDocs + newRows.length);
+                    setFileNames(currentNames => [...currentNames, ...files.map(f => f.name)]);
+
                 } catch (err) {
                     alert(`Hata: ${err.message}`);
-                    setFileNames([]);
-                    setTotalEbysDocs(0);
                 } finally {
                     setIsLoading(false);
                      e.target.value = null;
                 }
+            };
+            
+            const clearEbysData = () => {
+                setEbysData([]);
+                setPersonnelOptions([]);
+                setSelectedPersonnel([]);
+                setFileNames([]);
+                setTotalEbysDocs(0);
             };
 
             const generateReport = () => {
@@ -2405,10 +2422,13 @@ ${dataSummary}
                         let filteredData = ebysData.filter(row => row[personnelHeader] === personel);
                         
                         filteredData.sort((a, b) => {
-                            const dateA = new Date(formatDate(a[dateHeader]));
-                            const dateB = new Date(formatDate(b[dateHeader]));
-                            if (isNaN(dateA.getTime()) || isNaN(dateB.getTime())) return 0;
-                            return dateA - dateB;
+                             const dateAValue = a[dateHeader];
+                             const dateBValue = b[dateHeader];
+                             const dateA = typeof dateAValue === 'number' ? new Date(formatDate(dateAValue)) : new Date(dateAValue);
+                             const dateB = typeof dateBValue === 'number' ? new Date(formatDate(dateBValue)) : new Date(dateBValue);
+
+                             if (isNaN(dateA.getTime()) || isNaN(dateB.getTime())) return 0;
+                             return dateA - dateB;
                         });
 
                         const ws = XLSX.utils.json_to_sheet(filteredData);
@@ -2432,7 +2452,7 @@ ${dataSummary}
                         <div className="control-group">
                             <label>EBYS Excel Raporu Yükle</label>
                              <input type="file" multiple onChange={handleFileChange} accept=".xlsx, .xls" />
-                             {fileNames.length > 0 && <span style={{marginTop: '5px'}}>Seçilen: {fileNames.join(', ')}</span>}
+                             {fileNames.length > 0 && <span style={{marginTop: '5px', fontSize: '0.8rem'}}>Seçilenler: {fileNames.join(', ')}</span>}
                              {totalEbysDocs > 0 && <span style={{fontSize: '0.9rem', color: '#78716c', marginTop: '5px'}}>Toplam Bekleyen Evrak: {totalEbysDocs}</span>}
                         </div>
                         {personnelOptions.length > 0 &&
@@ -2446,6 +2466,7 @@ ${dataSummary}
                         <button onClick={generateReport} disabled={isLoading || selectedPersonnel.length === 0}>
                             Rapor Oluştur ve İndir
                         </button>
+                        <button onClick={clearEbysData} style={{backgroundColor: '#ef4444', color: 'white'}}>Verileri Temizle</button>
                     </div>
 
                      <div id="ebys-personnel-modal" className="modal-overlay" style={{display: 'none'}} onClick={() => document.getElementById('ebys-personnel-modal').style.display = 'none'}>
