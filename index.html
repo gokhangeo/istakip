@@ -1298,9 +1298,55 @@
                 );
             }
             
-            const exportToExcel=()=>{ 
+            const exportToExcel = () => {
                 try {
-                    if (sortField === 'tescile_giden' || sortField === 'iade edilen' || sortField === 'iptal_edilen' || sortField === 'fen_kayit_alinmayan' || sortField === 'plan_ornegi') {
+                    if (sortField === 'tescilden_geldi') {
+                        const headers = ['İLÇE', 'FEN KAYIT NO', 'GÖREVLİ PERSONEL', 'BAŞVURU DURUMU'];
+                        const dataForSheet = rows.map(row => [
+                            row['ilçe'],
+                            row['fen kayıt no'],
+                            row['görevli personel'],
+                            row['başvuru durumu']
+                        ]);
+
+                        const wb = XLSX.utils.book_new();
+                        const ws = XLSX.utils.aoa_to_sheet([headers, ...dataForSheet]);
+                        
+                        rows.forEach((row, rowIndex) => {
+                            const cellRef = `C${rowIndex + 2}`;
+                            const personelText = row['görevli personel'] || '';
+                            if (!personelText || !ws[cellRef]) return;
+
+                            const richText = [];
+                            const parts = personelText.split(',').map(p => p.trim());
+                            
+                            parts.forEach((part, index) => {
+                                const subParts = part.split('=>');
+                                if (subParts.length === 2 && subParts[1].trim().toLowerCase() === 'yapılıyor') {
+                                    const name = subParts[0].trim();
+                                    richText.push({ t: name, s: { font: { color: { rgb: "FF0000" } } } });
+                                    richText.push({ t: ` => ${subParts[1].trim()}` });
+                                } else {
+                                    richText.push({ t: part });
+                                }
+                                if (index < parts.length - 1) {
+                                    richText.push({ t: ', ' });
+                                }
+                            });
+                            
+                            ws[cellRef].t = 's';
+                            ws[cellRef].r = richText;
+                            ws[cellRef].v = personelText;
+                        });
+
+                        ws['!cols'] = [{ wch: 20 }, { wch: 15 }, { wch: 50 }, { wch: 20 }];
+                        XLSX.utils.book_append_sheet(wb, ws, 'Tescilden Geldi');
+                        XLSX.writeFile(wb, 'tescilden_geldi.xlsx');
+                        return;
+                    }
+                    
+                    const customExportFields = ['tescile_giden', 'iade edilen', 'iptal_edilen', 'fen_kayit_alinmayan', 'plan_ornegi'];
+                    if (customExportFields.includes(sortField)) {
                         const customHeaders = sortField === 'fen_kayit_alinmayan'
                             ? ['İLÇE', 'BAŞVURU TARİHİ', 'FEN KAYIT NO', 'İŞLEM', 'ZEMİN', 'GÖREVLİ PERSONEL', 'BAŞVURU AÇIKLAMA', 'ÖDEME']
                             : ['İLÇE', 'FEN KAYIT TARİHİ', 'FEN KAYIT NO', 'İŞLEM', 'ZEMİN', 'GÖREVLİ PERSONEL', 'BAŞVURU AÇIKLAMA'];
@@ -1380,9 +1426,9 @@
                     }
                 } catch(err) { 
                     console.error("Excel export error:", err);
-                    console.log("Excel'e aktarma sırasında bir hata oluştu. Lütfen konsolu kontrol edin.");
+                    alert("Excel'e aktarma sırasında bir hata oluştu. Lütfen konsolu kontrol edin.");
                 } 
-            }; 
+            };
             
             if(!rows) return null; 
 
@@ -2354,13 +2400,14 @@ ${dataSummary}
                 const files = Array.from(e.target.files);
                 if (files.length === 0) return;
                 setIsLoading(true);
-
+                
                 try {
                     const fileReadPromises = files.map(file => readExcelPromise(file, true).then(result => ({...result, fileName: file.name })));
                     const allReports = await Promise.all(fileReadPromises);
 
                     let currentPersonnel = new Set(personnelOptions);
                     let newRows = [];
+                    let newFileNames = [...fileNames];
 
                     allReports.forEach(report => {
                         if (report.rows.length === 0) return;
@@ -2370,6 +2417,7 @@ ${dataSummary}
                         if (!personnelHeader) {
                             throw new Error(`"${report.fileName}" dosyasında 'İşlemde Bekleyen Kullanıcı' sütunu bulunamadı.`);
                         }
+                        newFileNames.push(report.fileName);
 
                         report.rows.forEach(row => {
                             const personnelName = row[personnelHeader];
@@ -2385,7 +2433,7 @@ ${dataSummary}
                     setPersonnelOptions(uniquePersonnel);
                     setEbysData(currentData => [...currentData, ...newRows]);
                     setTotalEbysDocs(currentDocs => currentDocs + newRows.length);
-                    setFileNames(currentNames => [...currentNames, ...files.map(f => f.name)]);
+                    setFileNames(newFileNames);
 
                 } catch (err) {
                     alert(`Hata: ${err.message}`);
@@ -2766,6 +2814,7 @@ ${dataSummary}
                 {label:'Fen Kayıt Tarihine Göre',value:'fen kayıt tarihi'},
                 {label:'İade Edilen',value:'iade edilen'},
                 {label:'Tescil Edilen', value:'tescile_giden'},
+                {label:'Tescilden Geldi', value:'tescilden_geldi'},
                 {label:'İptal Edilen', value:'iptal_edilen'},
                 {label:'Fen Kayıt Alınmayan', value:'fen_kayit_alinmayan'},
                 {label:'Plan Örneği', value:'plan_ornegi'},
@@ -2799,6 +2848,8 @@ ${dataSummary}
                         if (!isNaN(dx) && !isNaN(dy)) return dx - dy;
                         return 0;
                     });
+                } else if (sortField === 'tescilden_geldi') {
+                    arr = arr.filter(d => String(d['başvuru durumu'] || '').toLocaleLowerCase('tr') === 'tescilden geldi');
                 } else if (sortField === 'iptal_edilen') {
                     arr = arr.filter(d => {
                         const status = String(d['başvuru durumu'] || '').toLocaleLowerCase('tr');
@@ -3069,6 +3120,7 @@ ${dataSummary}
                 {label:'Fen Kayıt Tarihine Göre',value:'fen kayıt tarihi'},
                 {label:'İade Edilen',value:'iade edilen'},
                 {label:'Tescil Edilen', value:'tescile_giden'},
+                {label:'Tescilden Geldi', value:'tescilden_geldi'},
                 {label:'İptal Edilen', value:'iptal_edilen'},
                 {label:'Fen Kayıt Alınmayan', value:'fen_kayit_alinmayan'},
                 {label:'Plan Örneği', value:'plan_ornegi'},
