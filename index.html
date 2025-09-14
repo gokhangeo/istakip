@@ -548,8 +548,9 @@
             flex-wrap: wrap;
         }
         
-        .ebys-results {
+        .ebys-chart-container {
             margin-top: 20px;
+            height: 400px;
         }
 
         @media (max-width: 600px) {
@@ -946,10 +947,11 @@
                             if(odeme.includes('ödendi') && !odeme.includes('ödenmedi') && (r['fen kayıt no'] === 0 || r['fen kayıt no'] == null)) conditionMet = true;
                             break;
                         case 'plan_ornegi':
-                            const planOrnegiTerms = ['plan örneği', 'teknik bilgi ve belge örnekleri'];
-                            const mahkemePlanOrnegiTerms = ['mahke', 'plan örneği'];
+                            const isPlanOrnegi = islemLower === 'plan örneği';
+                            const isMahkemePlanOrnegi = islemLower === 'mahkeme plan örneği';
+                            const isTeknikBilgi = islemLower === 'teknik bilgi ve belge örnekleri';
                             const isWaiting = !status.includes('eksiklikten iade edildi') && !status.includes('tescile gönderildi');
-                            if (isWaiting && (planOrnegiTerms.some(term => islemLower.includes(term)) || mahkemePlanOrnegiTerms.every(term => islemLower.includes(term)))) {
+                            if (isWaiting && (isPlanOrnegi || isMahkemePlanOrnegi || isTeknikBilgi)) {
                                  conditionMet = true;
                             }
                             break;
@@ -2395,6 +2397,9 @@ ${dataSummary}
             const [reportReady, setReportReady] = useState(false);
             const [fileNames, setFileNames] = useState([]);
             const [totalEbysDocs, setTotalEbysDocs] = useState(0);
+            const ebysChartRef = useRef(null);
+            const ebysChartInstance = useRef(null);
+
 
             const handleFileChange = async (e) => {
                 const files = Array.from(e.target.files);
@@ -2417,7 +2422,9 @@ ${dataSummary}
                         if (!personnelHeader) {
                             throw new Error(`"${report.fileName}" dosyasında 'İşlemde Bekleyen Kullanıcı' sütunu bulunamadı.`);
                         }
-                        newFileNames.push(report.fileName);
+                        if (!newFileNames.includes(report.fileName)) {
+                            newFileNames.push(report.fileName);
+                        }
 
                         report.rows.forEach(row => {
                             const personnelName = row[personnelHeader];
@@ -2431,8 +2438,9 @@ ${dataSummary}
                     const uniquePersonnel = [...currentPersonnel].sort((a,b) => a.localeCompare(b,'tr'));
                     
                     setPersonnelOptions(uniquePersonnel);
-                    setEbysData(currentData => [...currentData, ...newRows]);
-                    setTotalEbysDocs(currentDocs => currentDocs + newRows.length);
+                    const combinedData = [...ebysData, ...newRows];
+                    setEbysData(combinedData);
+                    setTotalEbysDocs(combinedData.length);
                     setFileNames(newFileNames);
 
                 } catch (err) {
@@ -2490,6 +2498,55 @@ ${dataSummary}
                 }
             }, [reportReady, ebysData, selectedPersonnel]);
 
+            useEffect(() => {
+                if(ebysData.length > 0 && ebysChartRef.current){
+                    const personnelHeader = Object.keys(ebysData[0]).find(h => normalizeHeader(h).includes('bekleyen') && (normalizeHeader(h).includes('kullanıcı') || normalizeHeader(h).includes('kullanici')));
+                    const counts = {};
+                    ebysData.forEach(row => {
+                        const p = row[personnelHeader];
+                        if(p) counts[p] = (counts[p] || 0) + 1;
+                    });
+
+                    const sortedData = Object.entries(counts).sort(([,a],[,b]) => b - a);
+                    const labels = sortedData.map(d => d[0]);
+                    const dataValues = sortedData.map(d => d[1]);
+
+                    if(ebysChartInstance.current){
+                        ebysChartInstance.current.destroy();
+                    }
+
+                    ebysChartInstance.current = new Chart(ebysChartRef.current, {
+                        type: 'bar',
+                        data: {
+                            labels,
+                            datasets: [{
+                                label: 'Bekleyen Evrak Sayısı',
+                                data: dataValues,
+                                backgroundColor: labels.map((_, i) => `hsl(${(i * 20)}, 70%, 60%)`),
+                            }]
+                        },
+                        options: {
+                            indexAxis: 'y',
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: { display: false },
+                                title: { display: true, text: 'EBYS Personel Bekleyen Evrak Sayıları' },
+                                datalabels: { anchor: 'end', align: 'right', color: '#444', font: { weight: 'bold' } }
+                            },
+                             scales: { 
+                                x: { beginAtZero: true } 
+                            },
+                        }
+                    });
+                } else {
+                     if(ebysChartInstance.current){
+                        ebysChartInstance.current.destroy();
+                        ebysChartInstance.current = null;
+                    }
+                }
+            }, [ebysData]);
+
 
             return (
                 <div className="ebys-reporter-container">
@@ -2516,6 +2573,12 @@ ${dataSummary}
                         </button>
                         <button onClick={clearEbysData} style={{backgroundColor: '#ef4444', color: 'white'}}>Verileri Temizle</button>
                     </div>
+
+                    {ebysData.length > 0 && 
+                        <div className="ebys-chart-container">
+                            <canvas ref={ebysChartRef}></canvas>
+                        </div>
+                    }
 
                      <div id="ebys-personnel-modal" className="modal-overlay" style={{display: 'none'}} onClick={() => document.getElementById('ebys-personnel-modal').style.display = 'none'}>
                         <div className="modal" onClick={e => e.stopPropagation()}>
