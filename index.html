@@ -1026,12 +1026,13 @@
                                         ilce: task['ilçe'] || '', 
                                         islem: task['işlem'] || '',
                                         zemin: task['zemin'] || '', 
+                                        basvuruDurumu: task['başvuru durumu'] || '',
                                         beklemeSuresi: Math.floor(diffDays), 
                                         personnelRaw: task['görevli personel'] || ''
                                     }; 
                                 } 
                             } 
-                        } 
+                        }
                     } 
                 }); 
                 let finalRows = Object.values(groupedTasks).sort((a, b) => b.beklemeSuresi - a.beklemeSuresi); 
@@ -1058,6 +1059,7 @@
                         'İlçe': row.ilce, 
                         'İşlem': row.islem,
                         'Zemin': row.zemin, 
+                        'Başvuru Durumu': row.basvuruDurumu,
                         'Bekleme Süresi (Gün)': row.beklemeSuresi 
                     };
                 }); 
@@ -1071,7 +1073,7 @@
                         ws[cell_ref].s.alignment = { wrapText: true }; 
                     } 
                 } 
-                ws['!cols'] = [ { wch: 30 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 20 }, { wch: 40 }, { wch: 20 } ]; 
+                ws['!cols'] = [ { wch: 30 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 20 }, { wch: 40 }, { wch: 25 }, { wch: 20 } ]; 
                 const wb = XLSX.utils.book_new(); 
                 XLSX.utils.book_append_sheet(wb, ws, 'Uyari Raporu'); 
                 XLSX.writeFile(wb, 'uyari_raporu.xlsx'); 
@@ -1104,6 +1106,7 @@
                                     <th className="col-ilce">İlçe</th> 
                                     <th className="col-islem">İşlem</th>
                                     <th className="col-zemin">Zemin</th> 
+                                    <th>Başvuru Durumu</th>
                                     <th className="col-bekleme-süresi-gün">Bekleme Süresi (Gün)</th> 
                                 </tr> 
                             </thead> 
@@ -1130,6 +1133,7 @@
                                         <td className="col-ilce">{row.ilce}</td> 
                                         <td className="col-islem">{row.islem}</td>
                                         <td className="col-zemin">{row.zemin}</td> 
+                                        <td>{row.basvuruDurumu}</td>
                                         <td className="col-bekleme-süresi-gün">{row.beklemeSuresi}</td> 
                                     </tr> 
                                 ))} 
@@ -2436,3 +2440,4 @@
     </script>
 </body>
 </html>
+
