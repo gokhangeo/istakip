@@ -11,7 +11,6 @@
     <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/showdown@2.1.0/dist/showdown.min.js"></script>
 
@@ -339,7 +338,7 @@
             color: white;
             font-weight: 500;
             padding: 10px 20px;
-         }
+        }
         .report-comparison-actions button:hover {
             background-color: #7e22ce; /* purple-700 */
         }
@@ -378,7 +377,7 @@
          .result-card .excel-btn:disabled {
              background-color: #9ca3af;
              cursor: not-allowed;
-         }
+        }
         
         /* EBYS Reporter Styles */
         .ebys-reporter-container {
@@ -428,6 +427,7 @@
         
         const normalizeHeader = (header) => { if (!header) return ""; let s; try { s = header.normalize('NFD').replace(/[\u0300-\u036f]/g, ''); } catch (e) { s = String(header); } s = s.trim().toLocaleLowerCase('tr').replace(/\s+/g, ' '); s = s.replace(/ı/g, 'i').replace(/İ/g, 'i'); return s; }
         const splitPersonel = (text) => { if (text == null) return []; const str = typeof text === 'string' ? text : String(text); return str.split(/[,;–-]/g).map(s => { let part = s.trim(); const arrowIdx = part.indexOf('=>'); if (arrowIdx !== -1) part = part.slice(0, arrowIdx).trim(); return part.replace(/\s*\(Müh\.\)\s*/, '').trim(); }).filter(Boolean); }
+        const parsePersonnelWithStatus = (text) => { if (text == null) return []; const str = typeof text === 'string' ? text : String(text); return str.split(/[,;–-]/g).map(s => { const parts = s.split('=>').map(p => p.trim()); const name = parts[0].replace(/\s*\(Müh\.\)\s*/, '').trim(); const status = parts.length > 1 ? parts[1] : ''; return { name, status }; }).filter(p => p.name); };
         const formatDate = (val) => { if (!val) return ""; if (typeof val === 'number') { const date = XLSX.SSF.parse_date_code(val); if (!date) return ""; return `${date.y}-${String(date.m).padStart(2,'0')}-${String(date.d).padStart(2,'0')}`; } if (typeof val === 'string') { let match = val.match(/^(\d{4}-\d{2}-\d{2})/); if (match) return match[1]; match = val.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})/); if (match) { const day = String(match[1]).padStart(2, '0'); const month = String(match[2]).padStart(2, '0'); const year = match[3]; return `${year}-${month}-${day}`; } const part = val.split(" ")[0]; const m2 = part.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})/); if (m2) { const day = String(m2[1]).padStart(2, '0'); const month = String(m2[2]).padStart(2, '0'); const year = m2[3]; return `${year}-${month}-${day}`; } return part; } return val; }
         const formatFenKayitNo = (val) => { if (val == null) return ""; if (typeof val === 'number') return val; if (typeof val === 'string') { const num = parseInt(val.replace(/\D/g,''),10); if (!isNaN(num)) return num; return val; } return val; }
         
@@ -515,14 +515,14 @@
                         allAllowedCols.forEach(col => { colIndexes[col] = -1; });
                         
                         headersNorm.forEach((hNorm, idx) => {
-                             for (const canonical of allAllowedCols) {
-                                 const keywords = allHeaderKeywords[canonical] || [canonical];
-                                 const allMatch = keywords.every(k => normalizeHeader(k) && hNorm.includes(normalizeHeader(k)));
-                                 if (allMatch && colIndexes[canonical] === -1) {
-                                     colIndexes[canonical] = idx;
-                                     break; 
-                                 }
-                             }
+                            for (const canonical of allAllowedCols) {
+                                const keywords = allHeaderKeywords[canonical] || [canonical];
+                                const allMatch = keywords.every(k => normalizeHeader(k) && hNorm.includes(normalizeHeader(k)));
+                                if (allMatch && colIndexes[canonical] === -1) {
+                                    colIndexes[canonical] = idx;
+                                    break; 
+                                }
+                            }
                         });
                         
                         // Handle "Personel" vs "Görevli Personel"
@@ -601,8 +601,8 @@
                     if (!isNaN(bd.getTime())) {
                         if (bd.getFullYear() === 2025) count2025++;
                         if (fStr) {
-                             const fd = new Date(fStr);
-                             if (!isNaN(fd.getTime()) && fd.getFullYear() > 1900 && fd >= threeMonthsAgo) {
+                            const fd = new Date(fStr);
+                            if (!isNaN(fd.getTime()) && fd.getFullYear() > 1900 && fd >= threeMonthsAgo) {
                                 const diff = (fd - bd) / (1000 * 60 * 60 * 24);
                                 if (!isNaN(diff) && diff >= 0) {
                                     totalDays += diff;
@@ -730,7 +730,7 @@
             ); 
         }
         
-        function ChartsBelow({ data, onZoom, personnelChartCardRef, waitingChartCardRef, islemChartCardRef, selectedIl, isEngineer, showOnlyEngineers, onToggleEngineers, sortField }) {
+        function ChartsBelow({ data, onZoom, selectedIl, isEngineer, showOnlyEngineers, onToggleEngineers, sortField }) {
             const totalRef = useRef();
             const dynamicRef = useRef();
             const islemRef = useRef();
@@ -762,8 +762,8 @@
                 data.forEach(r => {
                     const personnel = splitPersonel(r['görevli personel']);
                      if (personnel.length > 0) {
-                         personnel.forEach(p => {
-                            if (p) totalsMap[p] = (totalsMap[p] || 0) + 1;
+                          personnel.forEach(p => {
+                              if (p) totalsMap[p] = (totalsMap[p] || 0) + 1;
                         });
                     }
                     
@@ -909,17 +909,17 @@
                         </label>
                     </div>
                     <div style={{display: 'flex', gap: '24px', flexWrap: 'nowrap', overflowX: 'auto'}}>
-                        <div className="chart-card" ref={personnelChartCardRef}>
+                        <div className="chart-card">
                             <button className="zoom-btn" title="Büyüt" onClick={() => onZoom({ type: 'chart', data: showOnlyEngineers ? Object.fromEntries(Object.entries(personnelStats.totals).filter(([name]) => isEngineer(name))) : personnelStats.totals, title: `Personel İşlem Dağılımı (${title})` })}>🔍</button>
                             <div className="chart-title">Personel İşlem Dağılımı ({title})</div>
                             <div className="chart-wrapper" style={{height: '250px'}}><canvas ref={totalRef}></canvas></div>
                         </div>
-                        <div className="chart-card" ref={waitingChartCardRef}>
+                        <div className="chart-card">
                              <button className="zoom-btn" title="Büyüt" onClick={() => onZoom({ type: 'chart', data: showOnlyEngineers ? Object.fromEntries(Object.entries(personnelStats.dynamic).filter(([name]) => isEngineer(name))) : personnelStats.dynamic, title: `${dynamicTitle} (${title})` })}>🔍</button>
                             <div className="chart-title">{dynamicTitle} ({title})</div>
                             <div className="chart-wrapper" style={{height: '250px'}}><canvas ref={dynamicRef}></canvas></div>
                         </div>
-                         <div className="chart-card" ref={islemChartCardRef}>
+                         <div className="chart-card">
                              <button className="zoom-btn" title="Büyüt" onClick={() => onZoom({ type: 'chart', data: islemStats, title: `İşlem Sayıları (${title})` })}>🔍</button>
                             <div className="chart-title">İşlem Sayıları ({title})</div>
                             <div className="chart-wrapper" style={{height: '250px'}}><canvas ref={islemRef}></canvas></div>
@@ -929,7 +929,7 @@
             );
         }
         
-        function SummaryTable({ data, selectedIl, onZoom, summaryTableRef }) { 
+        function SummaryTable({ data, selectedIl, onZoom }) { 
             const groupArr = {}; 
             data.forEach(row => { 
                 if (!row._province) return; 
@@ -965,7 +965,7 @@
             );
 
             return ( 
-                <div className="chart-card" style={{ position:'relative', minWidth:'auto', flex:'1 1 auto' }} ref={summaryTableRef}> 
+                <div className="chart-card" style={{ position:'relative', minWidth:'auto', flex:'1 1 auto' }}> 
                     {groupKeys.length>0 && <button className="zoom-btn" title="Büyüt" onClick={onZoom}>🔍</button>} 
                     <div className="chart-title">Özet Tablo</div> 
                     <div style={{overflowX:'auto',background:'#f1f5f9',borderRadius:'12px',padding:'12px',minWidth:'600px'}}> 
@@ -1027,7 +1027,7 @@
                                         islem: task['işlem'] || '',
                                         zemin: task['zemin'] || '', 
                                         beklemeSuresi: Math.floor(diffDays), 
-                                        personnel: splitPersonel(task['görevli personel']) 
+                                        personnelRaw: task['görevli personel'] || ''
                                     }; 
                                 } 
                             } 
@@ -1037,7 +1037,7 @@
                 let finalRows = Object.values(groupedTasks).sort((a, b) => b.beklemeSuresi - a.beklemeSuresi); 
                 
                 if (showOnlyEngineers) {
-                    finalRows = finalRows.filter(row => row.personnel.some(p => isEngineer(p)));
+                    finalRows = finalRows.filter(row => parsePersonnelWithStatus(row.personnelRaw).some(p => isEngineer(p.name)));
                 }
 
                 setWarningRows(finalRows); 
@@ -1045,12 +1045,14 @@
 
             const handleExportWarningExcel = () => { 
                 const dataToExport = warningRows.map(row => {
-                    let personnelList = row.personnel;
-                    if (showOnlyEngineers) {
-                        personnelList = personnelList.filter(p => isEngineer(p));
-                    }
+                    const personnelListWithStatus = parsePersonnelWithStatus(row.personnelRaw);
+                    let personnelList = showOnlyEngineers ? personnelListWithStatus.filter(p => isEngineer(p.name)) : personnelListWithStatus;
                     return { 
-                        'Personel': personnelList.map(p => isEngineer(p) ? `${p} (Müh.)` : p).join("\n"), 
+                        'Personel': personnelList.map(p => {
+                            const namePart = isEngineer(p.name) ? `${p.name} (Müh.)` : p.name;
+                            const statusPart = (sortField === 'tescilden_geldi' && p.status) ? ` (${p.status})` : '';
+                            return `${namePart}${statusPart}`;
+                        }).join("\n"), 
                         'Fen Kayıt No': row.fenKayitNo, 
                         'İl': row.il, 
                         'İlçe': row.ilce, 
@@ -1110,11 +1112,13 @@
                                     <tr key={row.fenKayitNo}> 
                                         <td className="col-personel">
                                             {
-                                                (showOnlyEngineers ? row.personnel.filter(p => isEngineer(p)) : row.personnel)
+                                                parsePersonnelWithStatus(row.personnelRaw)
+                                                .filter(p => showOnlyEngineers ? isEngineer(p.name) : true)
                                                 .map((p, i, arr) => (
                                                     <React.Fragment key={i}>
-                                                        <span style={{ color: isEngineer(p) ? 'red' : 'inherit' }}>
-                                                            {p} {isEngineer(p) ? '(Müh.)' : ''}
+                                                        <span style={{ color: isEngineer(p.name) ? 'red' : 'inherit' }}>
+                                                            {p.name} {isEngineer(p.name) ? '(Müh.)' : ''}
+                                                            {sortField === 'tescilden_geldi' && p.status && ` (${p.status})`}
                                                         </span>
                                                         {i < arr.length - 1 && <br />}
                                                     </React.Fragment>
@@ -1157,43 +1161,20 @@
                 try {
                     if (sortField === 'tescilden_geldi') {
                         const headers = ['İLÇE', 'FEN KAYIT NO', 'GÖREVLİ PERSONEL', 'BAŞVURU DURUMU'];
-                        const dataForSheet = rows.map(row => [
-                            row['ilçe'],
-                            row['fen kayıt no'],
-                            row['görevli personel'],
-                            row['başvuru durumu']
-                        ]);
+                        const dataForSheet = rows.map(row => {
+                            const personnelList = parsePersonnelWithStatus(row['görevli personel']);
+                            const formattedPersonnel = personnelList.map(p => p.status ? `${p.name} (${p.status})` : p.name).join(', ');
+                            return [
+                                row['ilçe'],
+                                row['fen kayıt no'],
+                                formattedPersonnel,
+                                row['başvuru durumu']
+                            ];
+                        });
 
                         const wb = XLSX.utils.book_new();
                         const ws = XLSX.utils.aoa_to_sheet([headers, ...dataForSheet]);
                         
-                        rows.forEach((row, rowIndex) => {
-                            const cellRef = `C${rowIndex + 2}`;
-                            const personelText = row['görevli personel'] || '';
-                            if (!personelText || !ws[cellRef]) return;
-
-                            const richText = [];
-                            const parts = personelText.split(',').map(p => p.trim());
-                            
-                            parts.forEach((part, index) => {
-                                const subParts = part.split('=>');
-                                if (subParts.length === 2 && subParts[1].trim().toLowerCase() === 'yapılıyor') {
-                                    const name = subParts[0].trim();
-                                    richText.push({ t: name, s: { font: { color: { rgb: "FF0000" } } } });
-                                    richText.push({ t: ` => ${subParts[1].trim()}` });
-                                } else {
-                                    richText.push({ t: part });
-                                }
-                                if (index < parts.length - 1) {
-                                    richText.push({ t: ', ' });
-                                }
-                            });
-                            
-                            ws[cellRef].t = 's';
-                            ws[cellRef].r = richText;
-                            ws[cellRef].v = personelText;
-                        });
-
                         ws['!cols'] = [{ wch: 20 }, { wch: 15 }, { wch: 50 }, { wch: 20 }];
                         XLSX.utils.book_append_sheet(wb, ws, 'Tescilden Geldi');
                         XLSX.writeFile(wb, 'tescilden_geldi.xlsx');
@@ -1929,8 +1910,8 @@
                     });
                 } else {
                      if(ebysChartInstance.current){
-                        ebysChartInstance.current.destroy();
-                        ebysChartInstance.current = null;
+                         ebysChartInstance.current.destroy();
+                         ebysChartInstance.current = null;
                     }
                 }
             }, [ebysData]);
@@ -1969,40 +1950,40 @@
                     }
 
                      <div id="ebys-personnel-modal" className="modal-overlay" style={{display: 'none'}} onClick={() => document.getElementById('ebys-personnel-modal').style.display = 'none'}>
-                        <div className="modal" onClick={e => e.stopPropagation()}>
-                            <div className="modal-header"><h3>Personel Seç</h3><button className="close-btn" onClick={()=> document.getElementById('ebys-personnel-modal').style.display = 'none'}>×</button></div>
-                            <div className="modal-content">
-                                <div className="filter-list">
-                                    <div className="filter-item" key="select-all">
-                                        <label>
-                                            <input
-                                                type="checkbox"
-                                                checked={selectedPersonnel.length === personnelOptions.length && personnelOptions.length > 0}
-                                                onChange={e => {
-                                                    if (e.target.checked) {
-                                                        setSelectedPersonnel(personnelOptions);
-                                                    } else {
-                                                        setSelectedPersonnel([]);
-                                                    }
-                                                }}
-                                            />
-                                            <b>Tümünü Seç/Bırak</b>
-                                        </label>
-                                    </div>
-                                    {personnelOptions.map(p => <div className="filter-item" key={p}><label>
-                                        <input type="checkbox" checked={selectedPersonnel.includes(p)} onChange={e=>{
-                                            if(e.target.checked) setSelectedPersonnel([...selectedPersonnel,p]);
-                                            else setSelectedPersonnel(selectedPersonnel.filter(sp=>sp!==p));
-                                        }}/> {p}
-                                    </label></div>)}
-                                </div>
-                            </div>
-                            <div className="modal-footer">
-                                <button className="download-btn" onClick={()=>{setSelectedPersonnel([]); document.getElementById('ebys-personnel-modal').style.display = 'none';}}>Temizle</button>
-                                <button className="download-btn" style={{backgroundColor: '#16a34a'}} onClick={()=> document.getElementById('ebys-personnel-modal').style.display = 'none'}>Kapat</button>
-                            </div>
-                        </div>
-                    </div>
+                         <div className="modal" onClick={e => e.stopPropagation()}>
+                             <div className="modal-header"><h3>Personel Seç</h3><button className="close-btn" onClick={()=> document.getElementById('ebys-personnel-modal').style.display = 'none'}>×</button></div>
+                             <div className="modal-content">
+                                 <div className="filter-list">
+                                     <div className="filter-item" key="select-all">
+                                         <label>
+                                             <input
+                                                 type="checkbox"
+                                                 checked={selectedPersonnel.length === personnelOptions.length && personnelOptions.length > 0}
+                                                 onChange={e => {
+                                                     if (e.target.checked) {
+                                                         setSelectedPersonnel(personnelOptions);
+                                                     } else {
+                                                         setSelectedPersonnel([]);
+                                                     }
+                                                 }}
+                                             />
+                                             <b>Tümünü Seç/Bırak</b>
+                                         </label>
+                                     </div>
+                                     {personnelOptions.map(p => <div className="filter-item" key={p}><label>
+                                         <input type="checkbox" checked={selectedPersonnel.includes(p)} onChange={e=>{
+                                             if(e.target.checked) setSelectedPersonnel([...selectedPersonnel,p]);
+                                             else setSelectedPersonnel(selectedPersonnel.filter(sp=>sp!==p));
+                                         }}/> {p}
+                                     </label></div>)}
+                                 </div>
+                             </div>
+                             <div className="modal-footer">
+                                 <button className="download-btn" onClick={()=>{setSelectedPersonnel([]); document.getElementById('ebys-personnel-modal').style.display = 'none';}}>Temizle</button>
+                                 <button className="download-btn" style={{backgroundColor: '#16a34a'}} onClick={()=> document.getElementById('ebys-personnel-modal').style.display = 'none'}>Kapat</button>
+                             </div>
+                         </div>
+                     </div>
                 </div>
             );
         }
@@ -2025,10 +2006,6 @@
             const [isLoggedIn, setIsLoggedIn] = useState(false);
 
             const modalContentRef = useRef(null);
-            const summaryTableRef = useRef(null);
-            const personnelChartRef = useRef(null);
-            const waitingChartRef = useRef(null);
-            const islemChartRef = useRef(null);
             
             const readExcelFromUrl = async (url) => {
                 try {
@@ -2132,125 +2109,6 @@
                 }
             };
 
-            const handleExportGeneralReport = async () => {
-                setLoading(true);
-                const { jsPDF } = window.jspdf;
-                const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
-
-                const signatureImg = new Image();
-                signatureImg.src = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAARgAAAAsCAYAAAD2B2f5AAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAATYSURBVHhe7Z1fSxtRFMfvzC2b7Ya2SbC0sS19KIKVFJAggiAi+AMMPYgIesgXQfTgF4jgQRB68KCIF1EkRARpD0W0VCxYLJCklhKstLXt2mY3s5NfGXZ3t/M6M3u/8MvMvM+ZO+87c3ZndmCCILgYQ0yQIOjA2yA69lB04L2Q2Nen2NenmLUDBrQDBrQDBrQDBrQDBrQDBrQDBrQDBrQDBrQDBrQDBrQDBrQDBrQDBhL3w1sLw5iGfJ/pI+g/BCFfNq5yI6e3e1J6Wf2p+v/H6Gg1wzO4c2i1h12S4GfI8PuyO2bX7R3/tq6u/kE2z6V0e2Lx+jT5GvjV0H5fR+0Y9T0G87oB560y1n4m9n2b7v2+N8a8L3eM9S3X1q/X05kY4xV2zfY/pLp6a3v0c8SnaT7K8lO0G+T/VWUPG5WjK/T/cM8rT7N/oI8j/5A3kd+QN5Bfn9G0M087f5A3kX+Yp5N/kKezf5Cns3+Qp7N/kKeLd7+FfXj/A9bK+e/Qc5B/vX4vTz3/AUc3+vP6f4c8mzyj/M08hzyD/I08gzyN/IM8jfyDPJv/430dOwfJz+R/yB/359M/oI8+/yFvIv8hTy7/IU8u/yFPLv8hTy7/IU8u/yFPJv8/SyL/P0s8/z9LPP8/SwL/P0si/z/LPP8/SyL/P8s8/z/LPP8/Szj/H0s4/z/LPP8/Sxj/P0s4/z/LPP8/Sxj/P0s4/z/LPP8/Sxj/P0s4/z/LPP8/SzT/H0s0/z9LNP8/SzT/H0s0/z9LNP8/SzT/H0s0/z/LNP8/SzD/P8sw/z/LMP8/yzD/P8sw/z/LMP8/yzD/P8sw/z/LMP8/Sxb/P0sW/z9LFv8/Sxb/P0sW/z9LFv8/Sxb/P0sW/z/LMP8/yzD/P8sw/z9r/v8P0t8/yzD/P8sw/z/LMP8/yzD/P8s4/z87B/n/2T/IPyDP/8/Owf5/9g/yD/D8/+/8B/kH+P/ZP8g/wPP/v/Af5B/j/2T/IP8Dz/7/wH+Qf4/9k/yD/A8/+1cZ/8g/z/7Vxn/yD/P/tXGf/IP8/+1cZ/8g/z/7Vxn/yD/P/tXGf/IP8/+1cZ/8g/z/7Vxn/yD/P/tXGf/IP8/+1cZ/8g/z/7Vxn/yD/P/tXGf/IP8/+1cZ/8g/z/7Vxn/yD/P/tXGf/IP8/9k/yD/P/ZP8g/z/2T/IP8/+yf5B/n/2T/IP8/+yf5B/n/2T/IP8/+yf5B/n/2T/IP8/+yf5B/n/2T/IP8/+yf5B/n/2T/IP8/+yf5B/n/2T/IP8/+yf5B/n/2P/KP8/+yf5B/n/2D/Kv8/+yf5B/n/2D/Kv8/+wf5V/k/2P/KP8/+wf5V/k/2D/Kv8/9k/yD/P/tX+f/ZP8i/z/7V/n/2T/Iv8/9Vf4z/yD/P/tX+f/ZP8i/z/7V/n/2T/Iv8/9Vf4z/yD/P/tX+f/ZP8i/z/7V/n/2T/Iv8/9Vf5n/kD+f/ZP8i/z/5X/mf+QP5/9k/yL/P/lf+Z/5A/n/2T/Iv8/+V/5n/kD+f/ZP8i/z/5H/mf+QP5/9k/yL/P/k/+Z/wB/gG9i2pD/t6f0AAAAABJRU5ErkJggg==';
-                signatureImg.onload = async () => {
-                    const addElementToPdf = async (element, yPos) => {
-                        const canvas = await html2canvas(element, { scale: 2, backgroundColor: '#ffffff' });
-                        const imgData = canvas.toDataURL('image/png');
-                        const pageWidth = pdf.internal.pageSize.getWidth();
-                        const pageHeight = pdf.internal.pageSize.getHeight();
-                        const margin = 10;
-                        const imgWidth = pageWidth - (margin * 2);
-                        const imgHeight = (canvas.height * imgWidth) / canvas.width;
-                        
-                        if (yPos + imgHeight + margin + 10 > pageHeight && yPos > margin) { // +10 for signature
-                            pdf.addPage();
-                            yPos = margin;
-                        }
-                        pdf.addImage(imgData, 'PNG', margin, yPos, imgWidth, imgHeight);
-                        return yPos + imgHeight + 5; // 5 margin after element
-                    };
-
-                    const addSignature = (y) => {
-                         const pageHeight = pdf.internal.pageSize.getHeight();
-                         const sigHeight = 10;
-                         const sigWidth = 60;
-                         const sigY = pageHeight - sigHeight - 5; // 5mm from bottom
-                         pdf.addImage(signatureImg, 'PNG', 10, sigY, sigWidth, sigHeight);
-                    };
-
-                    let yPosition = 10;
-                    
-                    const currentFilteredData = filteredData.length > 0 ? filteredData : data;
-                    const titleSuffix = selectedIl.length > 0 ? ` (${selectedIl.join(', ')})` : ` (${[...new Set(currentFilteredData.map(d => d._province).filter(Boolean))].join(', ') || 'Tüm İller'})`;
-                    
-                    if (summaryTableRef.current) {
-                         yPosition = await addElementToPdf(summaryTableRef.current, yPosition);
-                    }
-                    
-                    const chartsContainer = document.createElement('div');
-                    chartsContainer.style.display = 'flex';
-                    chartsContainer.style.gap = '20px';
-                    if (personnelChartRef.current) chartsContainer.appendChild(personnelChartRef.current.cloneNode(true));
-                    if (waitingChartRef.current) chartsContainer.appendChild(waitingChartRef.current.cloneNode(true));
-                    if (islemChartRef.current) chartsContainer.appendChild(islemChartRef.current.cloneNode(true));
-
-                    if (chartsContainer.hasChildNodes()) {
-                       yPosition = await addElementToPdf(chartsContainer, yPosition);
-                    }
-
-                    addSignature(); // Add signature to the first page
-
-                    const dynamicChartConfigs = [
-                        { filter: 'tescile_giden', title: `Tescil Edilen(Tescilden Geldi Yapılmayan) ${titleSuffix}` },
-                        { filter: 'iptal_edilen', title: `Tapu İptal Edilen(Tescilden Geldi-Eksiklikten İade Yapılmayan) ${titleSuffix}` },
-                        { filter: 'fen_kayit_alinmayan', title: `Fen Kayıt Alınmayan(Ödemesi Yapılan) ${titleSuffix}` },
-                        { filter: 'plan_ornegi', title: `Plan Örneği-Teknik Bilgi Belge Bekleyen ${titleSuffix}` }
-                    ];
-
-                    for (const config of dynamicChartConfigs) {
-                        const tempChartContainer = document.createElement('div');
-                        tempChartContainer.style.position = 'absolute';
-                        tempChartContainer.style.left = '-9999px';
-                        tempChartContainer.style.width = '1200px';
-                        tempChartContainer.style.height = '800px';
-                        tempChartContainer.style.background = '#ffffff';
-                        tempChartContainer.style.padding = '20px';
-                        document.body.appendChild(tempChartContainer);
-
-                        const chartData = {};
-                        const filteredChartData = currentFilteredData.filter(d => {
-                            const status = String(d['başvuru durumu'] || '').toLocaleLowerCase('tr');
-                            const aciklama = String(d['başvuru açıklama'] || '').toLocaleLowerCase('tr');
-                            const odeme = String(d['ödeme'] || '').toLocaleLowerCase('tr');
-                            const islem = String(d['işlem'] || '').toLocaleLowerCase('tr');
-                            switch(config.filter) {
-                                case 'tescile_giden': return status.includes('tescile gönderildi') && aciklama.includes('tescil edildi');
-                                case 'iptal_edilen': return status.includes('tescile gönderildi') && aciklama.includes('iptal');
-                                case 'fen_kayit_alinmayan': return odeme.includes('ödendi') && (d['fen kayıt no'] === 0 || d['fen kayıt no'] == null);
-                                case 'plan_ornegi': 
-                                    const planOrnegiTerms = ['plan örneği', 'mahke', 'teknik bilgi ve belge örnekleri'];
-                                     const isWaiting = !status.includes('eksiklikten iade edildi') && !status.includes('tescile gönderildi');
-                                    return isWaiting && planOrnegiTerms.some(term => islem.includes(term));
-                                default: return false;
-                            }
-                        });
-                        
-                        filteredChartData.forEach(r => {
-                            const personnel = splitPersonel(r['görevli personel']);
-                            personnel.forEach(p => {
-                                if(p) chartData[p] = (chartData[p] || 0) + 1;
-                            });
-                        });
-                        
-                        if (Object.keys(chartData).length > 0) {
-                            const tempRoot = ReactDOM.createRoot(tempChartContainer);
-                            await new Promise(resolve => {
-                                tempRoot.render(<ZoomedChart chartData={chartData} title={config.title} onRender={resolve} isForPdf={true} isEngineer={isEngineer} />);
-                            });
-
-                            pdf.addPage();
-                            const canvas = await html2canvas(tempChartContainer, { scale: 2 });
-                            const imgData = canvas.toDataURL('image/png');
-                            pdf.addImage(imgData, 'PNG', 10, 10, pdf.internal.pageSize.getWidth() - 20, pdf.internal.pageSize.getHeight() - 30);
-                            addSignature();
-                            tempRoot.unmount();
-                        }
-
-                        document.body.removeChild(tempChartContainer);
-                    }
-
-                    pdf.save('Genel_Rapor.pdf');
-                    setLoading(false);
-                };
-            };
-
             const ilOptions = Array.from(new Set(data.map(d=>d._province).filter(p=>p))).sort((a,b)=>a.localeCompare(b,'tr'));
             const ilceOptions = Array.from(new Set(
                 data
@@ -2325,7 +2183,7 @@
                          const isMahkemePlanOrnegi = islem === 'mahkeme plan örneği';
                          const isTeknikBilgi = islem === 'teknik bilgi ve belge örnekleri';
                          return isPlanOrnegi || isMahkemePlanOrnegi || isTeknikBilgi;
-                     });
+                    });
                 } else if (sortField === 'bekleyen_eski_yeni') {
                     arr = arr.filter(d => {
                         const status = String(d['başvuru durumu'] || '').toLocaleLowerCase('tr');
@@ -2415,18 +2273,14 @@
                             <label>Veri Yönetimi</label>
                             <button onClick={() => { setData([]); setSelectedIl([]); setSelectedPersonel([]); setSelectedIlce([]); }} style={{backgroundColor: '#ef4444', color: 'white'}}>Verileri Temizle</button>
                         </div>
-                        <div className="control-group">
-                            <label>Genel Rapor</label>
-                            <button onClick={handleExportGeneralReport} style={{backgroundColor: '#059669', color: 'white'}}>Genel Rapor İndir (PDF)</button>
-                        </div>
                     </div>
                     <Dashboard data={data} filtered={filteredData} sortField={sortField} selectedPersonel={selectedPersonel} selectedIl={selectedIl} selectedIlce={selectedIlce} />
                     <div>
                         <div className="charts-below">
-                            <ChartsBelow data={filteredData} onZoom={setZoomContent} personnelChartCardRef={personnelChartRef} waitingChartCardRef={waitingChartRef} islemChartCardRef={islemChartRef} selectedIl={selectedIl} isEngineer={isEngineer} showOnlyEngineers={showOnlyEngineers} onToggleEngineers={() => setShowOnlyEngineers(!showOnlyEngineers)} sortField={sortField} />
+                            <ChartsBelow data={filteredData} onZoom={setZoomContent} selectedIl={selectedIl} isEngineer={isEngineer} showOnlyEngineers={showOnlyEngineers} onToggleEngineers={() => setShowOnlyEngineers(!showOnlyEngineers)} sortField={sortField} />
                         </div>
                         <div style={{marginTop: '24px'}}>
-                            <SummaryTable data={data} selectedIl={selectedIl} onZoom={() => setZoomContent({type: 'summary'})} summaryTableRef={summaryTableRef} />
+                            <SummaryTable data={data} selectedIl={selectedIl} onZoom={() => setZoomContent({type: 'summary'})} />
                         </div>
                     </div>
                     <WarningTable data={filteredData} isEngineer={isEngineer} showOnlyEngineers={showOnlyEngineers} onToggleEngineers={() => setShowOnlyEngineers(!showOnlyEngineers)} sortField={sortField} />
@@ -2582,4 +2436,3 @@
     </script>
 </body>
 </html>
-
