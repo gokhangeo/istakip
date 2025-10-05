@@ -302,149 +302,6 @@
         .filter-item input { margin-right: 10px; }
         .filter-item label:hover { background-color: #f1f5f9; }
         
-        /* AI Reporter Styles */
-        .ai-reporter-container {
-            margin-top: 24px;
-            padding: 20px;
-            border-radius: 12px;
-            background-color: #f0f9ff;
-            border: 1px solid #bae6fd;
-        }
-        .ai-reporter-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 16px;
-        }
-        .ai-reporter-header h3 {
-            margin: 0;
-            color: #0c4a6e;
-            font-size: 1.3rem;
-        }
-        .ai-reporter-tabs {
-            display: flex;
-            gap: 5px;
-            border-bottom: 1px solid #bae6fd;
-            margin-bottom: 16px;
-        }
-        .ai-reporter-tab {
-            padding: 10px 15px;
-            cursor: pointer;
-            border-radius: 6px 6px 0 0;
-            background-color: transparent;
-            border: 1px solid transparent;
-            border-bottom: none;
-            font-weight: 500;
-            color: #0369a1;
-        }
-        .ai-reporter-tab.active {
-            background-color: #fff;
-            border-color: #bae6fd;
-            color: #0c4a6e;
-        }
-        .ai-reporter-content {
-            /* styles for content area */
-        }
-        .ai-reporter-controls {
-            display: flex;
-            gap: 15px;
-            align-items: center;
-            flex-wrap: wrap;
-        }
-        .ai-reporter-controls .control-group {
-            min-width: 200px;
-        }
-        .ai-reporter-actions {
-            display: flex;
-            gap: 10px;
-            align-items: center;
-        }
-        .ai-reporter-actions button {
-            background-color: #0ea5e9;
-            color: white;
-            padding: 8px 16px;
-            font-weight: 500;
-        }
-        .ai-reporter-actions button.pdf-export {
-            background-color: #db2777;
-        }
-        .ai-reporter-actions button:disabled {
-            background-color: #9ca3af;
-            cursor: not-allowed;
-        }
-        .ai-report-display {
-            margin-top: 16px;
-            padding: 20px;
-            border-radius: 8px;
-            background-color: #ffffff;
-            border: 1px solid #e2e8f0;
-            color: #334155;
-            min-height: 100px;
-            font-family: 'Segoe UI', sans-serif;
-            line-height: 1.7;
-        }
-        .ai-report-display h1, .ai-report-display h2, .ai-report-display h3 {
-            color: #1e3a8a;
-            margin-top: 1.2em;
-            margin-bottom: 0.6em;
-            border-bottom: 1px solid #e2e8f0;
-            padding-bottom: 4px;
-        }
-        .ai-report-display h1 { font-size: 1.5em; }
-        .ai-report-display h2 { font-size: 1.3em; }
-        .ai-report-display h3 { font-size: 1.1em; }
-        .ai-report-display p { margin-bottom: 1em; }
-        .ai-report-display ul { padding-left: 20px; margin-bottom: 1em; }
-        .ai-report-display li { margin-bottom: 0.5em; }
-        .ai-report-display strong { color: #1e40af; }
-        
-        .interactive-query-builder {
-            display: flex;
-            flex-direction: column;
-            gap: 15px;
-        }
-
-        .query-row {
-            display: flex;
-            gap: 10px;
-            align-items: center;
-            flex-wrap: wrap;
-        }
-
-        .query-row span {
-            font-weight: 500;
-            color: #0c4a6e;
-        }
-
-        .interactive-display-container {
-            margin-top: 16px;
-            padding: 20px;
-            border-radius: 8px;
-            background-color: #ffffff;
-            border: 1px solid #e2e8f0;
-            min-height: 300px;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-        }
-        .interactive-display-container .ai-summary {
-            margin-top: 15px;
-            font-style: italic;
-            color: #1e40af;
-            text-align: center;
-            max-width: 80%;
-        }
-
-        .interactive-display-container .chart-area {
-            width: 100%;
-            height: 400px;
-        }
-
-        .interactive-display-container table {
-            width: 100%;
-        }
-
         /* Report Comparison Styles */
         .report-comparison-container {
             margin-top: 24px;
@@ -551,27 +408,13 @@
         .ebys-chart-container {
             margin-top: 20px;
             height: 400px;
-            width: 100%;
         }
 
         @media (max-width: 600px) {
             .dashboard { grid-template-columns: 1fr; }
             .charts-below { flex-direction: column; overflow-x: visible; }
-            .ai-reporter-controls {
-                flex-direction: column;
-                align-items: stretch;
-            }
         }
     </style>
-<script type="importmap">
-{
-  "imports": {
-    "marked": "https://aistudiocdn.com/marked@^16.3.0",
-    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.21.0"
-  }
-}
-</script>
-<link rel="stylesheet" href="/index.css">
 </head>
 <body>
     <div id="root"></div>
@@ -814,10 +657,7 @@
                 if (status.includes('eksiklikten iade edildi')) {
                     iade++;
                 }
-                
-                const hasOdendi = odeme.includes('ödendi');
-                const hasOdenmedi = odeme.includes('ödenmedi');
-                if (hasOdendi && !hasOdenmedi && (fenKayitNo === 0 || fenKayitNo == null)) {
+                if (odeme.includes('ödendi') && !odeme.includes('ödenmedi') && (fenKayitNo === 0 || fenKayitNo == null)) {
                     fenKayitAlinmayan++;
                 }
             });
@@ -956,14 +796,9 @@
                         case 'iptal_edilen':
                             if(status.includes('tescile gönderildi') && aciklama.includes('iptal')) conditionMet = true;
                             break;
-                        case 'fen_kayit_alinmayan': {
-                            const hasOdendi = odeme.includes('ödendi');
-                            const hasOdenmedi = odeme.includes('ödenmedi');
-                            if (hasOdendi && !hasOdenmedi && (r['fen kayıt no'] === 0 || r['fen kayıt no'] == null)) {
-                                conditionMet = true;
-                            }
+                        case 'fen_kayit_alinmayan':
+                            if(odeme.includes('ödendi') && !odeme.includes('ödenmedi') && (r['fen kayıt no'] === 0 || r['fen kayıt no'] == null)) conditionMet = true;
                             break;
-                        }
                         case 'plan_ornegi':
                             const isPlanOrnegi = islemLower === 'plan örneği';
                             const isMahkemePlanOrnegi = islemLower === 'mahkeme plan örneği';
@@ -1192,8 +1027,7 @@
                                         islem: task['işlem'] || '',
                                         zemin: task['zemin'] || '', 
                                         beklemeSuresi: Math.floor(diffDays), 
-                                        personnel: splitPersonel(task['görevli personel']),
-                                        basvuruDurumu: task['başvuru durumu'] || ''
+                                        personnel: splitPersonel(task['görevli personel']) 
                                     }; 
                                 } 
                             } 
@@ -1221,8 +1055,7 @@
                         'İl': row.il, 
                         'İlçe': row.ilce, 
                         'İşlem': row.islem,
-                        'Zemin': row.zemin,
-                        'Başvuru Durumu': row.basvuruDurumu,
+                        'Zemin': row.zemin, 
                         'Bekleme Süresi (Gün)': row.beklemeSuresi 
                     };
                 }); 
@@ -1236,7 +1069,7 @@
                         ws[cell_ref].s.alignment = { wrapText: true }; 
                     } 
                 } 
-                ws['!cols'] = [ { wch: 30 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 20 }, { wch: 40 }, { wch: 30 }, { wch: 20 } ]; 
+                ws['!cols'] = [ { wch: 30 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 20 }, { wch: 40 }, { wch: 20 } ]; 
                 const wb = XLSX.utils.book_new(); 
                 XLSX.utils.book_append_sheet(wb, ws, 'Uyari Raporu'); 
                 XLSX.writeFile(wb, 'uyari_raporu.xlsx'); 
@@ -1268,8 +1101,7 @@
                                     <th className="col-il">İl</th> 
                                     <th className="col-ilce">İlçe</th> 
                                     <th className="col-islem">İşlem</th>
-                                    <th className="col-zemin">Zemin</th>
-                                    <th className="col-basvuru-durumu">Başvuru Durumu</th>
+                                    <th className="col-zemin">Zemin</th> 
                                     <th className="col-bekleme-süresi-gün">Bekleme Süresi (Gün)</th> 
                                 </tr> 
                             </thead> 
@@ -1293,8 +1125,7 @@
                                         <td className="col-il">{row.il}</td> 
                                         <td className="col-ilce">{row.ilce}</td> 
                                         <td className="col-islem">{row.islem}</td>
-                                        <td className="col-zemin">{row.zemin}</td>
-                                        <td className="col-basvuru-durumu">{row.basvuruDurumu}</td>
+                                        <td className="col-zemin">{row.zemin}</td> 
                                         <td className="col-bekleme-süresi-gün">{row.beklemeSuresi}</td> 
                                     </tr> 
                                 ))} 
@@ -1666,471 +1497,6 @@
             );
         };
 
-        function InteractiveDisplay({ result, data }) {
-            const canvasRef = useRef(null);
-            const chartInstanceRef = useRef(null);
-            const [aiSummary, setAiSummary] = useState('');
-            const [isLoadingSummary, setIsLoadingSummary] = useState(false);
-
-            const API_KEY = "AIzaSyB_k4I2yXNG_mxMSX4jAY5Y8tb6z_uIjiQ";
-
-            useEffect(() => {
-                const generateSummary = async (config, processedData) => {
-                    if (!config || !processedData || processedData.length === 0) {
-                        setAiSummary('');
-                        return;
-                    }
-
-                    setIsLoadingSummary(true);
-                    const topItem = processedData[0];
-                    const prompt = `Aşağıdaki veri ve grafik bilgisine dayanarak tek cümlelik, profesyonel bir Türkçe özet oluştur:
-                    - Grafik Başlığı: "${config.title}"
-                    - En Yüksek Değer: "${topItem.label}" (${topItem.value} adet)
-                    Örnek: "İlçe bazında en çok bekleyen iş Silifke ilçesindedir."`;
-
-                     try {
-                        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${API_KEY}`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
-                        });
-                        if (!response.ok) throw new Error("API request failed");
-                        const result = await response.json();
-                        const summaryText = result.candidates[0].content.parts[0].text;
-                        setAiSummary(summaryText);
-                    } catch (error) {
-                        console.error("AI Summary Error:", error);
-                        setAiSummary("Özet oluşturulurken bir hata oluştu.");
-                    } finally {
-                        setIsLoadingSummary(false);
-                    }
-                };
-
-                if (chartInstanceRef.current) {
-                    chartInstanceRef.current.destroy();
-                    chartInstanceRef.current = null;
-                }
-
-                if (!result || !result.processedData || !canvasRef.current) {
-                    setAiSummary('');
-                    return;
-                }
-
-                const { config, processedData } = result;
-                const labels = processedData.map(d => d.label);
-                const values = processedData.map(d => d.value);
-
-                if (config.chartType === 'table') {
-                    setAiSummary('');
-                    return; 
-                }
-                
-                generateSummary(config, processedData);
-
-                chartInstanceRef.current = new Chart(canvasRef.current, {
-                    type: config.chartType,
-                    data: {
-                        labels: labels,
-                        datasets: [{
-                            label: config.title,
-                            data: values,
-                            backgroundColor: labels.map((_, i) => `hsl(${(i * 360 / labels.length)}, 70%, 60%)`),
-                            borderColor: '#fff',
-                            borderWidth: 1
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: {
-                            title: {
-                                display: true,
-                                text: config.title,
-                                font: { size: 16 }
-                            },
-                            legend: {
-                                display: config.chartType === 'pie' || config.chartType === 'doughnut',
-                                position: 'bottom'
-                            },
-                            datalabels: {
-                                anchor: 'end',
-                                align: 'end',
-                                color: '#333',
-                                font: {
-                                    weight: 'bold'
-                                },
-                                formatter: (value) => value > 0 ? value : ''
-                            }
-                        }
-                    }
-                });
-
-            }, [result]);
-
-            if (!result) {
-                return <p>Grafik veya tablo oluşturmak için yukarıdan seçim yapın.</p>;
-            }
-            if (result.error) {
-                return <p style={{color: 'red'}}>{result.error}</p>;
-            }
-             if (!result.processedData) {
-                return <p>Sorgunuz işleniyor veya bir hata oluştu...</p>;
-            }
-
-            const { config, processedData } = result;
-
-            if (config.chartType === 'table') {
-                return (
-                    <div style={{width: '100%', height: '100%'}}>
-                        <h3>{config.title}</h3>
-                        <div className="table-wrapper" style={{maxHeight: '400px'}}>
-                            <table>
-                                <thead>
-                                    <tr>
-                                        <th>{config.dimension}</th>
-                                        <th>Değer</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {processedData.map(row => (
-                                        <tr key={row.label}>
-                                            <td>{row.label}</td>
-                                            <td>{row.value}</td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                );
-            }
-
-            return (
-                React.createElement('div', {style: {width: '100%', height: '100%'}},
-                    React.createElement('div', { className: 'chart-area' },
-                        React.createElement('canvas', { ref: canvasRef })
-                    ),
-                    React.createElement('div', { className: 'ai-summary' },
-                        isLoadingSummary ? "Özet oluşturuluyor..." : aiSummary
-                    )
-                )
-            );
-        }
-
-        function AIReportGenerator({ data, ilOptions, personnelOptions, selectedIl, isEngineer, sortField }) {
-            const [aiMode, setAiMode] = useState('report'); // 'report' or 'interactive'
-            const [reportType, setReportType] = useState('il');
-            const [selectedValue, setSelectedValue] = useState('');
-            const [isLoading, setIsLoading] = useState(false);
-            const [generatedReport, setGeneratedReport] = useState('');
-            const [reportHtml, setReportHtml] = useState('');
-            const reportDisplayRef = useRef(null);
-
-            // States for interactive mode v2
-            const [interactiveMetric, setInteractiveMetric] = useState('count');
-            const [interactiveDimension, setInteractiveDimension] = useState('_province');
-            const [interactiveChartType, setInteractiveChartType] = useState('bar');
-            const [interactiveResult, setInteractiveResult] = useState(null);
-
-            const API_KEY = "AIzaSyB_k4I2yXNG_mxMSX4jAY5Y8tb6z_uIjiQ";
-            const markdownConverter = new showdown.Converter();
-
-            useEffect(() => {
-                setSelectedValue('');
-                setGeneratedReport('');
-                setReportHtml('');
-            }, [reportType]);
-            
-            const handleGenerateReport = async () => {
-                const isComparative = reportType === 'karşılaştırmalı';
-                if (!isComparative && !selectedValue) {
-                    setGeneratedReport("Lütfen rapor için bir il veya personel seçin.");
-                    setReportHtml("<p>Lütfen rapor için bir il veya personel seçin.</p>");
-                    return;
-                }
-                if (isComparative && selectedIl.length < 2) {
-                     setGeneratedReport("Karşılaştırma için en az 2 il seçmelisiniz.");
-                    setReportHtml("<p>Karşılaştırma için en az 2 il seçmelisiniz. Lütfen üst menüdeki 'İl Filtresi' butonunu kullanın.</p>");
-                    return;
-                }
-
-                setIsLoading(true);
-                setGeneratedReport('');
-                setReportHtml('<p>Rapor oluşturuluyor, lütfen bekleyin...</p>');
-
-                const today = new Date();
-                const formattedDate = today.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' });
-                let dataSummary = `Rapor Tarihi: ${formattedDate}\n`;
-                let prompt;
-
-                let filteredDataForReport = [];
-                 if (isComparative) {
-                    filteredDataForReport = data.filter(d => selectedIl.includes(d._province));
-                } else if (reportType === 'il') {
-                    filteredDataForReport = data.filter(d => d._province === selectedValue);
-                } else {
-                    const normalizedSelectedValue = normalizeName(selectedValue);
-                    filteredDataForReport = data.filter(d => splitPersonel(d['görevli personel']).some(p => normalizeName(p) === normalizedSelectedValue));
-                }
-                
-                const metrics = calcMetrics(filteredDataForReport);
-                 const foundOption = sortOptions.find(o => o.value === sortField);
-                 const currentFilterName = sortField ? (foundOption ? foundOption.label : 'Tümü') : 'Tümü';
-                dataSummary += `Filtre: ${currentFilterName}\n`;
-                dataSummary += `Toplam İşlem: ${metrics.toplam}\nBekleyen İşlem: ${metrics.totalWaiting}\n7+ Gün Bekleyen: ${metrics.overdue}\nOrt. F.K. Süresi: ${metrics.avgDays} gün\nOrt. İşlem Süresi: ${metrics.avgTescilSuresi} gün`;
-
-                prompt = `
-You are a data analyst assistant for the Turkish Land Registry and Cadastre. Your task is to generate a professional, data-driven "Genel Durum Değerlendirmesi" (General Situation Assessment) in Turkish based on the provided data summary.
-
-**Strict Rules:**
-1.  **NO INTERPRETATION:** Do NOT interpret, comment on, or add any qualitative judgment (like "good", "bad", "high", "low") to the data.
-2.  **DATA ONLY:** Your entire response must ONLY consist of the data points from the summary, presented in a list format under a single main heading.
-3.  **FORMAT:**
-    * Start with the main heading: "## Genel Durum Değerlendirmesi"
-    * List each data point using markdown bullet points (*).
-    * Use the exact metric names provided in the summary.
-4.  **LANGUAGE:** The entire output must be in Turkish.
-
-**Data Summary to Use:**
-${dataSummary}
-                `;
-
-
-                try {
-                    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${API_KEY}`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
-                    });
-
-                    if (!response.ok) {
-                        const errorBody = await response.json();
-                        throw new Error(`API hatası: ${response.status} ${response.statusText} - ${JSON.stringify(errorBody)}`);
-                    }
-
-                    const result = await response.json();
-                    const reportText = result.candidates[0].content.parts[0].text;
-                    setGeneratedReport(reportText);
-                    setReportHtml(markdownConverter.makeHtml(reportText));
-
-                } catch (error) {
-                    console.error("Gemini API error:", error);
-                    const errorMsg = `Rapor oluşturulurken bir hata oluştu: ${error.message}. Lütfen API anahtarınızı veya internet bağlantınızı kontrol edin.`;
-                    setGeneratedReport(errorMsg);
-                    setReportHtml(`<p style="color: red;">${errorMsg}</p>`);
-                } finally {
-                    setIsLoading(false);
-                }
-            };
-            
-            const handleExportToPdf = () => {
-                const reportElement = reportDisplayRef.current;
-                if (!reportElement || !generatedReport) {
-                    console.error("Rapor verisi veya element bulunamadı.");
-                    return;
-                }
-                
-                const { jsPDF } = window.jspdf;
-                html2canvas(reportElement, { scale: 2 }).then(canvas => {
-                    const imgData = canvas.toDataURL('image/png');
-                    const pdf = new jsPDF('p', 'mm', 'a4');
-                    const pdfWidth = pdf.internal.pageSize.getWidth();
-                    const pdfHeight = pdf.internal.pageSize.getHeight();
-                    const canvasWidth = canvas.width;
-                    const canvasHeight = canvas.height;
-                    const ratio = canvasWidth / canvasHeight;
-                    const imgWidth = pdfWidth - 20; // 10mm margin on each side
-                    const imgHeight = imgWidth / ratio;
-                    
-                    let heightLeft = imgHeight;
-                    let position = 10; // top margin
-
-                    pdf.addImage(imgData, 'PNG', 10, position, imgWidth, imgHeight);
-                    heightLeft -= (pdfHeight - 20);
-
-                    while (heightLeft > 0) {
-                        position = heightLeft - imgHeight; 
-                        pdf.addPage();
-                        pdf.addImage(imgData, 'PNG', 10, position, imgWidth, imgHeight);
-                        heightLeft -= (pdfHeight - 20);
-                    }
-                    
-                    pdf.save("YapayZeka_Raporu.pdf");
-                });
-            };
-
-            const handleGenerateInteractive = () => {
-                setIsLoading(true);
-                setInteractiveResult(null);
-
-                const config = {
-                    chartType: interactiveChartType,
-                    title: `${interactiveDimension} bazında ${interactiveMetric} dağılımı`,
-                    dimension: interactiveDimension,
-                    metric: interactiveMetric
-                };
-
-                try {
-                    const processedData = processDataForInteractive(data, config);
-                    setInteractiveResult({ config, processedData });
-                } catch(e) {
-                    setInteractiveResult({ error: `Grafik oluşturulurken hata: ${e.message}`});
-                } finally {
-                    setIsLoading(false);
-                }
-            };
-            
-            const processDataForInteractive = (sourceData, config) => {
-                const results = {};
-                const today = new Date();
-
-                sourceData.forEach(row => {
-                    let keys = [];
-                    if (config.dimension === 'görevli personel') {
-                        keys = splitPersonel(row['görevli personel']);
-                    } else if (config.dimension === 'yıl') {
-                        if(row['başvuru tarihi']) {
-                            const year = new Date(row['başvuru tarihi']).getFullYear();
-                            if(year) keys = [String(year)];
-                        }
-                    } else if (config.dimension === 'işlem') {
-                        let islem = String(row['işlem'] || '').trim();
-                        const islemLower = islem.toLowerCase();
-                        if ((islemLower.includes('mahke') && islemLower.includes('plan örneği')) || islemLower.includes('teknik bilgi ve belge örnekleri')) {
-                            islem = 'Plan Örneği';
-                        } else if (islemLower.startsWith('ayırma ve yola / yeşil alana terk')) {
-                            islem = 'Ayırma Ve Yola / Yeşil Alana Terk';
-                        }
-                        keys = [islem];
-                    }
-                    else {
-                        const key = row[config.dimension];
-                        if (key) keys = [String(key)];
-                    }
-
-                    if (keys.length === 0) keys = ["(Belirtilmemiş)"];
-
-                    keys.forEach(key => {
-                        if (!results[key]) {
-                            results[key] = { value: 0 };
-                        }
-                        
-                        const status = String(row['başvuru durumu'] || '').toLocaleLowerCase('tr');
-                        const isClosed = status.includes('eksiklikten iade edildi') || status.includes('tescile gönderildi');
-
-                        let shouldCount = false;
-                        if (config.metric === 'count') {
-                            shouldCount = true;
-                        } else if (config.metric === 'pending_count') {
-                            if (!isClosed) shouldCount = true;
-                        } else if (config.metric === 'overdue_count') {
-                            const fStr = row['fen kayıt tarihi'];
-                             const daysThreshold = sortField === 'plan_ornegi' ? 2 : 7;
-                             if (fStr && !isClosed) {
-                                  const diff = (today - new Date(fStr)) / (1000 * 60 * 60 * 24);
-                                  if (diff >= daysThreshold) shouldCount = true;
-                             }
-                        }
-                        if (shouldCount) results[key].value++;
-                    });
-                });
-                
-                return Object.entries(results).map(([label, values]) => {
-                    return { label, value: values.value };
-                }).filter(item => item.value > 0).sort((a, b) => b.value - a.value);
-            };
-
-            const options = reportType === 'il' ? ilOptions : personnelOptions;
-            const isComparative = reportType === 'karşılaştırmalı';
-            const canGenerate = !isLoading && (isComparative ? selectedIl.length > 1 : !!selectedValue);
-
-            return (
-                <div className="ai-reporter-container">
-                    <div className="ai-reporter-header">
-                        <h3>Yapay Zeka Destekli Raporlama</h3>
-                    </div>
-                    
-                    <div className="ai-reporter-tabs">
-                        <button className={`ai-reporter-tab ${aiMode === 'report' ? 'active' : ''}`} onClick={() => setAiMode('report')}>Otomatik Rapor</button>
-                        <button className={`ai-reporter-tab ${aiMode === 'interactive' ? 'active' : ''}`} onClick={() => setAiMode('interactive')}>İnteraktif Sorgu</button>
-                    </div>
-
-                    <div className="ai-reporter-content">
-                        {aiMode === 'report' && (
-                           React.createElement('div', null,
-                                React.createElement('div', { className: 'ai-reporter-controls' },
-                                    React.createElement('div', { className: 'control-group' },
-                                        React.createElement('label', null, 'Rapor Türü'),
-                                        React.createElement('select', { value: reportType, onChange: e => setReportType(e.target.value) },
-                                            React.createElement('option', { value: 'il' }, 'İl Bazında'),
-                                            React.createElement('option', { value: 'personel' }, 'Personel Bazında'),
-                                            React.createElement('option', { value: 'karşılaştırmalı' }, 'Karşılaştırmalı İl Raporu')
-                                        )
-                                    ),
-                                    !isComparative && (
-                                        React.createElement('div', { className: 'control-group' },
-                                            React.createElement('label', null, reportType === 'il' ? 'İl Seçin' : 'Personel Seçin'),
-                                            React.createElement('select', { value: selectedValue, onChange: e => setSelectedValue(e.target.value), disabled: options.length === 0 },
-                                                React.createElement('option', { value: '' }, '-- Seçim Yapın --'),
-                                                options.map(opt => React.createElement('option', { key: opt, value: opt }, `${opt} ${isEngineer(opt) ? '(Müh.)' : ''}`))
-                                            )
-                                        )
-                                    ),
-                                    React.createElement('div', { className: 'ai-reporter-actions' },
-                                        React.createElement('button', { onClick: handleGenerateReport, disabled: !canGenerate },
-                                            isLoading ? 'Oluşturuluyor...' : 'Rapor Oluştur'
-                                        ),
-                                        React.createElement('button', { onClick: handleExportToPdf, className: 'pdf-export', disabled: isLoading || !generatedReport },
-                                            'PDF Olarak İndir'
-                                        )
-                                    )
-                                ),
-                                isComparative && React.createElement('p', { style: { marginTop: '10px', color: '#0c4a6e' } }, React.createElement('i', null, "Karşılaştırma yapılacak illeri üst menüdeki 'İl Filtresi' butonundan seçebilirsiniz. (En az 2 il seçilmelidir)")),
-                                React.createElement('div', { className: 'ai-report-display', ref: reportDisplayRef, dangerouslySetInnerHTML: { __html: reportHtml || '<p>Oluşturulan rapor burada görünecektir.</p>' } })
-                            )
-                        )}
-
-                        {aiMode === 'interactive' && (
-                             React.createElement('div', null,
-                                React.createElement('div', { className: 'interactive-query-builder' },
-                                    React.createElement('div', { className: 'query-row' },
-                                        React.createElement('span', null, 'NE GÖSTERİLSİN?'),
-                                        React.createElement('select', { value: interactiveMetric, onChange: e => setInteractiveMetric(e.target.value) },
-                                            React.createElement('option', { value: 'count' }, 'Toplam İş Sayısı'),
-                                            React.createElement('option', { value: 'pending_count' }, 'Bekleyen İş Sayısı'),
-                                            React.createElement('option', { value: 'overdue_count' }, 'Süresi Geçen İş Sayısı')
-                                        ),
-                                        React.createElement('span', null, 'NEYE GÖRE GRUPLANSIN?'),
-                                        React.createElement('select', { value: interactiveDimension, onChange: e => setInteractiveDimension(e.target.value) },
-                                            React.createElement('option', { value: '_province' }, 'İl'),
-                                            React.createElement('option', { value: '_district' }, 'İlçe'),
-                                            React.createElement('option', { value: 'görevli personel' }, 'Personel'),
-                                            React.createElement('option', { value: 'işlem' }, 'İşlem Türü'),
-                                            React.createElement('option', { value: 'yıl' }, 'Yıl')
-                                        ),
-                                        React.createElement('span', null, 'NASIL GÖRÜNSÜN?'),
-                                        React.createElement('select', { value: interactiveChartType, onChange: e => setInteractiveChartType(e.target.value) },
-                                            React.createElement('option', { value: 'bar' }, 'Bar Grafiği'),
-                                            React.createElement('option', { value: 'pie' }, 'Pasta Grafiği'),
-                                            React.createElement('option', { value: 'doughnut' }, 'Halka Grafik'),
-                                            React.createElement('option', { value: 'table' }, 'Tablo')
-                                        )
-                                    ),
-                                    React.createElement('button', { onClick: handleGenerateInteractive, disabled: isLoading },
-                                        isLoading ? 'Oluşturuluyor...' : 'Grafik/Tablo Oluştur'
-                                    )
-                                ),
-                                
-                                React.createElement('div', { className: 'interactive-display-container' },
-                                    isLoading ? React.createElement('p', null, 'Yükleniyor...') : React.createElement(InteractiveDisplay, { result: interactiveResult, data: data })
-                                )
-                            )
-                        )}
-                    </div>
-                </div>
-            );
-        }
-
         function ReportComparison({ engineers, isEngineer }) {
             const [oldReport, setOldReport] = useState({ data: [], headers: [], name: '' });
             const [newReport, setNewReport] = useState({ data: [], headers: [], name: '' });
@@ -2411,7 +1777,7 @@ ${dataSummary}
             );
         }
 
-         function EbysReporter({ onZoom }) {
+         function EbysReporter() {
             const [ebysData, setEbysData] = useState([]);
             const [personnelOptions, setPersonnelOptions] = useState([]);
             const [selectedPersonnel, setSelectedPersonnel] = useState([]);
@@ -2479,10 +1845,6 @@ ${dataSummary}
                 setSelectedPersonnel([]);
                 setFileNames([]);
                 setTotalEbysDocs(0);
-                 if(ebysChartInstance.current){
-                    ebysChartInstance.current.destroy();
-                    ebysChartInstance.current = null;
-                }
             };
 
             const generateReport = () => {
@@ -2601,28 +1963,8 @@ ${dataSummary}
                     </div>
 
                     {ebysData.length > 0 && 
-                        <div className="chart-card" style={{ minHeight: '420px', marginTop: '20px' }}>
-                            <button
-                                className="zoom-btn"
-                                title="Büyüt"
-                                onClick={() => {
-                                    const personnelHeader = Object.keys(ebysData[0]).find(h => normalizeHeader(h).includes('bekleyen') && (normalizeHeader(h).includes('kullanıcı') || normalizeHeader(h).includes('kullanici')));
-                                    if (!personnelHeader) return;
-                                    const counts = {};
-                                    ebysData.forEach(row => {
-                                        const p = row[personnelHeader];
-                                        if (p) counts[p] = (counts[p] || 0) + 1;
-                                    });
-                                    onZoom({
-                                        type: 'chart',
-                                        data: counts,
-                                        title: 'EBYS Personel Bekleyen Evrak Sayıları'
-                                    });
-                                }}
-                            >🔍</button>
-                            <div className="ebys-chart-container">
-                                <canvas ref={ebysChartRef}></canvas>
-                            </div>
+                        <div className="ebys-chart-container">
+                            <canvas ref={ebysChartRef}></canvas>
                         </div>
                     }
 
@@ -2796,7 +2138,7 @@ ${dataSummary}
                 const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
 
                 const signatureImg = new Image();
-                signatureImg.src = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAARgAAAAsCAYAAAD2B2f5AAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAATYSURBVHhe7Z1fSxtRFMfvzC2b7Ya2SbC0sS19KIKVFJAggiAi+AMMPYgIesgXQfTgF4jgQRB68KCIF1EkRARpD0W0VCxYLJCklhKstLXt2mY3s5NfGXZ3t/M6M3u/8MvMvM+ZO+87c3ZndmCCILgYQ0yQIOjA2yA69lB04L2Q2Nen2NenmLUDBrQDBrQDBrQDBrQDBrQDBrQDBrQDBrQDBrQDBrQDBrQDBrQDBrQDBhL3w1sLw5iGfJ/pI+g/BCFfNq5yI6e3e1J6Wf2p+v/H6Gg1wzO4c2i1h12S4GfI8PuyO2bX7R3/tq6u/kE2z6V0e2Lx+jT5GvjV0H5fR+0Y9T0G87oB560y1n4m9n2b7v2+N8a8L3eM9S3X1q/X05kY4xV2zfY/pLp6a3v0c8SnaT7K8lO0G+T/VWUPG5WjK/T/cM8rT7N/oI8j/5A3kd+QN5Bfn9G0M087f5A3kX+Yp5N/kKezf5Cns3+Qp5N/kKeLd7+FfXj/A9bK+e/Qc5B/vX4vTz3/AUc3+vP6f4c8mzyj/M08hzyD/I08gzyN/IM8jfyDPJv/430dOwfJz+R/yB/359M/oI8+/yFvIv8hTy7/IU8u/yFPLv8hTy7/IU8u/yFPJv8/SyL/P0s8/z9LPP8/Sxj/P0si/z/LPP8/SyL/P0s8/z/LPP8/Sxj/P0s4/z/LPP8/Sxj/P0s4/z/LPP8/Sxj/P0s4/z/LPP8/Sxj/P0s4/z/LPP8/Sxj/P0s4/z/LPP8/Sxj/P0s4/z/LPP8/Sxj/P0s4/z/LPP8/Sxj/P0s4/z/LPP8/SzT/H0s0/z9LNP8/SzT/H0s0/z9LNP8/SzT/H0s0/z9LNP8/SzD/P8sw/z/LMP8/yzD/P8sw/z/LMP8/yzD/P8sw/z/LMP8/Sxb/P0sW/z9LFv8/Sxb/P0sW/z9LFv8/Sxb/P0sW/z/LMP8/yzD/P8sw/z9r/v8P0t8/yzD/P8sw/z/LMP8/yzD/P8s4/z87B/n/2T/IPyDP/8/Owf5/9g/yD/D8/+/8B/kH+P/ZP8g/wPP/v/Af5B/j/2T/IP8Dz/7/wH+Qf4/9k/yD/A8/+1cZ/8g/z/7Vxn/yD/P/tXGf/IP8/+1cZ/8g/z/7Vxn/yD/P/tXGf/IP8/+1cZ/8g/z/7Vxn/yD/P/tXGf/IP8/+1cZ/8g/z/7Vxn/yD/P/tXGf/IP8/+1cZ/8g/z/7Vxn/yD/P/tXGf/IP8/9k/yD/P/ZP8g/z/2T/IP8/+yf5B/n/2T/IP8/+yf5B/n/2T/IP8/+yf5B/n/2T/IP8/+yf5B/n/2T/IP8/+yf5B/n/2T/IP8/+yf5B/n/2T/IP8/+yf5B/n/2P/KP8/+yf5B/n/2D/Kv8/+yf5B/n/2D/Kv8/+wf5V/k/2P/KP8/+wf5V/k/2D/Kv8/9k/yD/P/tX+f/ZP8i/z/7V/n/2T/Iv8/9Vf4z/yD/P/tX+f/ZP8i/z/7V/n/2T/Iv8/9Vf4z/yD/P/tX+f/ZP8i/z/7V/n/2T/Iv8/9Vf5n/kD+f/ZP8i/z/5X/mf+QP5/9k/yL/P/lf+Z/5A/n/2T/Iv8/+V/5n/kD+f/ZP8i/z/5H/mf+QP5/9k/yL/P/k/+Z/wB/gG9i2pD/t6f0AAAAABJRU5ErkJggg==';
+                signatureImg.src = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAARgAAAAsCAYAAAD2B2f5AAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAATYSURBVHhe7Z1fSxtRFMfvzC2b7Ya2SbC0sS19KIKVFJAggiAi+AMMPYgIesgXQfTgF4jgQRB68KCIF1EkRARpD0W0VCxYLJCklhKstLXt2mY3s5NfGXZ3t/M6M3u/8MvMvM+ZO+87c3ZndmCCILgYQ0yQIOjA2yA69lB04L2Q2Nen2NenmLUDBrQDBrQDBrQDBrQDBrQDBrQDBrQDBrQDBrQDBrQDBrQDBrQDBrQDBhL3w1sLw5iGfJ/pI+g/BCFfNq5yI6e3e1J6Wf2p+v/H6Gg1wzO4c2i1h12S4GfI8PuyO2bX7R3/tq6u/kE2z6V0e2Lx+jT5GvjV0H5fR+0Y9T0G87oB560y1n4m9n2b7v2+N8a8L3eM9S3X1q/X05kY4xV2zfY/pLp6a3v0c8SnaT7K8lO0G+T/VWUPG5WjK/T/cM8rT7N/oI8j/5A3kd+QN5Bfn9G0M087f5A3kX+Yp5N/kKezf5Cns3+Qp7N/kKeLd7+FfXj/A9bK+e/Qc5B/vX4vTz3/AUc3+vP6f4c8mzyj/M08hzyD/I08gzyN/IM8jfyDPJv/430dOwfJz+R/yB/359M/oI8+/yFvIv8hTy7/IU8u/yFPLv8hTy7/IU8u/yFPJv8/SyL/P0s8/z9LPP8/SwL/P0si/z/LPP8/SyL/P8s8/z/LPP8/Szj/H0s4/z/LPP8/Sxj/P0s4/z/LPP8/Sxj/P0s4/z/LPP8/Sxj/P0s4/z/LPP8/SzT/H0s0/z9LNP8/SzT/H0s0/z9LNP8/SzT/H0s0/z/LNP8/SzD/P8sw/z/LMP8/yzD/P8sw/z/LMP8/yzD/P8sw/z/LMP8/Sxb/P0sW/z9LFv8/Sxb/P0sW/z9LFv8/Sxb/P0sW/z/LMP8/yzD/P8sw/z9r/v8P0t8/yzD/P8sw/z/LMP8/yzD/P8s4/z87B/n/2T/IPyDP/8/Owf5/9g/yD/D8/+/8B/kH+P/ZP8g/wPP/v/Af5B/j/2T/IP8Dz/7/wH+Qf4/9k/yD/A8/+1cZ/8g/z/7Vxn/yD/P/tXGf/IP8/+1cZ/8g/z/7Vxn/yD/P/tXGf/IP8/+1cZ/8g/z/7Vxn/yD/P/tXGf/IP8/+1cZ/8g/z/7Vxn/yD/P/tXGf/IP8/+1cZ/8g/z/7Vxn/yD/P/tXGf/IP8/9k/yD/P/ZP8g/z/2T/IP8/+yf5B/n/2T/IP8/+yf5B/n/2T/IP8/+yf5B/n/2T/IP8/+yf5B/n/2T/IP8/+yf5B/n/2T/IP8/+yf5B/n/2T/IP8/+yf5B/n/2P/KP8/+yf5B/n/2D/Kv8/+yf5B/n/2D/Kv8/+wf5V/k/2P/KP8/+wf5V/k/2D/Kv8/9k/yD/P/tX+f/ZP8i/z/7V/n/2T/Iv8/9Vf4z/yD/P/tX+f/ZP8i/z/7V/n/2T/Iv8/9Vf4z/yD/P/tX+f/ZP8i/z/7V/n/2T/Iv8/9Vf5n/kD+f/ZP8i/z/5X/mf+QP5/9k/yL/P/lf+Z/5A/n/2T/Iv8/+V/5n/kD+f/ZP8i/z/5H/mf+QP5/9k/yL/P/k/+Z/wB/gG9i2pD/t6f0AAAAABJRU5ErkJggg==';
                 signatureImg.onload = async () => {
                     const addElementToPdf = async (element, yPos) => {
                         const canvas = await html2canvas(element, { scale: 2, backgroundColor: '#ffffff' });
@@ -2871,11 +2213,7 @@ ${dataSummary}
                             switch(config.filter) {
                                 case 'tescile_giden': return status.includes('tescile gönderildi') && aciklama.includes('tescil edildi');
                                 case 'iptal_edilen': return status.includes('tescile gönderildi') && aciklama.includes('iptal');
-                                case 'fen_kayit_alinmayan': {
-                                    const hasOdendi = odeme.includes('ödendi');
-                                    const hasOdenmedi = odeme.includes('ödenmedi');
-                                    return hasOdendi && !hasOdenmedi && (d['fen kayıt no'] === 0 || d['fen kayıt no'] == null);
-                                }
+                                case 'fen_kayit_alinmayan': return odeme.includes('ödendi') && (d['fen kayıt no'] === 0 || d['fen kayıt no'] == null);
                                 case 'plan_ornegi': 
                                     const planOrnegiTerms = ['plan örneği', 'mahke', 'teknik bilgi ve belge örnekleri'];
                                      const isWaiting = !status.includes('eksiklikten iade edildi') && !status.includes('tescile gönderildi');
@@ -2978,9 +2316,7 @@ ${dataSummary}
                 } else if (sortField === 'fen_kayit_alinmayan') {
                     arr = arr.filter(d => {
                         const odeme = String(d['ödeme'] || '').toLocaleLowerCase('tr');
-                        const hasOdendi = odeme.includes('ödendi');
-                        const hasOdenmedi = odeme.includes('ödenmedi');
-                        return hasOdendi && !hasOdenmedi && (d['fen kayıt no'] === 0 || d['fen kayıt no'] == null);
+                        return odeme.includes('ödendi') && !odeme.includes('ödenmedi') && (d['fen kayıt no'] === 0 || d['fen kayıt no'] == null);
                     });
                 } else if (sortField === 'plan_ornegi') {
                      arr = arr.filter(d => {
@@ -3095,9 +2431,9 @@ ${dataSummary}
                     </div>
                     <WarningTable data={filteredData} isEngineer={isEngineer} showOnlyEngineers={showOnlyEngineers} onToggleEngineers={() => setShowOnlyEngineers(!showOnlyEngineers)} sortField={sortField} />
                     <DataTable data={filteredData} sortField={sortField} isEngineer={isEngineer} showOnlyEngineers={showOnlyEngineers} onToggleEngineers={() => setShowOnlyEngineers(!showOnlyEngineers)} />
-                    <AIReportGenerator data={filteredData.length > 0 ? filteredData : data} ilOptions={ilOptions} personnelOptions={personnelOptions} selectedIl={selectedIl} isEngineer={isEngineer} sortField={sortField} />
+                    
                     <ReportComparison engineers={engineers} isEngineer={isEngineer} />
-                    <EbysReporter onZoom={setZoomContent} />
+                    <EbysReporter />
                 </React.Fragment>}
                 
                 {zoomContent && (
@@ -3244,6 +2580,6 @@ ${dataSummary}
             ];
         ReactDOM.createRoot(document.getElementById('root')).render(<App />);
     </script>
-<script type="module" src="/index.tsx"></script>
 </body>
 </html>
+
