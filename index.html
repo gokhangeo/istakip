@@ -2132,7 +2132,8 @@
                 {label:'Fen Kayıt Alınmayan', value:'fen_kayit_alinmayan'},
                 {label:'Plan Örneği', value:'plan_ornegi'},
                 {label:'Bekleyen (Eskiden Yeniye)', value:'bekleyen_eski_yeni'},
-                {label:'Bekleyen (Yeniden Eskiye)', value:'bekleyen_yeni_eski'}
+                {label:'Bekleyen (Yeniden Eskiye)', value:'bekleyen_yeni_eski'},
+                {label:'Uygun Olmayan İade Gerekçeleri', value:'uygun_olmayan_iade'}
             ];
             
             const filteredData=(() => {
@@ -2209,6 +2210,56 @@
                         const dy = new Date(b['başvuru tarihi']);
                         if (!isNaN(dx) && !isNaN(dy)) return dy - dx;
                         return 0;
+                    });
+                } else if (sortField === 'uygun_olmayan_iade') {
+                    const inappropriateReasons = [
+                        'teknik kontrol devam ediyor',
+                        'arazi planlaması yapılacak',
+                        'dosya kontrolleri devam ediyor',
+                        'kontrol edildi'
+                    ];
+
+                    arr = arr.filter(d => {
+                        const status = String(d['başvuru durumu'] || '').toLocaleLowerCase('tr');
+                        if (!status.includes('eksiklikten iade edildi')) {
+                            return false;
+                        }
+
+                        const aciklama = String(d['başvuru açıklama'] || '');
+                        const dateRegex = /(.*?)-(\d{1,2}\.\d{1,2}\.\d{4})/g;
+                        let matches = [...aciklama.matchAll(dateRegex)];
+                        
+                        if (matches.length === 0) {
+                            return false;
+                        }
+
+                        let latestEntry = null;
+                        let latestDate = null;
+
+                        matches.forEach(match => {
+                            const reasonText = match[1].trim();
+                            const dateStr = match[2];
+                            const dateParts = dateStr.split('.');
+                            const currentDate = new Date(dateParts[2], dateParts[1] - 1, dateParts[0]);
+
+                            if (!latestDate || currentDate > latestDate) {
+                                latestDate = currentDate;
+                                latestEntry = { reason: reasonText, date: currentDate };
+                            }
+                        });
+
+                        if (latestEntry) {
+                            const latestReason = latestEntry.reason.toLocaleLowerCase('tr');
+                            return inappropriateReasons.some(inappropriate => latestReason.includes(inappropriate));
+                        }
+
+                        return false;
+                    });
+                    
+                     arr.sort((a, b) => {
+                        const pa = a['görevli personel'] || '';
+                        const pb = b['görevli personel'] || '';
+                        return pa.localeCompare(pb, 'tr');
                     });
                 } else if (sortField) {
                      arr.sort((a,b)=>{ 
