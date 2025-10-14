@@ -1083,9 +1083,7 @@
 
             const handleExportWarningExcel = () => { 
                 const isUygunOlmayanIadeMode = sortField === 'uygun_olmayan_iade';
-                let dataToExport;
-                let cols = [];
-
+                
                 const getPersonnelText = (row) => {
                     const personnelListWithStatus = parsePersonnelWithStatus(row.personnelRaw);
                     let personnelList = showOnlyEngineers ? personnelListWithStatus.filter(p => isEngineer(p.name)) : personnelListWithStatus;
@@ -1097,32 +1095,90 @@
                 };
 
                 if (isUygunOlmayanIadeMode) {
-                    dataToExport = warningRows.map(row => ({ 
-                        'Personel': getPersonnelText(row),
-                        'Fen Kayıt Tarihi': row.fenKayitTarihi,
-                        'Fen Kayıt No': row.fenKayitNo, 
-                        'İl': row.il, 
-                        'İlçe': row.ilce, 
-                        'İşlem': row.islem,
-                        'Zemin': row.zemin, 
-                        'Başvuru Durumu': row.basvuruDurumu,
-                        'Başvuru Açıklama': row.basvuruAciklama
-                    }));
-                    cols = [ { wch: 30 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 20 }, { wch: 40 }, { wch: 25 }, { wch: 50 }];
-                } else {
-                    dataToExport = warningRows.map(row => ({
-                        'Personel': getPersonnelText(row),
-                        'Fen Kayıt Tarihi': row.fenKayitTarihi,
-                        'Fen Kayıt No': row.fenKayitNo, 
-                        'İl': row.il, 
-                        'İlçe': row.ilce, 
-                        'İşlem': row.islem,
-                        'Zemin': row.zemin, 
-                        'Başvuru Durumu': row.basvuruDurumu,
-                        'Bekleme Süresi (Gün)': row.beklemeSuresi 
-                    }));
-                    cols = [ { wch: 30 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 20 }, { wch: 40 }, { wch: 25 }, { wch: 20 } ];
+                    const wb = XLSX.utils.book_new();
+
+                    const allEngineersInReport = [...new Set(
+                        warningRows.flatMap(row =>
+                            parsePersonnelWithStatus(row.personnelRaw)
+                                .filter(p => isEngineer(p.name))
+                                .map(p => p.name)
+                        )
+                    )].sort((a, b) => a.localeCompare(b, 'tr'));
+
+                    if (allEngineersInReport.length === 0) {
+                        alert("Uyarı raporunda analiz edilecek mühendis bulunamadı.");
+                        return;
+                    }
+
+                    allEngineersInReport.forEach(engineerName => {
+                        const engineerRows = warningRows.filter(row =>
+                            parsePersonnelWithStatus(row.personnelRaw).some(p => p.name === engineerName && isEngineer(p.name))
+                        );
+
+                        if (engineerRows.length > 0) {
+                            engineerRows.sort((a, b) => {
+                                const dateA = a.fenKayitTarihi ? new Date(a.fenKayitTarihi) : null;
+                                const dateB = b.fenKayitTarihi ? new Date(b.fenKayitTarihi) : null;
+                                if (dateA && dateB) {
+                                    return dateA - dateB;
+                                }
+                                if (dateA) return -1;
+                                if (dateB) return 1;
+                                return 0;
+                            });
+
+                            const dataToExport = engineerRows.map(row => ({
+                                'Personel': parsePersonnelWithStatus(row.personnelRaw)
+                                              .map(p => isEngineer(p.name) ? `${p.name} (Müh.)` : p.name)
+                                              .join("\n"),
+                                'Fen Kayıt Tarihi': row.fenKayitTarihi,
+                                'Fen Kayıt No': row.fenKayitNo,
+                                'İl': row.il,
+                                'İlçe': row.ilce,
+                                'İşlem': row.islem,
+                                'Zemin': row.zemin,
+                                'Başvuru Durumu': row.basvuruDurumu,
+                                'Başvuru Açıklama': row.basvuruAciklama
+                            }));
+
+                            const ws = XLSX.utils.json_to_sheet(dataToExport);
+                            const cols = [ { wch: 30 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 20 }, { wch: 40 }, { wch: 25 }, { wch: 50 }];
+                            ws['!cols'] = cols;
+
+                            const range = XLSX.utils.decode_range(ws['!ref']);
+                            for (let R = range.s.r + 1; R <= range.e.r; ++R) {
+                                const cell_address = { c: 0, r: R };
+                                const cell_ref = XLSX.utils.encode_cell(cell_address);
+                                if (ws[cell_ref] && ws[cell_ref].v) {
+                                    if (!ws[cell_ref].s) ws[cell_ref].s = {};
+                                    ws[cell_ref].s.alignment = { wrapText: true, vertical: 'top' };
+                                }
+                            }
+
+                            const sheetName = engineerName.replace(/[\\/*?:]/g, "").substring(0, 31);
+                            XLSX.utils.book_append_sheet(wb, ws, sheetName);
+                        }
+                    });
+
+                    XLSX.writeFile(wb, 'Iade_Uyari_Raporu_Muhendis.xlsx');
+                    return;
                 }
+
+                // Default export for other warning types
+                let dataToExport;
+                let cols = [];
+                dataToExport = warningRows.map(row => ({
+                    'Personel': getPersonnelText(row),
+                    'Fen Kayıt Tarihi': row.fenKayitTarihi,
+                    'Fen Kayıt No': row.fenKayitNo, 
+                    'İl': row.il, 
+                    'İlçe': row.ilce, 
+                    'İşlem': row.islem,
+                    'Zemin': row.zemin, 
+                    'Başvuru Durumu': row.basvuruDurumu,
+                    'Bekleme Süresi (Gün)': row.beklemeSuresi 
+                }));
+                cols = [ { wch: 30 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 20 }, { wch: 40 }, { wch: 25 }, { wch: 20 } ];
                 
                 const ws = XLSX.utils.json_to_sheet(dataToExport); 
                 const range = XLSX.utils.decode_range(ws['!ref']); 
@@ -2516,6 +2572,8 @@
     </script>
 </body>
 </html>
+
+
 
 
 
