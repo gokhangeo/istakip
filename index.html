@@ -1029,7 +1029,8 @@
                                     zemin: d['zemin'] || '',
                                     basvuruDurumu: d['başvuru durumu'] || '',
                                     basvuruAciklama: d['başvuru açıklama'] || '',
-                                    personnelRaw: d['görevli personel'] || ''
+                                    personnelRaw: d['görevli personel'] || '',
+                                    fenKayitTarihi: d['fen kayıt tarihi'] || ''
                                 };
                             }
                         }
@@ -1108,10 +1109,11 @@
                         'İlçe': row.ilce, 
                         'İşlem': row.islem,
                         'Zemin': row.zemin, 
+                        'Fen Kayıt Tarihi': row.fenKayitTarihi,
                         'Başvuru Durumu': row.basvuruDurumu,
                         'Başvuru Açıklama': row.basvuruAciklama
                     }));
-                    cols = [ { wch: 30 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 20 }, { wch: 40 }, { wch: 25 }, { wch: 50 }];
+                    cols = [ { wch: 30 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 20 }, { wch: 40 }, { wch: 15 }, { wch: 25 }, { wch: 50 }];
                 } else {
                     dataToExport = warningRows.map(row => ({
                         'Personel': getPersonnelText(row),
@@ -1174,6 +1176,7 @@
                                     <th className="col-ilce">İlçe</th> 
                                     <th className="col-islem">İşlem</th>
                                     <th className="col-zemin">Zemin</th> 
+                                    {isUygunOlmayanIadeMode && <th>Fen Kayıt Tarihi</th>}
                                     <th>Başvuru Durumu</th>
                                     {isUygunOlmayanIadeMode ? <th>Başvuru Açıklama</th> : <th className="col-bekleme-süresi-gün">Bekleme Süresi (Gün)</th> }
                                 </tr> 
@@ -1201,6 +1204,7 @@
                                         <td className="col-ilce">{row.ilce}</td> 
                                         <td className="col-islem">{row.islem}</td>
                                         <td className="col-zemin">{row.zemin}</td> 
+                                        {isUygunOlmayanIadeMode && <td>{row.fenKayitTarihi}</td>}
                                         <td>{row.basvuruDurumu}</td>
                                         {isUygunOlmayanIadeMode ? <td style={{whiteSpace: 'normal', wordBreak: 'break-word'}}>{row.basvuruAciklama}</td> : <td className="col-bekleme-süresi-gün">{row.beklemeSuresi}</td>}
                                     </tr> 
@@ -2516,4 +2520,5 @@
     </script>
 </body>
 </html>
+
 
