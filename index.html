@@ -991,69 +991,130 @@
             const [warningRows, setWarningRows] = useState([]); 
             
             useEffect(() => { 
-                let relevantData = data;
-                
-                if (sortField === 'plan_ornegi') {
-                    relevantData = relevantData.filter(d => {
-                        const islem = String(d['işlem'] || '').toLocaleLowerCase('tr');
-                        const isPlanOrnegi = islem === 'plan örneği';
-                        const isMahkemePlanOrnegi = islem === 'mahkeme plan örneği';
-                        const isTeknikBilgi = islem === 'teknik bilgi ve belge örnekleri';
-                        
-                        return isPlanOrnegi || isMahkemePlanOrnegi || isTeknikBilgi;
-                    });
-                }
-                
-                const today = new Date(); 
-                const groupedTasks = {}; 
-                const daysThreshold = sortField === 'plan_ornegi' ? 2 : 7;
+                const today = new Date();
+                let finalRows = [];
 
-                relevantData.forEach(task => { 
-                    const fStr = task['fen kayıt tarihi']; 
-                    if (fStr) { 
-                        const fenKayitDate = new Date(fStr); 
-                        if (!isNaN(fenKayitDate) && fenKayitDate.getFullYear() > 1900) { 
-                            const diffDays = (today - fenKayitDate) / (1000 * 60 * 60 * 24); 
-                            const status = String(task['başvuru durumu']||'').toLocaleLowerCase('tr'); 
-                            const isClosed = status.includes('eksiklikten iade edildi') || status.includes('tescile gönderildi'); 
-                            const fenKayitNo = task['fen kayıt no']; 
-                            const hasValidFenKayitNo = fenKayitNo != null && fenKayitNo != 0; 
-                            if (diffDays >= daysThreshold && !isClosed && hasValidFenKayitNo) {
-                                if (!groupedTasks[fenKayitNo]) { 
-                                    groupedTasks[fenKayitNo] = { 
-                                        fenKayitNo: fenKayitNo, 
-                                        il: task._province || '', 
-                                        ilce: task['ilçe'] || '', 
-                                        islem: task['işlem'] || '',
-                                        zemin: task['zemin'] || '', 
-                                        basvuruDurumu: task['başvuru durumu'] || '',
-                                        beklemeSuresi: Math.floor(diffDays), 
-                                        personnelRaw: task['görevli personel'] || ''
-                                    }; 
-                                } 
-                            } 
+                if (sortField === 'uygun_olmayan_iade') {
+                    const threeMonthsAgo = new Date();
+                    threeMonthsAgo.setMonth(today.getMonth() - 3);
+                    const groupedTasks = {};
+
+                    data.forEach(d => {
+                        const status = String(d['başvuru durumu'] || '').toLocaleLowerCase('tr');
+                        if (!status.includes('eksiklikten iade edildi')) return;
+
+                        const aciklama = String(d['başvuru açıklama'] || '');
+                        const dateRegex = /(.*?)-(\d{1,2}\.\d{1,2}\.\d{4})/g;
+                        let matches = [...aciklama.matchAll(dateRegex)];
+                        if (matches.length === 0) return;
+
+                        let latestDate = null;
+                        matches.forEach(match => {
+                            const dateStr = match[2];
+                            const dateParts = dateStr.split('.');
+                            const currentDate = new Date(parseInt(dateParts[2]), parseInt(dateParts[1]) - 1, parseInt(dateParts[0]));
+                            if (!latestDate || currentDate > latestDate) {
+                                latestDate = currentDate;
+                            }
+                        });
+                        
+                        const fenKayitNo = d['fen kayıt no'];
+                        if (latestDate && latestDate >= threeMonthsAgo) {
+                            if (fenKayitNo && !groupedTasks[fenKayitNo]) { // Group by fenKayitNo to fix key error
+                                groupedTasks[fenKayitNo] = {
+                                    fenKayitNo: fenKayitNo,
+                                    il: d._province || '',
+                                    ilce: d['ilçe'] || '',
+                                    islem: d['işlem'] || '',
+                                    zemin: d['zemin'] || '',
+                                    basvuruDurumu: d['başvuru durumu'] || '',
+                                    basvuruAciklama: d['başvuru açıklama'] || '',
+                                    personnelRaw: d['görevli personel'] || ''
+                                };
+                            }
                         }
-                    } 
-                }); 
-                let finalRows = Object.values(groupedTasks).sort((a, b) => b.beklemeSuresi - a.beklemeSuresi); 
-                
+                    });
+                    finalRows = Object.values(groupedTasks);
+
+                } else {
+                    let relevantData = data;
+                    if (sortField === 'plan_ornegi') {
+                        relevantData = relevantData.filter(d => {
+                            const islem = String(d['işlem'] || '').toLocaleLowerCase('tr');
+                            return ['plan örneği', 'mahkeme plan örneği', 'teknik bilgi ve belge örnekleri'].includes(islem);
+                        });
+                    }
+                    
+                    const groupedTasks = {};
+                    const daysThreshold = sortField === 'plan_ornegi' ? 2 : 7;
+
+                    relevantData.forEach(task => {
+                        const fStr = task['fen kayıt tarihi'];
+                        if (fStr) {
+                            const fenKayitDate = new Date(fStr);
+                            if (!isNaN(fenKayitDate) && fenKayitDate.getFullYear() > 1900) {
+                                const diffDays = (today - fenKayitDate) / (1000 * 60 * 60 * 24);
+                                const status = String(task['başvuru durumu'] || '').toLocaleLowerCase('tr');
+                                const isClosed = status.includes('eksiklikten iade edildi') || status.includes('tescile gönderildi');
+                                const fenKayitNo = task['fen kayıt no'];
+                                const hasValidFenKayitNo = fenKayitNo != null && fenKayitNo != 0;
+                                if (diffDays >= daysThreshold && !isClosed && hasValidFenKayitNo) {
+                                    if (!groupedTasks[fenKayitNo]) {
+                                        groupedTasks[fenKayitNo] = {
+                                            fenKayitNo: fenKayitNo,
+                                            il: task._province || '',
+                                            ilce: task['ilçe'] || '',
+                                            islem: task['işlem'] || '',
+                                            zemin: task['zemin'] || '',
+                                            basvuruDurumu: task['başvuru durumu'] || '',
+                                            beklemeSuresi: Math.floor(diffDays),
+                                            personnelRaw: task['görevli personel'] || ''
+                                        };
+                                    }
+                                }
+                            }
+                        }
+                    });
+                    finalRows = Object.values(groupedTasks).sort((a, b) => b.beklemeSuresi - a.beklemeSuresi);
+                }
+
                 if (showOnlyEngineers) {
                     finalRows = finalRows.filter(row => parsePersonnelWithStatus(row.personnelRaw).some(p => isEngineer(p.name)));
                 }
 
-                setWarningRows(finalRows); 
+                setWarningRows(finalRows);
             }, [data, isEngineer, showOnlyEngineers, sortField]); 
 
             const handleExportWarningExcel = () => { 
-                const dataToExport = warningRows.map(row => {
+                const isUygunOlmayanIadeMode = sortField === 'uygun_olmayan_iade';
+                let dataToExport;
+                let cols = [];
+
+                const getPersonnelText = (row) => {
                     const personnelListWithStatus = parsePersonnelWithStatus(row.personnelRaw);
                     let personnelList = showOnlyEngineers ? personnelListWithStatus.filter(p => isEngineer(p.name)) : personnelListWithStatus;
-                    return { 
-                        'Personel': personnelList.map(p => {
-                            const namePart = isEngineer(p.name) ? `${p.name} (Müh.)` : p.name;
-                            const statusPart = (sortField === 'tescilden_geldi' && p.status) ? ` (${p.status})` : '';
-                            return `${namePart}${statusPart}`;
-                        }).join("\n"), 
+                    return personnelList.map(p => {
+                        const namePart = isEngineer(p.name) ? `${p.name} (Müh.)` : p.name;
+                        const statusPart = (sortField === 'tescilden_geldi' && p.status) ? ` (${p.status})` : '';
+                        return `${namePart}${statusPart}`;
+                    }).join("\n");
+                };
+
+                if (isUygunOlmayanIadeMode) {
+                    dataToExport = warningRows.map(row => ({ 
+                        'Personel': getPersonnelText(row),
+                        'Fen Kayıt No': row.fenKayitNo, 
+                        'İl': row.il, 
+                        'İlçe': row.ilce, 
+                        'İşlem': row.islem,
+                        'Zemin': row.zemin, 
+                        'Başvuru Durumu': row.basvuruDurumu,
+                        'Başvuru Açıklama': row.basvuruAciklama
+                    }));
+                    cols = [ { wch: 30 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 20 }, { wch: 40 }, { wch: 25 }, { wch: 50 }];
+                } else {
+                    dataToExport = warningRows.map(row => ({
+                        'Personel': getPersonnelText(row),
                         'Fen Kayıt No': row.fenKayitNo, 
                         'İl': row.il, 
                         'İlçe': row.ilce, 
@@ -1061,28 +1122,35 @@
                         'Zemin': row.zemin, 
                         'Başvuru Durumu': row.basvuruDurumu,
                         'Bekleme Süresi (Gün)': row.beklemeSuresi 
-                    };
-                }); 
+                    }));
+                    cols = [ { wch: 30 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 20 }, { wch: 40 }, { wch: 25 }, { wch: 20 } ];
+                }
+                
                 const ws = XLSX.utils.json_to_sheet(dataToExport); 
                 const range = XLSX.utils.decode_range(ws['!ref']); 
                 for (let R = range.s.r + 1; R <= range.e.r; ++R) { 
                     const cell_address = { c: 0, r: R }; 
                     const cell_ref = XLSX.utils.encode_cell(cell_address); 
-                    if (ws[cell_ref]) { 
+                    if (ws[cell_ref] && ws[cell_ref].v) { 
                         if (!ws[cell_ref].s) ws[cell_ref].s = {}; 
-                        ws[cell_ref].s.alignment = { wrapText: true }; 
+                        ws[cell_ref].s.alignment = { wrapText: true, vertical: 'top' }; 
                     } 
                 } 
-                ws['!cols'] = [ { wch: 30 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 20 }, { wch: 40 }, { wch: 25 }, { wch: 20 } ]; 
+                ws['!cols'] = cols; 
                 const wb = XLSX.utils.book_new(); 
                 XLSX.utils.book_append_sheet(wb, ws, 'Uyari Raporu'); 
                 XLSX.writeFile(wb, 'uyari_raporu.xlsx'); 
             }; 
+
             if (warningRows.length === 0) { return null; } 
             
-            const warningTitle = sortField === 'plan_ornegi' 
-                ? `2 Günden Fazla Bekleyen İşlemler (Uyarı) (Toplam: ${warningRows.length})`
-                : `7 Günden Fazla Bekleyen İşlemler (Uyarı) (Toplam: ${warningRows.length})`;
+            const isUygunOlmayanIadeMode = sortField === 'uygun_olmayan_iade';
+
+            const warningTitle = isUygunOlmayanIadeMode
+                ? `Son 3 Ay İçindeki İadeler (Toplam: ${warningRows.length})`
+                : (sortField === 'plan_ornegi' 
+                    ? `2 Günden Fazla Bekleyen İşlemler (Uyarı) (Toplam: ${warningRows.length})`
+                    : `7 Günden Fazla Bekleyen İşlemler (Uyarı) (Toplam: ${warningRows.length})`);
             
             return ( 
                 <div className="warning-table-container"> 
@@ -1107,12 +1175,12 @@
                                     <th className="col-islem">İşlem</th>
                                     <th className="col-zemin">Zemin</th> 
                                     <th>Başvuru Durumu</th>
-                                    <th className="col-bekleme-süresi-gün">Bekleme Süresi (Gün)</th> 
+                                    {isUygunOlmayanIadeMode ? <th>Başvuru Açıklama</th> : <th className="col-bekleme-süresi-gün">Bekleme Süresi (Gün)</th> }
                                 </tr> 
                             </thead> 
                             <tbody> 
-                                {warningRows.map((row) => ( 
-                                    <tr key={row.fenKayitNo}> 
+                                {warningRows.map((row, index) => ( 
+                                    <tr key={`${row.fenKayitNo}-${index}`}> 
                                         <td className="col-personel">
                                             {
                                                 parsePersonnelWithStatus(row.personnelRaw)
@@ -1134,7 +1202,7 @@
                                         <td className="col-islem">{row.islem}</td>
                                         <td className="col-zemin">{row.zemin}</td> 
                                         <td>{row.basvuruDurumu}</td>
-                                        <td className="col-bekleme-süresi-gün">{row.beklemeSuresi}</td> 
+                                        {isUygunOlmayanIadeMode ? <td style={{whiteSpace: 'normal', wordBreak: 'break-word'}}>{row.basvuruAciklama}</td> : <td className="col-bekleme-süresi-gün">{row.beklemeSuresi}</td>}
                                     </tr> 
                                 ))} 
                             </tbody> 
@@ -1185,7 +1253,7 @@
                         return;
                     }
                     
-                    const customExportFields = ['tescile_giden', 'iade edilen', 'iptal_edilen', 'fen_kayit_alinmayan', 'plan_ornegi'];
+                    const customExportFields = ['tescile_giden', 'iade edilen', 'iptal_edilen', 'fen_kayit_alinmayan', 'plan_ornegi', 'uygun_olmayan_iade'];
                     if (customExportFields.includes(sortField)) {
                         const customHeaders = sortField === 'fen_kayit_alinmayan'
                             ? ['İLÇE', 'BAŞVURU TARİHİ', 'FEN KAYIT NO', 'İŞLEM', 'ZEMİN', 'GÖREVLİ PERSONEL', 'BAŞVURU AÇIKLAMA', 'ÖDEME']
@@ -2212,57 +2280,7 @@
                         return 0;
                     });
                 } else if (sortField === 'uygun_olmayan_iade') {
-                    const inappropriateReasons = [
-                        'teknik kontrol devam ediyor',
-                        'arazi planlaması yapılacak',
-                        'dosya kontrolleri devam ediyor',
-                        'kontrol edildi',
-                        'inceleniyor',
-                        'değerlendiriliyor',
-                        'beklemede',
-                        'kontrol edilecek',
-                        'alanına bakılacak',
-                        'sahasına gidilecek',
-                        'işlemde'
-                    ];
-
-                    arr = arr.filter(d => {
-                        const status = String(d['başvuru durumu'] || '').toLocaleLowerCase('tr');
-                        if (!status.includes('eksiklikten iade edildi')) {
-                            return false;
-                        }
-
-                        const aciklama = String(d['başvuru açıklama'] || '');
-                        const dateRegex = /(.*?)-(\d{1,2}\.\d{1,2}\.\d{4})/g;
-                        let matches = [...aciklama.matchAll(dateRegex)];
-                        
-                        if (matches.length === 0) {
-                            return false;
-                        }
-
-                        let latestEntry = null;
-                        let latestDate = null;
-
-                        matches.forEach(match => {
-                            const reasonText = match[1].trim();
-                            const dateStr = match[2];
-                            const dateParts = dateStr.split('.');
-                            const currentDate = new Date(dateParts[2], dateParts[1] - 1, dateParts[0]);
-
-                            if (!latestDate || currentDate > latestDate) {
-                                latestDate = currentDate;
-                                latestEntry = { reason: reasonText, date: currentDate };
-                            }
-                        });
-
-                        if (latestEntry) {
-                            const latestReason = latestEntry.reason.toLocaleLowerCase('tr');
-                            return inappropriateReasons.some(inappropriate => latestReason.includes(inappropriate));
-                        }
-
-                        return false;
-                    });
-                    
+                    arr = arr.filter(d => String(d['başvuru durumu'] || '').toLocaleLowerCase('tr').includes('eksiklikten iade edildi'));
                      arr.sort((a, b) => {
                         const pa = a['görevli personel'] || '';
                         const pb = b['görevli personel'] || '';
@@ -2498,5 +2516,4 @@
     </script>
 </body>
 </html>
-
 
