@@ -995,11 +995,11 @@
                 let finalRows = [];
 
                 if (sortField === 'uygun_olmayan_iade') {
-                    const threeMonthsAgo = new Date();
-                    threeMonthsAgo.setMonth(today.getMonth() - 3);
+                    const oneHundredDaysAgo = new Date();
+                    oneHundredDaysAgo.setDate(today.getDate() - 100);
                     const groupedTasks = {};
 
-                    data.forEach(d => {
+                    data.forEach((d, index) => {
                         const status = String(d['başvuru durumu'] || '').toLocaleLowerCase('tr');
                         if (!status.includes('eksiklikten iade edildi')) return;
 
@@ -1010,9 +1010,11 @@
                         if (isNaN(fenKayitTarihi.getTime())) return; // Skip if date is invalid
                         
                         const fenKayitNo = d['fen kayıt no'];
-                        if (fenKayitTarihi && fenKayitTarihi >= threeMonthsAgo) {
-                            if (fenKayitNo && !groupedTasks[fenKayitNo]) { // Group by fenKayitNo to fix key error
-                                groupedTasks[fenKayitNo] = {
+                        const key = `${fenKayitNo}-${d['ilçe']}-${index}`;
+
+                        if (fenKayitTarihi && fenKayitTarihi >= oneHundredDaysAgo) {
+                            if (fenKayitNo && !groupedTasks[key]) {
+                                groupedTasks[key] = {
                                     fenKayitNo: fenKayitNo,
                                     il: d._province || '',
                                     ilce: d['ilçe'] || '',
@@ -1040,7 +1042,7 @@
                     const groupedTasks = {};
                     const daysThreshold = sortField === 'plan_ornegi' ? 2 : 7;
 
-                    relevantData.forEach(task => {
+                    relevantData.forEach((task, index) => {
                         const fStr = task['fen kayıt tarihi'];
                         if (fStr) {
                             const fenKayitDate = new Date(fStr);
@@ -1051,8 +1053,9 @@
                                 const fenKayitNo = task['fen kayıt no'];
                                 const hasValidFenKayitNo = fenKayitNo != null && fenKayitNo != 0;
                                 if (diffDays >= daysThreshold && !isClosed && hasValidFenKayitNo) {
-                                    if (!groupedTasks[fenKayitNo]) {
-                                        groupedTasks[fenKayitNo] = {
+                                    const key = `${fenKayitNo}-${task['ilçe']}-${index}`;
+                                    if (!groupedTasks[key]) {
+                                        groupedTasks[key] = {
                                             fenKayitNo: fenKayitNo,
                                             il: task._province || '',
                                             ilce: task['ilçe'] || '',
@@ -1060,7 +1063,8 @@
                                             zemin: task['zemin'] || '',
                                             basvuruDurumu: task['başvuru durumu'] || '',
                                             beklemeSuresi: Math.floor(diffDays),
-                                            personnelRaw: task['görevli personel'] || ''
+                                            personnelRaw: task['görevli personel'] || '',
+                                            fenKayitTarihi: task['fen kayıt tarihi'] || ''
                                         };
                                     }
                                 }
@@ -1095,19 +1099,20 @@
                 if (isUygunOlmayanIadeMode) {
                     dataToExport = warningRows.map(row => ({ 
                         'Personel': getPersonnelText(row),
+                        'Fen Kayıt Tarihi': row.fenKayitTarihi,
                         'Fen Kayıt No': row.fenKayitNo, 
                         'İl': row.il, 
                         'İlçe': row.ilce, 
                         'İşlem': row.islem,
                         'Zemin': row.zemin, 
-                        'Fen Kayıt Tarihi': row.fenKayitTarihi,
                         'Başvuru Durumu': row.basvuruDurumu,
                         'Başvuru Açıklama': row.basvuruAciklama
                     }));
-                    cols = [ { wch: 30 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 20 }, { wch: 40 }, { wch: 15 }, { wch: 25 }, { wch: 50 }];
+                    cols = [ { wch: 30 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 20 }, { wch: 40 }, { wch: 25 }, { wch: 50 }];
                 } else {
                     dataToExport = warningRows.map(row => ({
                         'Personel': getPersonnelText(row),
+                        'Fen Kayıt Tarihi': row.fenKayitTarihi,
                         'Fen Kayıt No': row.fenKayitNo, 
                         'İl': row.il, 
                         'İlçe': row.ilce, 
@@ -1116,7 +1121,7 @@
                         'Başvuru Durumu': row.basvuruDurumu,
                         'Bekleme Süresi (Gün)': row.beklemeSuresi 
                     }));
-                    cols = [ { wch: 30 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 20 }, { wch: 40 }, { wch: 25 }, { wch: 20 } ];
+                    cols = [ { wch: 30 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 20 }, { wch: 40 }, { wch: 25 }, { wch: 20 } ];
                 }
                 
                 const ws = XLSX.utils.json_to_sheet(dataToExport); 
@@ -1140,7 +1145,7 @@
             const isUygunOlmayanIadeMode = sortField === 'uygun_olmayan_iade';
 
             const warningTitle = isUygunOlmayanIadeMode
-                ? `Son 3 Ay İçindeki İadeler (Toplam: ${warningRows.length})`
+                ? `Son 100 Gün İçindeki İadeler (Toplam: ${warningRows.length})`
                 : (sortField === 'plan_ornegi' 
                     ? `2 Günden Fazla Bekleyen İşlemler (Uyarı) (Toplam: ${warningRows.length})`
                     : `7 Günden Fazla Bekleyen İşlemler (Uyarı) (Toplam: ${warningRows.length})`);
@@ -1161,20 +1166,20 @@
                         <table> 
                             <thead> 
                                 <tr> 
-                                    <th className="col-personel">Personel</th> 
+                                    <th className="col-personel">Personel</th>
+                                    <th>Fen Kayıt Tarihi</th>
                                     <th className="col-fen-kayit-no">Fen Kayıt No</th> 
                                     <th className="col-il">İl</th> 
                                     <th className="col-ilce">İlçe</th> 
                                     <th className="col-islem">İşlem</th>
                                     <th className="col-zemin">Zemin</th> 
-                                    {isUygunOlmayanIadeMode && <th>Fen Kayıt Tarihi</th>}
                                     <th>Başvuru Durumu</th>
                                     {isUygunOlmayanIadeMode ? <th>Başvuru Açıklama</th> : <th className="col-bekleme-süresi-gün">Bekleme Süresi (Gün)</th> }
                                 </tr> 
                             </thead> 
                             <tbody> 
                                 {warningRows.map((row, index) => ( 
-                                    <tr key={`${row.fenKayitNo}-${index}`}> 
+                                    <tr key={`${row.fenKayitNo}-${row.ilce}-${index}`}> 
                                         <td className="col-personel">
                                             {
                                                 parsePersonnelWithStatus(row.personnelRaw)
@@ -1190,12 +1195,12 @@
                                                 ))
                                             }
                                         </td>
+                                        <td>{row.fenKayitTarihi}</td>
                                         <td className="col-fen-kayit-no">{row.fenKayitNo}</td> 
                                         <td className="col-il">{row.il}</td> 
                                         <td className="col-ilce">{row.ilce}</td> 
                                         <td className="col-islem">{row.islem}</td>
                                         <td className="col-zemin">{row.zemin}</td> 
-                                        {isUygunOlmayanIadeMode && <td>{row.fenKayitTarihi}</td>}
                                         <td>{row.basvuruDurumu}</td>
                                         {isUygunOlmayanIadeMode ? <td style={{whiteSpace: 'normal', wordBreak: 'break-word'}}>{row.basvuruAciklama}</td> : <td className="col-bekleme-süresi-gün">{row.beklemeSuresi}</td>}
                                     </tr> 
@@ -2511,6 +2516,7 @@
     </script>
 </body>
 </html>
+
 
 
 
