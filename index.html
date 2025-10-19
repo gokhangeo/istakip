@@ -989,8 +989,13 @@
         
         function WarningTable({ data, isEngineer, showOnlyEngineers, onToggleEngineers, sortField }) { 
             const [warningRows, setWarningRows] = useState([]); 
+            const [dateSortOrder, setDateSortOrder] = useState('asc');
 
-            useEffect(() => { 
+            const toggleDateSort = () => {
+                setDateSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
+            };
+
+            useEffect(() => {
                 const today = new Date();
                 let finalRows = [];
 
@@ -1075,10 +1080,9 @@
                     finalRows.sort((a, b) => {
                         const dateA = a.fenKayitTarihi ? new Date(a.fenKayitTarihi) : null;
                         const dateB = b.fenKayitTarihi ? new Date(b.fenKayitTarihi) : null;
-                        if (dateA && dateB) return dateA - dateB;
-                        if (dateA) return -1;
-                        if (dateB) return 1;
-                        return 0;
+                        if (!dateA) return 1;
+                        if (!dateB) return -1;
+                        return dateSortOrder === 'asc' ? dateA - dateB : dateB - dateA;
                     });
                 }
                 else if (sortField === 'uygun_olmayan_iade') {
@@ -1119,10 +1123,9 @@
                     finalRows.sort((a, b) => {
                         const dateA = a.fenKayitTarihi ? new Date(a.fenKayitTarihi) : null;
                         const dateB = b.fenKayitTarihi ? new Date(b.fenKayitTarihi) : null;
-                        if (dateA && dateB) return dateA - dateB;
-                        if (dateA) return -1;
-                        if (dateB) return 1;
-                        return 0;
+                        if (!dateA) return 1;
+                        if (!dateB) return -1;
+                        return dateSortOrder === 'asc' ? dateA - dateB : dateB - dateA;
                     });
                 } else {
                     let relevantData = data;
@@ -1173,7 +1176,7 @@
                 }
 
                 setWarningRows(finalRows);
-            }, [data, isEngineer, showOnlyEngineers, sortField]); 
+            }, [data, isEngineer, showOnlyEngineers, sortField, dateSortOrder]); 
 
             const handleExportWarningExcel = () => { 
                 const getPersonnelText = (row) => {
@@ -1260,7 +1263,12 @@
                             <thead> 
                                 <tr> 
                                     <th className="col-personel">Personel</th>
-                                    <th>Fen Kayıt Tarihi</th>
+                                    <th>
+                                        Fen Kayıt Tarihi
+                                        {(isOnemliIslerMode || isUygunOlmayanIadeMode) && (
+                                             <span onClick={toggleDateSort} style={{ cursor: 'pointer', userSelect: 'none', padding: '0 5px' }}>{dateSortOrder === 'asc' ? '🔼' : '🔽'}</span>
+                                        )}
+                                    </th>
                                     <th className="col-fen-kayit-no">Fen Kayıt No</th> 
                                     <th className="col-il">İl</th> 
                                     <th className="col-ilce">İlçe</th> 
@@ -2630,6 +2638,10 @@
     </script>
 </body>
 </html>
+
+
+
+
 
 
 
