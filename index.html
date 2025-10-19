@@ -994,7 +994,50 @@
                 const today = new Date();
                 let finalRows = [];
 
-                if (sortField === 'uygun_olmayan_iade') {
+                if (sortField === 'onemli_isler') {
+                    const oneHundredFiftyDaysAgo = new Date();
+                    oneHundredFiftyDaysAgo.setDate(today.getDate() - 150);
+                    const groupedTasks = {};
+
+                    data.forEach((d, index) => {
+                        const islem = String(d['işlem'] || '').trim();
+                        const onemliIslemler = [
+                            "3194 Sayılı Kanunun 18. Madde Uygulaması",
+                            "Kat İrtifakı Tesisi",
+                            "Kat Mülkiyeti Tesisi",
+                            "Mülkiyet Raporu"
+                        ];
+
+                        if (!onemliIslemler.includes(islem)) return;
+
+                        const fenKayitTarihiStr = d['fen kayıt tarihi'];
+                        if (!fenKayitTarihiStr) return; 
+
+                        const fenKayitTarihi = new Date(fenKayitTarihiStr);
+                        if (isNaN(fenKayitTarihi.getTime())) return; 
+                        
+                        const fenKayitNo = d['fen kayıt no'];
+                        const key = `${fenKayitNo}-${d['ilçe']}-${index}`;
+
+                        if (fenKayitTarihi && fenKayitTarihi >= oneHundredFiftyDaysAgo) {
+                            if (fenKayitNo && !groupedTasks[key]) {
+                                groupedTasks[key] = {
+                                    fenKayitNo: fenKayitNo,
+                                    il: d._province || '',
+                                    ilce: d['ilçe'] || '',
+                                    islem: d['işlem'] || '',
+                                    zemin: d['zemin'] || '',
+                                    basvuruDurumu: d['başvuru durumu'] || '',
+                                    basvuruAciklama: d['başvuru açıklama'] || '',
+                                    personnelRaw: d['görevli personel'] || '',
+                                    fenKayitTarihi: d['fen kayıt tarihi'] || ''
+                                };
+                            }
+                        }
+                    });
+                    finalRows = Object.values(groupedTasks);
+                }
+                else if (sortField === 'uygun_olmayan_iade') {
                     const oneHundredDaysAgo = new Date();
                     oneHundredDaysAgo.setDate(today.getDate() - 100);
                     const groupedTasks = {};
@@ -1037,7 +1080,50 @@
                         if (dateB) return 1;
                         return 0;
                     });
+                }
+                else if (sortField === 'uygun_olmayan_iade') {
+                    const oneHundredDaysAgo = new Date();
+                    oneHundredDaysAgo.setDate(today.getDate() - 100);
+                    const groupedTasks = {};
 
+                    data.forEach((d, index) => {
+                        const status = String(d['başvuru durumu'] || '').toLocaleLowerCase('tr');
+                        if (!status.includes('eksiklikten iade edildi')) return;
+
+                        const fenKayitTarihiStr = d['fen kayıt tarihi'];
+                        if (!fenKayitTarihiStr) return; 
+
+                        const fenKayitTarihi = new Date(fenKayitTarihiStr);
+                        if (isNaN(fenKayitTarihi.getTime())) return; 
+                        
+                        const fenKayitNo = d['fen kayıt no'];
+                        const key = `${fenKayitNo}-${d['ilçe']}-${index}`;
+
+                        if (fenKayitTarihi && fenKayitTarihi >= oneHundredDaysAgo) {
+                            if (fenKayitNo && !groupedTasks[key]) {
+                                groupedTasks[key] = {
+                                    fenKayitNo: fenKayitNo,
+                                    il: d._province || '',
+                                    ilce: d['ilçe'] || '',
+                                    islem: d['işlem'] || '',
+                                    zemin: d['zemin'] || '',
+                                    basvuruDurumu: d['başvuru durumu'] || '',
+                                    basvuruAciklama: d['başvuru açıklama'] || '',
+                                    personnelRaw: d['görevli personel'] || '',
+                                    fenKayitTarihi: d['fen kayıt tarihi'] || ''
+                                };
+                            }
+                        }
+                    });
+                    finalRows = Object.values(groupedTasks);
+                    finalRows.sort((a, b) => {
+                        const dateA = a.fenKayitTarihi ? new Date(a.fenKayitTarihi) : null;
+                        const dateB = b.fenKayitTarihi ? new Date(b.fenKayitTarihi) : null;
+                        if (dateA && dateB) return dateA - dateB;
+                        if (dateA) return -1;
+                        if (dateB) return 1;
+                        return 0;
+                    });
                 } else {
                     let relevantData = data;
                     if (sortField === 'plan_ornegi') {
@@ -1147,12 +1233,15 @@
             if (warningRows.length === 0 && sortField !== 'uygun_olmayan_iade') { return null; } 
             
             const isUygunOlmayanIadeMode = sortField === 'uygun_olmayan_iade';
+            const isOnemliIslerMode = sortField === 'onemli_isler';
 
-            const warningTitle = isUygunOlmayanIadeMode
-                ? `Son 100 Gün İçindeki İadeler (Toplam: ${warningRows.length})`
-                : (sortField === 'plan_ornegi' 
-                    ? `2 Günden Fazla Bekleyen İşlemler (Uyarı) (Toplam: ${warningRows.length})`
-                    : `7 Günden Fazla Bekleyen İşlemler (Uyarı) (Toplam: ${warningRows.length})`);
+            const warningTitle = isOnemliIslerMode
+                ? `Son 150 Gündeki Önemli İşler (Toplam: ${warningRows.length})`
+                : (isUygunOlmayanIadeMode
+                    ? `Son 100 Gün İçindeki İadeler (Toplam: ${warningRows.length})`
+                    : (sortField === 'plan_ornegi' 
+                        ? `2 Günden Fazla Bekleyen İşlemler (Uyarı) (Toplam: ${warningRows.length})`
+                        : `7 Günden Fazla Bekleyen İşlemler (Uyarı) (Toplam: ${warningRows.length})`));
             
             return ( 
                 <div className="warning-table-container"> 
@@ -1178,7 +1267,7 @@
                                     <th className="col-islem">İşlem</th>
                                     <th className="col-zemin">Zemin</th> 
                                     <th>Başvuru Durumu</th>
-                                    {isUygunOlmayanIadeMode ? <th>Başvuru Açıklama</th> : <th className="col-bekleme-süresi-gün">Bekleme Süresi (Gün)</th> }
+                                    {isUygunOlmayanIadeMode || isOnemliIslerMode ? <th>Başvuru Açıklama</th> : <th className="col-bekleme-süresi-gün">Bekleme Süresi (Gün)</th> }
                                 </tr> 
                             </thead> 
                             <tbody> 
@@ -1206,7 +1295,7 @@
                                         <td className="col-islem">{row.islem}</td>
                                         <td className="col-zemin">{row.zemin}</td> 
                                         <td>{row.basvuruDurumu}</td>
-                                        {isUygunOlmayanIadeMode ? <td style={{whiteSpace: 'normal', wordBreak: 'break-word'}}>{row.basvuruAciklama}</td> : <td className="col-bekleme-süresi-gün">{row.beklemeSuresi}</td>}
+                                        {isUygunOlmayanIadeMode || isOnemliIslerMode ? <td style={{whiteSpace: 'normal', wordBreak: 'break-word'}}>{row.basvuruAciklama}</td> : <td className="col-bekleme-süresi-gün">{row.beklemeSuresi}</td>}
                                     </tr> 
                                 ))} 
                             </tbody> 
@@ -2205,7 +2294,8 @@
                 {label:'Plan Örneği', value:'plan_ornegi'},
                 {label:'Bekleyen (Eskiden Yeniye)', value:'bekleyen_eski_yeni'},
                 {label:'Bekleyen (Yeniden Eskiye)', value:'bekleyen_yeni_eski'},
-                {label:'Uygun Olmayan İade Gerekçeleri', value:'uygun_olmayan_iade'}
+                {label:'Uygun Olmayan İade Gerekçeleri', value:'uygun_olmayan_iade'},
+                {label:'Önemli İşler', value:'onemli_isler'}
             ];
             
             const filteredData=(() => {
@@ -2290,12 +2380,32 @@
                         const pb = b['görevli personel'] || '';
                         return pa.localeCompare(pb, 'tr');
                     });
+                } else if (sortField === 'onemli_isler') {
+                    const onemliIslemler = [
+                        "3194 Sayılı Kanunun 18. Madde Uygulaması",
+                        "Kat İrtifakı Tesisi",
+                        "Kat Mülkiyeti Tesisi",
+                        "Mülkiyet Raporu"
+                    ];
+                    arr = arr.filter(d => onemliIslemler.includes(String(d['işlem'] || '').trim()));
                 } else if (sortField) {
-                     arr.sort((a,b)=>{ 
-                        const x=a[sortField]||'', y=b[sortField]||''; 
-                        if(sortField.includes('tarih')){ const dx=new Date(x), dy=new Date(y); if(!isNaN(dx)&&!isNaN(dy)) return dx-dy; } 
-                        return x<y?-1:x>y?1:0; 
-                    }); 
+                    arr.sort((a, b) => {
+                        if (sortField.includes('tarih')) {
+                            const dateA = a[sortField] ? new Date(a[sortField]) : null;
+                            const dateB = b[sortField] ? new Date(b[sortField]) : null;
+
+                            if (!dateA || isNaN(dateA)) return 1;
+                            if (!dateB || isNaN(dateB)) return -1;
+
+                            return dateA - dateB;
+                        }
+                        const valA = a[sortField] || '';
+                        const valB = b[sortField] || '';
+                        if (typeof valA === 'string' && typeof valB === 'string') {
+                            return valA.localeCompare(valB, 'tr');
+                        }
+                        return valA < valB ? -1 : valA > valB ? 1 : 0;
+                    });
                 }
                 return arr;
             })();
@@ -2520,5 +2630,8 @@
     </script>
 </body>
 </html>
+
+
+
 
 
