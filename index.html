@@ -11,6 +11,7 @@
     <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/showdown@2.1.0/dist/showdown.min.js"></script>
 
@@ -338,7 +339,7 @@
             color: white;
             font-weight: 500;
             padding: 10px 20px;
-        }
+       }
         .report-comparison-actions button:hover {
             background-color: #7e22ce; /* purple-700 */
         }
@@ -377,7 +378,7 @@
          .result-card .excel-btn:disabled {
              background-color: #9ca3af;
              cursor: not-allowed;
-        }
+         }
         
         /* EBYS Reporter Styles */
         .ebys-reporter-container {
@@ -427,7 +428,16 @@
         
         const normalizeHeader = (header) => { if (!header) return ""; let s; try { s = header.normalize('NFD').replace(/[\u0300-\u036f]/g, ''); } catch (e) { s = String(header); } s = s.trim().toLocaleLowerCase('tr').replace(/\s+/g, ' '); s = s.replace(/ı/g, 'i').replace(/İ/g, 'i'); return s; }
         const splitPersonel = (text) => { if (text == null) return []; const str = typeof text === 'string' ? text : String(text); return str.split(/[,;–-]/g).map(s => { let part = s.trim(); const arrowIdx = part.indexOf('=>'); if (arrowIdx !== -1) part = part.slice(0, arrowIdx).trim(); return part.replace(/\s*\(Müh\.\)\s*/, '').trim(); }).filter(Boolean); }
-        const parsePersonnelWithStatus = (text) => { if (text == null) return []; const str = typeof text === 'string' ? text : String(text); return str.split(/[,;–-]/g).map(s => { const parts = s.split('=>').map(p => p.trim()); const name = parts[0].replace(/\s*\(Müh\.\)\s*/, '').trim(); const status = parts.length > 1 ? parts[1] : ''; return { name, status }; }).filter(p => p.name); };
+        const parsePersonnelWithStatus = (text) => {
+            if (text == null) return [];
+            const str = typeof text === 'string' ? text : String(text);
+            return str.split(/[,;]/g).map(s => {
+                const parts = s.trim().split('=>');
+                const name = (parts[0] || '').replace(/\s*\(Müh\.\)\s*/, '').trim();
+                const status = parts.length > 1 ? parts[1].trim() : null;
+                return { name, status };
+            }).filter(p => p.name);
+        };
         const formatDate = (val) => { if (!val) return ""; if (typeof val === 'number') { const date = XLSX.SSF.parse_date_code(val); if (!date) return ""; return `${date.y}-${String(date.m).padStart(2,'0')}-${String(date.d).padStart(2,'0')}`; } if (typeof val === 'string') { let match = val.match(/^(\d{4}-\d{2}-\d{2})/); if (match) return match[1]; match = val.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})/); if (match) { const day = String(match[1]).padStart(2, '0'); const month = String(match[2]).padStart(2, '0'); const year = match[3]; return `${year}-${month}-${day}`; } const part = val.split(" ")[0]; const m2 = part.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})/); if (m2) { const day = String(m2[1]).padStart(2, '0'); const month = String(m2[2]).padStart(2, '0'); const year = m2[3]; return `${year}-${month}-${day}`; } return part; } return val; }
         const formatFenKayitNo = (val) => { if (val == null) return ""; if (typeof val === 'number') return val; if (typeof val === 'string') { const num = parseInt(val.replace(/\D/g,''),10); if (!isNaN(num)) return num; return val; } return val; }
         
@@ -730,15 +740,18 @@
             ); 
         }
         
-        function ChartsBelow({ data, onZoom, selectedIl, isEngineer, showOnlyEngineers, onToggleEngineers, sortField }) {
+        function ChartsBelow({ data, onZoom, personnelChartCardRef, waitingChartCardRef, islemChartCardRef, districtChartCardRef, selectedIl, isEngineer, showOnlyEngineers, onToggleEngineers, sortField }) {
             const totalRef = useRef();
             const dynamicRef = useRef();
             const islemRef = useRef();
+            const districtRef = useRef();
             const totalChartRef = useRef(null);
             const dynamicChartRef = useRef(null);
             const islemChartRef = useRef(null);
+            const districtChartRef = useRef(null);
             const [personnelStats, setPersonnelStats] = useState({ totals: {}, dynamic: {} });
             const [islemStats, setIslemStats] = useState({});
+            const [districtStats, setDistrictStats] = useState({});
             
             let dynamicTitle = "Bekleyen İşlem Sayıları";
             switch(sortField) {
@@ -753,17 +766,19 @@
                 if (!data || data.length === 0) {
                     setPersonnelStats({ totals: {}, dynamic: {} });
                     setIslemStats({});
+                    setDistrictStats({});
                     return;
                 }
                 const totalsMap = {};
                 const dynamicMap = {};
                 const islemMap = {};
+                const districtMap = {};
 
                 data.forEach(r => {
                     const personnel = splitPersonel(r['görevli personel']);
                      if (personnel.length > 0) {
-                          personnel.forEach(p => {
-                              if (p) totalsMap[p] = (totalsMap[p] || 0) + 1;
+                         personnel.forEach(p => {
+                            if (p) totalsMap[p] = (totalsMap[p] || 0) + 1;
                         });
                     }
                     
@@ -772,6 +787,12 @@
                     const odeme = String(r['ödeme'] || '').toLocaleLowerCase('tr');
                     const islem = String(r['işlem'] || '').trim();
                     const islemLower = islem.toLowerCase();
+                    const district = r._district;
+                    
+                    // Populate districtMap for waiting items
+                    if (district && !status.includes('eksiklikten iade edildi') && !status.includes('tescile gönderildi')) {
+                        districtMap[district] = (districtMap[district] || 0) + 1;
+                    }
                     
                     // Populate islemMap with grouping
                     let groupedIslem = islem;
@@ -822,16 +843,17 @@
                 
                 setPersonnelStats({ totals: totalsMap, dynamic: dynamicMap });
                 setIslemStats(islemMap);
+                setDistrictStats(districtMap);
             }, [data, sortField]);
 
-            const createSortedChart = (canvasRef, chartRef, chartData, label, isIslemChart = false) => {
+            const createSortedChart = (canvasRef, chartRef, chartData, label, isNonPersonnelChart = false) => {
                 try {
                     if (canvasRef.current) {
                         const sortedData = Object.entries(chartData).sort(([, a], [, b]) => b - a);
                         
                         let labels, dataValues;
 
-                        if (isIslemChart) {
+                        if (isNonPersonnelChart) {
                             labels = sortedData.map(d => d[0]);
                             dataValues = sortedData.map(d => d[1]);
                         } else {
@@ -866,7 +888,7 @@
                                     y: {
                                         ticks: {
                                             color: (context) => {
-                                                if (isIslemChart) return '#666';
+                                                if (isNonPersonnelChart) return '#666';
                                                 const originalName = context.tick.label.replace(' (Müh.)', '');
                                                 return isEngineer(originalName) ? 'red' : '#666';
                                             }
@@ -895,6 +917,10 @@
                 createSortedChart(islemRef, islemChartRef, islemStats, 'İşlem Sayıları', true);
             }, [islemStats]);
 
+            useEffect(() => {
+                createSortedChart(districtRef, districtChartRef, districtStats, 'İlçe Bekleyen İşlemler', true);
+            }, [districtStats]);
+
 
             if (!data || data.length === 0) return null;
 
@@ -909,27 +935,32 @@
                         </label>
                     </div>
                     <div style={{display: 'flex', gap: '24px', flexWrap: 'nowrap', overflowX: 'auto'}}>
-                        <div className="chart-card">
+                        <div className="chart-card" ref={personnelChartCardRef}>
                             <button className="zoom-btn" title="Büyüt" onClick={() => onZoom({ type: 'chart', data: showOnlyEngineers ? Object.fromEntries(Object.entries(personnelStats.totals).filter(([name]) => isEngineer(name))) : personnelStats.totals, title: `Personel İşlem Dağılımı (${title})` })}>🔍</button>
                             <div className="chart-title">Personel İşlem Dağılımı ({title})</div>
                             <div className="chart-wrapper" style={{height: '250px'}}><canvas ref={totalRef}></canvas></div>
                         </div>
-                        <div className="chart-card">
+                        <div className="chart-card" ref={waitingChartCardRef}>
                              <button className="zoom-btn" title="Büyüt" onClick={() => onZoom({ type: 'chart', data: showOnlyEngineers ? Object.fromEntries(Object.entries(personnelStats.dynamic).filter(([name]) => isEngineer(name))) : personnelStats.dynamic, title: `${dynamicTitle} (${title})` })}>🔍</button>
                             <div className="chart-title">{dynamicTitle} ({title})</div>
                             <div className="chart-wrapper" style={{height: '250px'}}><canvas ref={dynamicRef}></canvas></div>
                         </div>
-                         <div className="chart-card">
+                         <div className="chart-card" ref={islemChartCardRef}>
                              <button className="zoom-btn" title="Büyüt" onClick={() => onZoom({ type: 'chart', data: islemStats, title: `İşlem Sayıları (${title})` })}>🔍</button>
                             <div className="chart-title">İşlem Sayıları ({title})</div>
                             <div className="chart-wrapper" style={{height: '250px'}}><canvas ref={islemRef}></canvas></div>
+                        </div>
+                        <div className="chart-card" ref={districtChartCardRef}>
+                            <button className="zoom-btn" title="Büyüt" onClick={() => onZoom({ type: 'chart', data: districtStats, title: `İlçe Bazlı Bekleyen İşlemler (${title})` })}>🔍</button>
+                            <div className="chart-title">İlçe Bazlı Bekleyen İşlemler ({title})</div>
+                            <div className="chart-wrapper" style={{height: '250px'}}><canvas ref={districtRef}></canvas></div>
                         </div>
                     </div>
                 </div>
             );
         }
         
-        function SummaryTable({ data, selectedIl, onZoom }) { 
+        function SummaryTable({ data, selectedIl, onZoom, summaryTableRef }) { 
             const groupArr = {}; 
             data.forEach(row => { 
                 if (!row._province) return; 
@@ -965,7 +996,7 @@
             );
 
             return ( 
-                <div className="chart-card" style={{ position:'relative', minWidth:'auto', flex:'1 1 auto' }}> 
+                <div className="chart-card" style={{ position:'relative', minWidth:'auto', flex:'1 1 auto' }} ref={summaryTableRef}> 
                     {groupKeys.length>0 && <button className="zoom-btn" title="Büyüt" onClick={onZoom}>🔍</button>} 
                     <div className="chart-title">Özet Tablo</div> 
                     <div style={{overflowX:'auto',background:'#f1f5f9',borderRadius:'12px',padding:'12px',minWidth:'600px'}}> 
@@ -1077,56 +1108,6 @@
                         }
                     });
                     finalRows = Object.values(groupedTasks);
-                    finalRows.sort((a, b) => {
-                        const dateA = a.fenKayitTarihi ? new Date(a.fenKayitTarihi) : null;
-                        const dateB = b.fenKayitTarihi ? new Date(b.fenKayitTarihi) : null;
-                        if (!dateA) return 1;
-                        if (!dateB) return -1;
-                        return dateSortOrder === 'asc' ? dateA - dateB : dateB - dateA;
-                    });
-                }
-                else if (sortField === 'uygun_olmayan_iade') {
-                    const oneHundredDaysAgo = new Date();
-                    oneHundredDaysAgo.setDate(today.getDate() - 100);
-                    const groupedTasks = {};
-
-                    data.forEach((d, index) => {
-                        const status = String(d['başvuru durumu'] || '').toLocaleLowerCase('tr');
-                        if (!status.includes('eksiklikten iade edildi')) return;
-
-                        const fenKayitTarihiStr = d['fen kayıt tarihi'];
-                        if (!fenKayitTarihiStr) return; 
-
-                        const fenKayitTarihi = new Date(fenKayitTarihiStr);
-                        if (isNaN(fenKayitTarihi.getTime())) return; 
-                        
-                        const fenKayitNo = d['fen kayıt no'];
-                        const key = `${fenKayitNo}-${d['ilçe']}-${index}`;
-
-                        if (fenKayitTarihi && fenKayitTarihi >= oneHundredDaysAgo) {
-                            if (fenKayitNo && !groupedTasks[key]) {
-                                groupedTasks[key] = {
-                                    fenKayitNo: fenKayitNo,
-                                    il: d._province || '',
-                                    ilce: d['ilçe'] || '',
-                                    islem: d['işlem'] || '',
-                                    zemin: d['zemin'] || '',
-                                    basvuruDurumu: d['başvuru durumu'] || '',
-                                    basvuruAciklama: d['başvuru açıklama'] || '',
-                                    personnelRaw: d['görevli personel'] || '',
-                                    fenKayitTarihi: d['fen kayıt tarihi'] || ''
-                                };
-                            }
-                        }
-                    });
-                    finalRows = Object.values(groupedTasks);
-                    finalRows.sort((a, b) => {
-                        const dateA = a.fenKayitTarihi ? new Date(a.fenKayitTarihi) : null;
-                        const dateB = b.fenKayitTarihi ? new Date(b.fenKayitTarihi) : null;
-                        if (!dateA) return 1;
-                        if (!dateB) return -1;
-                        return dateSortOrder === 'asc' ? dateA - dateB : dateB - dateA;
-                    });
                 } else {
                     let relevantData = data;
                     if (sortField === 'plan_ornegi') {
@@ -1170,7 +1151,17 @@
                     });
                     finalRows = Object.values(groupedTasks).sort((a, b) => b.beklemeSuresi - a.beklemeSuresi);
                 }
-                
+
+                if (sortField === 'onemli_isler' || sortField === 'uygun_olmayan_iade') {
+                     finalRows.sort((a, b) => {
+                        const dateA = a.fenKayitTarihi ? new Date(a.fenKayitTarihi) : null;
+                        const dateB = b.fenKayitTarihi ? new Date(b.fenKayitTarihi) : null;
+                        if (!dateA) return 1;
+                        if (!dateB) return -1;
+                        return dateSortOrder === 'asc' ? dateA - dateB : dateB - dateA;
+                    });
+                }
+
                 if (showOnlyEngineers) {
                     finalRows = finalRows.filter(row => parsePersonnelWithStatus(row.personnelRaw).some(p => isEngineer(p.name)));
                 }
@@ -1188,52 +1179,39 @@
                         return `${namePart}${statusPart}`;
                     }).join("\n");
                 };
-
-                let dataToExport = warningRows; // warningRows is already sorted
-
-                const mappedData = isUygunOlmayanIadeMode ? dataToExport.map(row => ({
-                    'Personel': getPersonnelText(row),
-                    'Fen Kayıt Tarihi': row.fenKayitTarihi,
-                    'Fen Kayıt No': row.fenKayitNo,
-                    'İl': row.il,
-                    'İlçe': row.ilce,
-                    'İşlem': row.islem,
-                    'Zemin': row.zemin,
-                    'Başvuru Durumu': row.basvuruDurumu,
-                    'Başvuru Açıklama': row.basvuruAciklama
-                })) : dataToExport.map(row => ({
-                    'Personel': getPersonnelText(row),
-                    'Fen Kayıt Tarihi': row.fenKayitTarihi,
-                    'Fen Kayıt No': row.fenKayitNo,
-                    'İl': row.il,
-                    'İlçe': row.ilce,
-                    'İşlem': row.islem,
-                    'Zemin': row.zemin,
-                    'Başvuru Durumu': row.basvuruDurumu,
-                    'Bekleme Süresi (Gün)': row.beklemeSuresi
-                }));
-
-                const cols = isUygunOlmayanIadeMode
-                    ? [{ wch: 30 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 20 }, { wch: 40 }, { wch: 25 }, { wch: 50 }]
-                    : [{ wch: 30 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 20 }, { wch: 40 }, { wch: 25 }, { wch: 20 }];
                 
-                const ws = XLSX.utils.json_to_sheet(mappedData); 
-                const range = XLSX.utils.decode_range(ws['!ref']); 
-                for (let R = range.s.r + 1; R <= range.e.r; ++R) { 
-                    const cell_address = { c: 0, r: R }; 
-                    const cell_ref = XLSX.utils.encode_cell(cell_address); 
-                    if (ws[cell_ref] && ws[cell_ref].v) { 
-                        if (!ws[cell_ref].s) ws[cell_ref].s = {}; 
-                        ws[cell_ref].s.alignment = { wrapText: true, vertical: 'top' }; 
-                    } 
-                } 
+                let dataToExport = warningRows.map(row => {
+                    const baseObject = {
+                        'Personel': getPersonnelText(row),
+                        'Fen Kayıt Tarihi': row.fenKayitTarihi,
+                        'Fen Kayıt No': row.fenKayitNo, 
+                        'İl': row.il, 
+                        'İlçe': row.ilce, 
+                        'İşlem': row.islem,
+                        'Zemin': row.zemin, 
+                        'Başvuru Durumu': row.basvuruDurumu,
+                    };
+                    if (sortField === 'uygun_olmayan_iade' || sortField === 'onemli_isler') {
+                        baseObject['Başvuru Açıklama'] = row.basvuruAciklama;
+                    } else {
+                        baseObject['Bekleme Süresi (Gün)'] = row.beklemeSuresi;
+                    }
+                    return baseObject;
+                });
+                
+                const ws = XLSX.utils.json_to_sheet(dataToExport); 
+                
+                const cols = (sortField === 'uygun_olmayan_iade' || sortField === 'onemli_isler') 
+                    ? [ { wch: 30 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 20 }, { wch: 40 }, { wch: 25 }, { wch: 50 }]
+                    : [ { wch: 30 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 20 }, { wch: 40 }, { wch: 25 }, { wch: 20 } ];
+
                 ws['!cols'] = cols; 
                 const wb = XLSX.utils.book_new(); 
                 XLSX.utils.book_append_sheet(wb, ws, 'Uyari Raporu'); 
                 XLSX.writeFile(wb, 'uyari_raporu.xlsx'); 
             }; 
 
-            if (warningRows.length === 0 && sortField !== 'uygun_olmayan_iade') { return null; } 
+            if (warningRows.length === 0) { return null; } 
             
             const isUygunOlmayanIadeMode = sortField === 'uygun_olmayan_iade';
             const isOnemliIslerMode = sortField === 'onemli_isler';
@@ -1334,27 +1312,50 @@
                 try {
                     if (sortField === 'tescilden_geldi') {
                         const headers = ['İLÇE', 'FEN KAYIT NO', 'GÖREVLİ PERSONEL', 'BAŞVURU DURUMU'];
-                        const dataForSheet = rows.map(row => {
-                            const personnelList = parsePersonnelWithStatus(row['görevli personel']);
-                            const formattedPersonnel = personnelList.map(p => p.status ? `${p.name} (${p.status})` : p.name).join(', ');
-                            return [
-                                row['ilçe'],
-                                row['fen kayıt no'],
-                                formattedPersonnel,
-                                row['başvuru durumu']
-                            ];
-                        });
+                        const dataForSheet = rows.map(row => [
+                            row['ilçe'],
+                            row['fen kayıt no'],
+                            row['görevli personel'],
+                            row['başvuru durumu']
+                        ]);
 
                         const wb = XLSX.utils.book_new();
                         const ws = XLSX.utils.aoa_to_sheet([headers, ...dataForSheet]);
                         
+                        rows.forEach((row, rowIndex) => {
+                            const cellRef = `C${rowIndex + 2}`;
+                            const personelText = row['görevli personel'] || '';
+                            if (!personelText || !ws[cellRef]) return;
+
+                            const richText = [];
+                            const parts = personelText.split(',').map(p => p.trim());
+                            
+                            parts.forEach((part, index) => {
+                                const subParts = part.split('=>');
+                                if (subParts.length === 2 && subParts[1].trim().toLowerCase() === 'yapılıyor') {
+                                    const name = subParts[0].trim();
+                                    richText.push({ t: name, s: { font: { color: { rgb: "FF0000" } } } });
+                                    richText.push({ t: ` => ${subParts[1].trim()}` });
+                                } else {
+                                    richText.push({ t: part });
+                                }
+                                if (index < parts.length - 1) {
+                                    richText.push({ t: ', ' });
+                                }
+                            });
+                            
+                            ws[cellRef].t = 's';
+                            ws[cellRef].r = richText;
+                            ws[cellRef].v = personelText;
+                        });
+
                         ws['!cols'] = [{ wch: 20 }, { wch: 15 }, { wch: 50 }, { wch: 20 }];
                         XLSX.utils.book_append_sheet(wb, ws, 'Tescilden Geldi');
                         XLSX.writeFile(wb, 'tescilden_geldi.xlsx');
                         return;
                     }
                     
-                    const customExportFields = ['tescile_giden', 'iade edilen', 'iptal_edilen', 'fen_kayit_alinmayan', 'plan_ornegi', 'uygun_olmayan_iade'];
+                    const customExportFields = ['tescile_giden', 'iade edilen', 'iptal_edilen', 'fen_kayit_alinmayan', 'plan_ornegi'];
                     if (customExportFields.includes(sortField)) {
                         const customHeaders = sortField === 'fen_kayit_alinmayan'
                             ? ['İLÇE', 'BAŞVURU TARİHİ', 'FEN KAYIT NO', 'İŞLEM', 'ZEMİN', 'GÖREVLİ PERSONEL', 'BAŞVURU AÇIKLAMA', 'ÖDEME']
@@ -2009,7 +2010,7 @@
                  setReportReady(true);
             };
             
-             useEffect(() => {
+              useEffect(() => {
                 if (reportReady && ebysData.length > 0) {
                     const personnelHeader = Object.keys(ebysData[0]).find(h => normalizeHeader(h).includes('bekleyen') && (normalizeHeader(h).includes('kullanıcı') || normalizeHeader(h).includes('kullanici')));
                     const dateHeader = Object.keys(ebysData[0]).find(h => normalizeHeader(h) === 'tarih');
@@ -2083,9 +2084,9 @@
                     });
                 } else {
                      if(ebysChartInstance.current){
-                         ebysChartInstance.current.destroy();
-                         ebysChartInstance.current = null;
-                    }
+                        ebysChartInstance.current.destroy();
+                        ebysChartInstance.current = null;
+                     }
                 }
             }, [ebysData]);
 
@@ -2179,6 +2180,11 @@
             const [isLoggedIn, setIsLoggedIn] = useState(false);
 
             const modalContentRef = useRef(null);
+            const summaryTableRef = useRef(null);
+            const personnelChartRef = useRef(null);
+            const waitingChartRef = useRef(null);
+            const islemChartRef = useRef(null);
+            const districtChartRef = useRef(null);
             
             const readExcelFromUrl = async (url) => {
                 try {
@@ -2314,12 +2320,12 @@
                 
                 if(sortField==='iade edilen') {
                     arr=arr.filter(d=>String(d['başvuru durumu']||'').toLocaleLowerCase('tr').includes('eksiklikten iade edildi'));
-                      arr.sort((a, b) => {
-                        const dx = new Date(a['fen kayıt tarihi']);
-                        const dy = new Date(b['fen kayıt tarihi']);
-                        if (!isNaN(dx) && !isNaN(dy)) return dx - dy;
-                        return 0;
-                    });
+                         arr.sort((a, b) => {
+                            const dx = new Date(a['fen kayıt tarihi']);
+                            const dy = new Date(b['fen kayıt tarihi']);
+                            if (!isNaN(dx) && !isNaN(dy)) return dx - dy;
+                            return 0;
+                        });
                 } else if (sortField === 'tescile_giden') {
                     arr = arr.filter(d => {
                         const status = String(d['başvuru durumu'] || '').toLocaleLowerCase('tr');
@@ -2352,13 +2358,13 @@
                         return odeme.includes('ödendi') && !odeme.includes('ödenmedi') && (d['fen kayıt no'] === 0 || d['fen kayıt no'] == null);
                     });
                 } else if (sortField === 'plan_ornegi') {
-                     arr = arr.filter(d => {
+                       arr = arr.filter(d => {
                          const islem = String(d['işlem'] || '').toLocaleLowerCase('tr');
                          const isPlanOrnegi = islem === 'plan örneği';
                          const isMahkemePlanOrnegi = islem === 'mahkeme plan örneği';
                          const isTeknikBilgi = islem === 'teknik bilgi ve belge örnekleri';
                          return isPlanOrnegi || isMahkemePlanOrnegi || isTeknikBilgi;
-                    });
+                     });
                 } else if (sortField === 'bekleyen_eski_yeni') {
                     arr = arr.filter(d => {
                         const status = String(d['başvuru durumu'] || '').toLocaleLowerCase('tr');
@@ -2383,7 +2389,7 @@
                     });
                 } else if (sortField === 'uygun_olmayan_iade') {
                     arr = arr.filter(d => String(d['başvuru durumu'] || '').toLocaleLowerCase('tr').includes('eksiklikten iade edildi'));
-                     arr.sort((a, b) => {
+                    arr.sort((a, b) => {
                         const pa = a['görevli personel'] || '';
                         const pb = b['görevli personel'] || '';
                         return pa.localeCompare(pb, 'tr');
@@ -2479,10 +2485,10 @@
                     <Dashboard data={data} filtered={filteredData} sortField={sortField} selectedPersonel={selectedPersonel} selectedIl={selectedIl} selectedIlce={selectedIlce} />
                     <div>
                         <div className="charts-below">
-                            <ChartsBelow data={filteredData} onZoom={setZoomContent} selectedIl={selectedIl} isEngineer={isEngineer} showOnlyEngineers={showOnlyEngineers} onToggleEngineers={() => setShowOnlyEngineers(!showOnlyEngineers)} sortField={sortField} />
+                            <ChartsBelow data={filteredData} onZoom={setZoomContent} personnelChartCardRef={personnelChartRef} waitingChartCardRef={waitingChartRef} islemChartCardRef={islemChartRef} districtChartCardRef={districtChartRef} selectedIl={selectedIl} isEngineer={isEngineer} showOnlyEngineers={showOnlyEngineers} onToggleEngineers={() => setShowOnlyEngineers(!showOnlyEngineers)} sortField={sortField} />
                         </div>
                         <div style={{marginTop: '24px'}}>
-                            <SummaryTable data={data} selectedIl={selectedIl} onZoom={() => setZoomContent({type: 'summary'})} />
+                            <SummaryTable data={data} selectedIl={selectedIl} onZoom={() => setZoomContent({type: 'summary'})} summaryTableRef={summaryTableRef} />
                         </div>
                     </div>
                     <WarningTable data={filteredData} isEngineer={isEngineer} showOnlyEngineers={showOnlyEngineers} onToggleEngineers={() => setShowOnlyEngineers(!showOnlyEngineers)} sortField={sortField} />
@@ -2621,29 +2627,8 @@
             );
         };
         
-        const sortOptions=[
-                {label:'Sıralama Yok',value:''},
-                {label:'Başvuru Tarihine Göre',value:'başvuru tarihi'},
-                {label:'Fen Kayıt Tarihine Göre',value:'fen kayıt tarihi'},
-                {label:'İade Edilen',value:'iade edilen'},
-                {label:'Tescil Edilen', value:'tescile_giden'},
-                {label:'Tescilden Geldi', value:'tescilden_geldi'},
-                {label:'İptal Edilen', value:'iptal_edilen'},
-                {label:'Fen Kayıt Alınmayan', value:'fen_kayit_alinmayan'},
-                {label:'Plan Örneği', value:'plan_ornegi'},
-                {label:'Bekleyen (Eskiden Yeniye)', value:'bekleyen_eski_yeni'},
-                {label:'Bekleyen (Yeniden Eskiye)', value:'bekleyen_yeni_eski'}
-            ];
         ReactDOM.createRoot(document.getElementById('root')).render(<App />);
     </script>
 </body>
 </html>
-
-
-
-
-
-
-
-
 
