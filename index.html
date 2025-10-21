@@ -2495,6 +2495,7 @@
                     <DataTable data={filteredData} sortField={sortField} isEngineer={isEngineer} showOnlyEngineers={showOnlyEngineers} onToggleEngineers={() => setShowOnlyEngineers(!showOnlyEngineers)} />
                     
                     <ReportComparison engineers={engineers} isEngineer={isEngineer} />
+                    <MegsisReporter data={data} isEngineer={isEngineer} />
                     <EbysReporter />
                 </React.Fragment>}
                 
@@ -2626,6 +2627,108 @@
                 </div>
             );
         };
+
+        function MegsisReporter({ data, isEngineer }) {
+            const [isLoading, setIsLoading] = useState(false);
+        
+            const handleReportGeneration = () => {
+                if (data.length === 0) {
+                    alert("Rapor oluşturmak için lütfen önce bir MEGSİS dosyası yükleyin.");
+                    return;
+                }
+        
+                setIsLoading(true);
+        
+                try {
+                    const wb = XLSX.utils.book_new();
+        
+                    const allEngineersInData = [...new Set(
+                        data.flatMap(row =>
+                            parsePersonnelWithStatus(row['görevli personel'])
+                                .filter(p => isEngineer(p.name))
+                                .map(p => p.name)
+                        )
+                    )].sort((a, b) => a.localeCompare(b, 'tr'));
+        
+                    if (allEngineersInData.length === 0) {
+                        alert("Yüklenen dosyada raporlanacak mühendis bulunamadı.");
+                        setIsLoading(false);
+                        return;
+                    }
+        
+                    allEngineersInData.forEach(engineerName => {
+                        let engineerRows = data.filter(row =>
+                            parsePersonnelWithStatus(row['görevli personel']).some(p => p.name === engineerName && isEngineer(p.name))
+                        );
+        
+                        engineerRows.sort((a, b) => {
+                            const dateA = a['fen kayıt tarihi'] ? new Date(a['fen kayıt tarihi']) : null;
+                            const dateB = b['fen kayıt tarihi'] ? new Date(b['fen kayıt tarihi']) : null;
+                            if (dateA && dateB) return dateA - dateB;
+                            if (dateA) return -1;
+                            if (dateB) return 1;
+                            return 0;
+                        });
+        
+                        if (engineerRows.length > 0) {
+                            const dataToExport = engineerRows.map(row => ({
+                                'Personel': parsePersonnelWithStatus(row['görevli personel'])
+                                    .map(p => isEngineer(p.name) ? `${p.name} (Müh.)` : p.name)
+                                    .join("\n"),
+                                'Fen Kayıt Tarihi': row['fen kayıt tarihi'],
+                                'Fen Kayıt No': row['fen kayıt no'],
+                                'İl': row._province,
+                                'İlçe': row._district,
+                                'İşlem': row['işlem'],
+                                'Zemin': row['zemin'],
+                                'Başvuru Durumu': row['başvuru durumu'],
+                                'Başvuru Açıklama': row['başvuru açıklama']
+                            }));
+        
+                            const ws = XLSX.utils.json_to_sheet(dataToExport);
+                            const cols = [{ wch: 30 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 20 }, { wch: 40 }, { wch: 25 }, { wch: 50 }];
+                            ws['!cols'] = cols;
+        
+                            const range = XLSX.utils.decode_range(ws['!ref']);
+                            for (let R = range.s.r + 1; R <= range.e.r; ++R) {
+                                const cell_address = { c: 0, r: R };
+                                const cell_ref = XLSX.utils.encode_cell(cell_address);
+                                if (ws[cell_ref] && ws[cell_ref].v) {
+                                    if (!ws[cell_ref].s) ws[cell_ref].s = {};
+                                    ws[cell_ref].s.alignment = { wrapText: true, vertical: 'top' };
+                                }
+                            }
+        
+                            const sheetName = engineerName.replace(/[\\/*?:]/g, "").substring(0, 31);
+                            XLSX.utils.book_append_sheet(wb, ws, sheetName);
+                        }
+                    });
+        
+                    XLSX.writeFile(wb, 'MEGSIS_Muhendis_Raporu.xlsx');
+                } catch (err) {
+                    console.error("MEGSİS Rapor oluşturma hatası:", err);
+                    alert("Rapor oluşturulurken bir hata oluştu.");
+                } finally {
+                    setIsLoading(false);
+                }
+            };
+        
+            return (
+                <div className="ebys-reporter-container" style={{backgroundColor: '#f0f9ff', borderColor: '#bae6fd'}}>
+                    <div className="ebys-reporter-header">
+                        <h3 style={{color: '#075985'}}>MEGSİS Raporlama</h3>
+                    </div>
+                    <div className="ebys-controls">
+                        <p style={{textAlign: 'center', fontSize: '0.9rem', color: '#0369a1'}}>
+                            Yüklenmiş olan MEGSİS verisini kullanarak mühendis bazlı, en eski fen kayıt tarihine göre sıralanmış bir Excel raporu oluşturur.
+                        </p>
+                        <button onClick={handleReportGeneration} disabled={isLoading || data.length === 0}>
+                            {isLoading ? 'Rapor Oluşturuluyor...' : 'Mühendis Bazlı Rapor Al'}
+                        </button>
+                    </div>
+                </div>
+            );
+        }
         
         ReactDOM.createRoot(document.getElementById('root')).render(<App />);
     </script>
