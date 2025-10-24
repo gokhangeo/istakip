@@ -339,7 +339,7 @@
             color: white;
             font-weight: 500;
             padding: 10px 20px;
-       }
+         }
         .report-comparison-actions button:hover {
             background-color: #7e22ce; /* purple-700 */
         }
@@ -378,7 +378,7 @@
          .result-card .excel-btn:disabled {
              background-color: #9ca3af;
              cursor: not-allowed;
-         }
+          }
         
         /* EBYS Reporter Styles */
         .ebys-reporter-container {
@@ -431,10 +431,15 @@
         const parsePersonnelWithStatus = (text) => {
             if (text == null) return [];
             const str = typeof text === 'string' ? text : String(text);
-            return str.split(/[,;]/g).map(s => {
-                const parts = s.trim().split('=>');
-                const name = (parts[0] || '').replace(/\s*\(Müh\.\)\s*/, '').trim();
-                const status = parts.length > 1 ? parts[1].trim() : null;
+            return str.split(/[,;–-]/g).map(s => {
+                let part = s.trim();
+                let status = null;
+                const arrowIdx = part.indexOf('=>');
+                if (arrowIdx !== -1) {
+                    status = part.slice(arrowIdx + 2).trim();
+                    part = part.slice(0, arrowIdx).trim();
+                }
+                const name = part.replace(/\s*\(Müh\.\)\s*/, '').trim();
                 return { name, status };
             }).filter(p => p.name);
         };
@@ -611,13 +616,13 @@
                     if (!isNaN(bd.getTime())) {
                         if (bd.getFullYear() === 2025) count2025++;
                         if (fStr) {
-                            const fd = new Date(fStr);
-                            if (!isNaN(fd.getTime()) && fd.getFullYear() > 1900 && fd >= threeMonthsAgo) {
-                                const diff = (fd - bd) / (1000 * 60 * 60 * 24);
-                                if (!isNaN(diff) && diff >= 0) {
-                                    totalDays += diff;
-                                    countDays++;
-                                }
+                             const fd = new Date(fStr);
+                             if (!isNaN(fd.getTime()) && fd.getFullYear() > 1900 && fd >= threeMonthsAgo) {
+                                 const diff = (fd - bd) / (1000 * 60 * 60 * 24);
+                                 if (!isNaN(diff) && diff >= 0) {
+                                     totalDays += diff;
+                                     countDays++;
+                                 }
                             }
                         }
                     }
@@ -762,6 +767,9 @@
                 case 'plan_ornegi': dynamicTitle = 'Plan Örneği-Teknik Bilgi Belge Bekleyen'; break;
             }
 
+            const titleSuffix = selectedIl.length > 0 ? selectedIl.join(' - ') : ([...new Set(data.map(d => d._province).filter(Boolean))].join(' - ') || 'Tüm İller');
+
+
             useEffect(() => {
                 if (!data || data.length === 0) {
                     setPersonnelStats({ totals: {}, dynamic: {} });
@@ -778,8 +786,8 @@
                     const personnel = splitPersonel(r['görevli personel']);
                      if (personnel.length > 0) {
                          personnel.forEach(p => {
-                            if (p) totalsMap[p] = (totalsMap[p] || 0) + 1;
-                        });
+                             if (p) totalsMap[p] = (totalsMap[p] || 0) + 1;
+                         });
                     }
                     
                     const status = String(r['başvuru durumu'] || '').toLocaleLowerCase('tr');
@@ -870,6 +878,10 @@
                             labels = filteredSortedData.map(d => isEngineer(d[0]) ? `${d[0]} (Müh.)` : d[0]);
                             dataValues = filteredSortedData.map(d => d[1]);
                         }
+                        
+                        const totalCount = dataValues.reduce((sum, val) => sum + val, 0);
+                        const chartLabel = `${label} (${titleSuffix} - Toplam: ${totalCount})`; // Include titleSuffix and total count
+
 
                         if (chartRef.current) chartRef.current.destroy();
                         
@@ -878,7 +890,7 @@
                             data: {
                                 labels,
                                 datasets: [{
-                                    label,
+                                    label: chartLabel, // Use updated label
                                     data: dataValues,
                                     backgroundColor: labels.map((_, i) => `hsl(${(i * 360 / labels.length)}, 70%, 60%)`)
                                 }]
@@ -887,6 +899,11 @@
                                 indexAxis: 'y',
                                 responsive: true,
                                 plugins: {
+                                    title: { // Use title plugin for better display
+                                        display: true,
+                                        text: chartLabel,
+                                        font: { size: 14 } // Adjust font size if needed
+                                    },
                                     legend: { display: false },
                                     datalabels: { anchor: 'end', align: 'right', color: '#444', font: { weight: 'bold' } }
                                 },
@@ -912,57 +929,55 @@
             };
 
             useEffect(() => {
-                createSortedChart(totalRef, totalChartRef, personnelStats.totals, 'Toplam İşlem Sayısı');
-            }, [personnelStats.totals, isEngineer, showOnlyEngineers]);
+                 createSortedChart(totalRef, totalChartRef, personnelStats.totals, `Personel İşlem Dağılımı`);
+            }, [personnelStats.totals, isEngineer, showOnlyEngineers, selectedIl, titleSuffix]);
 
             useEffect(() => {
                 createSortedChart(dynamicRef, dynamicChartRef, personnelStats.dynamic, dynamicTitle);
-            }, [personnelStats.dynamic, isEngineer, showOnlyEngineers, dynamicTitle]);
+            }, [personnelStats.dynamic, isEngineer, showOnlyEngineers, dynamicTitle, selectedIl, titleSuffix]);
 
             useEffect(() => {
-                createSortedChart(islemRef, islemChartRef, islemStats, 'İşlem Sayıları', true);
-            }, [islemStats]);
+                 createSortedChart(islemRef, islemChartRef, islemStats, `İşlem Sayıları`, true);
+            }, [islemStats, selectedIl, titleSuffix]);
 
-            useEffect(() => {
-                createSortedChart(districtRef, districtChartRef, districtStats, 'İlçe Bekleyen İşlemler', true);
-            }, [districtStats]);
+             useEffect(() => {
+                 createSortedChart(districtRef, districtChartRef, districtStats, `İlçe Bazlı Bekleyen İşlemler`, true);
+            }, [districtStats, selectedIl, titleSuffix]);
 
 
             if (!data || data.length === 0) return null;
 
-            const title = selectedIl.length > 0 ? selectedIl.join(' - ') : ([...new Set(data.map(d => d._province).filter(Boolean))].join(' - ') || 'Tüm İller');
-
             return (
                  <div style={{flex: 3, display: 'flex', flexDirection: 'column', gap: '10px', minWidth: '1050px'}}>
-                    <div style={{alignSelf: 'center'}}>
-                        <label style={{display: 'flex', alignItems: 'center', cursor: 'pointer', fontSize: '0.9rem'}}>
-                            <input type="checkbox" checked={showOnlyEngineers} onChange={onToggleEngineers} />
-                            Grafiklerde Sadece Mühendisleri Göster
-                        </label>
-                    </div>
-                    <div style={{display: 'flex', gap: '24px', flexWrap: 'nowrap', overflowX: 'auto'}}>
-                        <div className="chart-card" ref={personnelChartCardRef}>
-                            <button className="zoom-btn" title="Büyüt" onClick={() => onZoom({ type: 'chart', data: showOnlyEngineers ? Object.fromEntries(Object.entries(personnelStats.totals).filter(([name]) => isEngineer(name))) : personnelStats.totals, title: `Personel İşlem Dağılımı (${title})` })}>🔍</button>
-                            <div className="chart-title">Personel İşlem Dağılımı ({title})</div>
-                            <div className="chart-wrapper" style={{height: '250px'}}><canvas ref={totalRef}></canvas></div>
-                        </div>
-                        <div className="chart-card" ref={waitingChartCardRef}>
-                             <button className="zoom-btn" title="Büyüt" onClick={() => onZoom({ type: 'chart', data: showOnlyEngineers ? Object.fromEntries(Object.entries(personnelStats.dynamic).filter(([name]) => isEngineer(name))) : personnelStats.dynamic, title: `${dynamicTitle} (${title})` })}>🔍</button>
-                            <div className="chart-title">{dynamicTitle} ({title})</div>
-                            <div className="chart-wrapper" style={{height: '250px'}}><canvas ref={dynamicRef}></canvas></div>
-                        </div>
-                         <div className="chart-card" ref={islemChartCardRef}>
-                             <button className="zoom-btn" title="Büyüt" onClick={() => onZoom({ type: 'chart', data: islemStats, title: `İşlem Sayıları (${title})` })}>🔍</button>
-                            <div className="chart-title">İşlem Sayıları ({title})</div>
-                            <div className="chart-wrapper" style={{height: '250px'}}><canvas ref={islemRef}></canvas></div>
-                        </div>
-                        <div className="chart-card" ref={districtChartCardRef}>
-                            <button className="zoom-btn" title="Büyüt" onClick={() => onZoom({ type: 'chart', data: districtStats, title: `İlçe Bazlı Bekleyen İşlemler (${title})` })}>🔍</button>
-                            <div className="chart-title">İlçe Bazlı Bekleyen İşlemler ({title})</div>
-                            <div className="chart-wrapper" style={{height: '250px'}}><canvas ref={districtRef}></canvas></div>
-                        </div>
-                    </div>
-                </div>
+                     <div style={{alignSelf: 'center'}}>
+                         <label style={{display: 'flex', alignItems: 'center', cursor: 'pointer', fontSize: '0.9rem'}}>
+                             <input type="checkbox" checked={showOnlyEngineers} onChange={onToggleEngineers} />
+                             Grafiklerde Sadece Mühendisleri Göster
+                         </label>
+                     </div>
+                     <div className="charts-below">
+                         <div className="chart-card" ref={personnelChartCardRef}>
+                             <button className="zoom-btn" title="Büyüt" onClick={() => onZoom({ type: 'chart', data: showOnlyEngineers ? Object.fromEntries(Object.entries(personnelStats.totals).filter(([name]) => isEngineer(name))) : personnelStats.totals, title: `Personel İşlem Dağılımı (${titleSuffix})` })}>🔍</button>
+                             {/* Title is now handled by Chart.js title plugin */}
+                             <div className="chart-wrapper" style={{height: '250px'}}><canvas ref={totalRef}></canvas></div>
+                         </div>
+                         <div className="chart-card" ref={waitingChartCardRef}>
+                              <button className="zoom-btn" title="Büyüt" onClick={() => onZoom({ type: 'chart', data: showOnlyEngineers ? Object.fromEntries(Object.entries(personnelStats.dynamic).filter(([name]) => isEngineer(name))) : personnelStats.dynamic, title: `${dynamicTitle} (${titleSuffix})` })}>🔍</button>
+                             {/* Title is now handled by Chart.js title plugin */}
+                             <div className="chart-wrapper" style={{height: '250px'}}><canvas ref={dynamicRef}></canvas></div>
+                         </div>
+                          <div className="chart-card" ref={islemChartCardRef}>
+                               <button className="zoom-btn" title="Büyüt" onClick={() => onZoom({ type: 'chart', data: islemStats, title: `İşlem Sayıları (${titleSuffix})` })}>🔍</button>
+                             {/* Title is now handled by Chart.js title plugin */}
+                             <div className="chart-wrapper" style={{height: '250px'}}><canvas ref={islemRef}></canvas></div>
+                         </div>
+                         <div className="chart-card" ref={districtChartCardRef}>
+                               <button className="zoom-btn" title="Büyüt" onClick={() => onZoom({ type: 'chart', data: districtStats, title: `İlçe Bazlı Bekleyen İşlemler (${titleSuffix})` })}>🔍</button>
+                             {/* Title is now handled by Chart.js title plugin */}
+                             <div className="chart-wrapper" style={{height: '250px'}}><canvas ref={districtRef}></canvas></div>
+                         </div>
+                     </div>
+                 </div>
             );
         }
         
@@ -992,7 +1007,7 @@
                         <td>{r.overdue}</td>
                         <td>{r.tescileGiden}</td>
                         <td>{r.iade}</td>
-                        <td>{r.totalWaiting}</td>
+                        <td>{r.totalWaiting}</td> 
                     </tr>
                 ))
             ) : (
@@ -1114,7 +1129,7 @@
                         }
                     });
                     finalRows = Object.values(groupedTasks);
-                } else {
+                } else { // Handle other sort fields like 'plan_ornegi', '7_day_wait' etc.
                     let relevantData = data;
                     if (sortField === 'plan_ornegi') {
                         relevantData = relevantData.filter(d => {
@@ -1155,18 +1170,20 @@
                             }
                         }
                     });
-                    finalRows = Object.values(groupedTasks).sort((a, b) => b.beklemeSuresi - a.beklemeSuresi);
+                    finalRows = Object.values(groupedTasks).sort((a, b) => b.beklemeSuresi - a.beklemeSuresi); // Default sort by wait time desc
                 }
 
-                if (sortField === 'onemli_isler' || sortField === 'uygun_olmayan_iade') {
-                     finalRows.sort((a, b) => {
+                // Apply date sorting if applicable
+                 if (sortField === 'onemli_isler' || sortField === 'uygun_olmayan_iade') {
+                    finalRows.sort((a, b) => {
                         const dateA = a.fenKayitTarihi ? new Date(a.fenKayitTarihi) : null;
                         const dateB = b.fenKayitTarihi ? new Date(b.fenKayitTarihi) : null;
-                        if (!dateA) return 1;
+                        if (!dateA) return 1; // Put nulls at the end
                         if (!dateB) return -1;
                         return dateSortOrder === 'asc' ? dateA - dateB : dateB - dateA;
                     });
-                }
+                 }
+
 
                 if (showOnlyEngineers) {
                     finalRows = finalRows.filter(row => parsePersonnelWithStatus(row.personnelRaw).some(p => isEngineer(p.name)));
@@ -1185,9 +1202,14 @@
                         return `${namePart}${statusPart}`;
                     }).join("\n");
                 };
-                
-                let dataToExport = warningRows.map(row => {
-                    const baseObject = {
+
+                // Default export for all warning types (now unified)
+                let dataToExport;
+                let cols = [];
+                const isIadeOrOnemliMode = sortField === 'uygun_olmayan_iade' || sortField === 'onemli_isler';
+
+                 dataToExport = warningRows.map(row => {
+                    const baseRow = {
                         'Personel': getPersonnelText(row),
                         'Fen Kayıt Tarihi': row.fenKayitTarihi,
                         'Fen Kayıt No': row.fenKayitNo, 
@@ -1195,22 +1217,32 @@
                         'İlçe': row.ilce, 
                         'İşlem': row.islem,
                         'Zemin': row.zemin, 
-                        'Başvuru Durumu': row.basvuruDurumu,
+                        'Başvuru Durumu': row.basvuruDurumu
                     };
-                    if (sortField === 'uygun_olmayan_iade' || sortField === 'onemli_isler') {
-                        baseObject['Başvuru Açıklama'] = row.basvuruAciklama;
+                    if (isIadeOrOnemliMode) {
+                        baseRow['Başvuru Açıklama'] = row.basvuruAciklama;
                     } else {
-                        baseObject['Bekleme Süresi (Gün)'] = row.beklemeSuresi;
+                        baseRow['Bekleme Süresi (Gün)'] = row.beklemeSuresi;
                     }
-                    return baseObject;
-                });
+                    return baseRow;
+                 });
+
+                 if (isIadeOrOnemliMode) {
+                    cols = [ { wch: 30 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 20 }, { wch: 40 }, { wch: 25 }, { wch: 50 }];
+                 } else {
+                     cols = [ { wch: 30 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 20 }, { wch: 40 }, { wch: 25 }, { wch: 20 } ];
+                 }
                 
                 const ws = XLSX.utils.json_to_sheet(dataToExport); 
-                
-                const cols = (sortField === 'uygun_olmayan_iade' || sortField === 'onemli_isler') 
-                    ? [ { wch: 30 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 20 }, { wch: 40 }, { wch: 25 }, { wch: 50 }]
-                    : [ { wch: 30 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 20 }, { wch: 40 }, { wch: 25 }, { wch: 20 } ];
-
+                const range = XLSX.utils.decode_range(ws['!ref']); 
+                for (let R = range.s.r + 1; R <= range.e.r; ++R) { 
+                    const cell_address = { c: 0, r: R }; 
+                    const cell_ref = XLSX.utils.encode_cell(cell_address); 
+                    if (ws[cell_ref] && ws[cell_ref].v) { 
+                        if (!ws[cell_ref].s) ws[cell_ref].s = {}; 
+                        ws[cell_ref].s.alignment = { wrapText: true, vertical: 'top' }; 
+                    } 
+                } 
                 ws['!cols'] = cols; 
                 const wb = XLSX.utils.book_new(); 
                 XLSX.utils.book_append_sheet(wb, ws, 'Uyari Raporu'); 
@@ -1303,8 +1335,8 @@
 
             if (showOnlyEngineers) {
                 rows = rows.filter(row => {
-                    const personnel = splitPersonel(row['görevli personel']);
-                    return personnel.some(p => isEngineer(p));
+                    const personnel = parsePersonnelWithStatus(row['görevli personel']);
+                    return personnel.some(p => isEngineer(p.name));
                 });
             }
 
@@ -1334,25 +1366,34 @@
                             if (!personelText || !ws[cellRef]) return;
 
                             const richText = [];
-                            const parts = personelText.split(',').map(p => p.trim());
+                            const personnelWithStatus = parsePersonnelWithStatus(personelText);
                             
-                            parts.forEach((part, index) => {
-                                const subParts = part.split('=>');
-                                if (subParts.length === 2 && subParts[1].trim().toLowerCase() === 'yapılıyor') {
-                                    const name = subParts[0].trim();
-                                    richText.push({ t: name, s: { font: { color: { rgb: "FF0000" } } } });
-                                    richText.push({ t: ` => ${subParts[1].trim()}` });
-                                } else {
-                                    richText.push({ t: part });
+                            personnelWithStatus.forEach((p, index) => {
+                                const isEng = isEngineer(p.name);
+                                const namePart = isEng ? `${p.name} (Müh.)` : p.name;
+
+                                const style = {};
+                                if (p.status && p.status.toLowerCase() === 'yapılıyor') {
+                                    style.font = { color: { rgb: "FF0000" } };
+                                } else if (isEng) {
+                                     style.font = { color: { rgb: "FF0000" } }; // Keep engineers red if no specific status
                                 }
-                                if (index < parts.length - 1) {
+
+                                richText.push({ t: namePart, s: style });
+
+                                if(p.status){
+                                     richText.push({ t: ` => ${p.status}` });
+                                }
+
+
+                                if (index < personnelWithStatus.length - 1) {
                                     richText.push({ t: ', ' });
                                 }
                             });
                             
-                            ws[cellRef].t = 's';
+                            ws[cellRef].t = 'r'; // Set cell type to rich text
                             ws[cellRef].r = richText;
-                            ws[cellRef].v = personelText;
+                            ws[cellRef].v = personelText; // Keep plain text value for sorting/filtering
                         });
 
                         ws['!cols'] = [{ wch: 20 }, { wch: 15 }, { wch: 50 }, { wch: 20 }];
@@ -1374,11 +1415,11 @@
                         rows.forEach(row => {
                             const rowData = customCols.map(col => {
                                 if (col === 'görevli personel') {
-                                    let personnel = splitPersonel(row[col]);
+                                    let personnel = parsePersonnelWithStatus(row[col]);
                                     if (showOnlyEngineers) {
-                                        personnel = personnel.filter(p => isEngineer(p));
+                                        personnel = personnel.filter(p => isEngineer(p.name));
                                     }
-                                    return personnel.map(p => isEngineer(p) ? `${p} (Müh.)` : p).join(', ');
+                                    return personnel.map(p => isEngineer(p.name) ? `${p.name} (Müh.)` : p.name).join(', ');
                                 }
                                 return row[col];
                             });
@@ -1398,11 +1439,15 @@
                         rows.forEach(row => {
                             const rowData = ALLOWED_COLS.map(col => {
                                 if (col === 'görevli personel') {
-                                    let personnel = splitPersonel(row[col]);
+                                    let personnel = parsePersonnelWithStatus(row[col]);
                                     if (showOnlyEngineers) {
-                                        personnel = personnel.filter(p => isEngineer(p));
+                                        personnel = personnel.filter(p => isEngineer(p.name));
                                     }
-                                    return personnel.map(p => isEngineer(p) ? `${p} (Müh.)` : p).join(', ');
+                                    return personnel.map(p => {
+                                        const namePart = isEngineer(p.name) ? `${p.name} (Müh.)` : p.name;
+                                         const statusPart = (sortField === 'tescilden_geldi' && p.status) ? ` (${p.status})` : ''; // Include status only for tescilden_geldi
+                                        return `${namePart}${statusPart}`;
+                                    }).join(', ');
                                 }
                                 return row[col];
                             });
@@ -1424,8 +1469,8 @@
                                         shouldBeRed = true;
                                     }
                                 } else if (col === 'görevli personel') {
-                                    const personnel = splitPersonel(row[col]);
-                                    if (personnel.some(p => isEngineer(p))) {
+                                    const personnel = parsePersonnelWithStatus(row[col]);
+                                    if (personnel.some(p => isEngineer(p.name))) {
                                         shouldBeRed = true;
                                     }
                                 }
@@ -1453,16 +1498,17 @@
                     <tr key={i}>
                         {ALLOWED_COLS.map(col => {
                             if (col === 'görevli personel') {
-                                let personnel = splitPersonel(row[col]);
+                                let personnel = parsePersonnelWithStatus(row[col]);
                                 if (showOnlyEngineers) {
-                                    personnel = personnel.filter(p => isEngineer(p));
+                                    personnel = personnel.filter(p => isEngineer(p.name));
                                 }
                                 return (
                                     <td key={col} className={`col-${col.replace(/\s+/g, '-')}`}>
                                         {personnel.map((p, i) => (
                                             <React.Fragment key={i}>
-                                                <span style={{ color: isEngineer(p) ? 'red' : 'inherit' }}>
-                                                    {p} {isEngineer(p) ? '(Müh.)' : ''}
+                                                <span style={{ color: isEngineer(p.name) ? 'red' : 'inherit' }}>
+                                                    {p.name} {isEngineer(p.name) ? '(Müh.)' : ''}
+                                                    {sortField === 'tescilden_geldi' && p.status && ` (${p.status})`}
                                                 </span>
                                                 {i < personnel.length - 1 && ', '}
                                             </React.Fragment>
@@ -2016,7 +2062,7 @@
                  setReportReady(true);
             };
             
-              useEffect(() => {
+             useEffect(() => {
                 if (reportReady && ebysData.length > 0) {
                     const personnelHeader = Object.keys(ebysData[0]).find(h => normalizeHeader(h).includes('bekleyen') && (normalizeHeader(h).includes('kullanıcı') || normalizeHeader(h).includes('kullanici')));
                     const dateHeader = Object.keys(ebysData[0]).find(h => normalizeHeader(h) === 'tarih');
@@ -2092,7 +2138,7 @@
                      if(ebysChartInstance.current){
                         ebysChartInstance.current.destroy();
                         ebysChartInstance.current = null;
-                     }
+                    }
                 }
             }, [ebysData]);
 
@@ -2145,7 +2191,7 @@
                                                      } else {
                                                          setSelectedPersonnel([]);
                                                      }
-                                                 }}
+                                                 }} // Missing closing brace added here
                                              />
                                              <b>Tümünü Seç/Bırak</b>
                                          </label>
@@ -2168,6 +2214,109 @@
             );
         }
 
+        function MegsisReporter({ data, isEngineer }) {
+            const [isLoading, setIsLoading] = useState(false);
+        
+            const handleReportGeneration = () => {
+                if (data.length === 0) {
+                    alert("Rapor oluşturmak için lütfen önce bir MEGSİS dosyası yükleyin.");
+                    return;
+                }
+        
+                setIsLoading(true);
+        
+                try {
+                    const wb = XLSX.utils.book_new();
+        
+                    const allEngineersInData = [...new Set(
+                        data.flatMap(row =>
+                            parsePersonnelWithStatus(row['görevli personel'])
+                                .filter(p => isEngineer(p.name))
+                                .map(p => p.name)
+                        )
+                    )].sort((a, b) => a.localeCompare(b, 'tr'));
+        
+                    if (allEngineersInData.length === 0) {
+                        alert("Yüklenen dosyada raporlanacak mühendis bulunamadı.");
+                        setIsLoading(false);
+                        return;
+                    }
+        
+                    allEngineersInData.forEach(engineerName => {
+                        let engineerRows = data.filter(row =>
+                            parsePersonnelWithStatus(row['görevli personel']).some(p => p.name === engineerName && isEngineer(p.name))
+                        );
+        
+                        engineerRows.sort((a, b) => {
+                            const dateA = a['fen kayıt tarihi'] ? new Date(a['fen kayıt tarihi']) : null;
+                            const dateB = b['fen kayıt tarihi'] ? new Date(b['fen kayıt tarihi']) : null;
+                            if (dateA && dateB) return dateA - dateB;
+                            if (dateA) return -1;
+                            if (dateB) return 1;
+                            return 0;
+                        });
+        
+                        if (engineerRows.length > 0) {
+                            const dataToExport = engineerRows.map(row => ({
+                                'Personel': parsePersonnelWithStatus(row['görevli personel'])
+                                    .map(p => isEngineer(p.name) ? `${p.name} (Müh.)` : p.name)
+                                    .join("\n"),
+                                'Fen Kayıt Tarihi': row['fen kayıt tarihi'],
+                                'Fen Kayıt No': row['fen kayıt no'],
+                                'İl': row._province,
+                                'İlçe': row._district,
+                                'İşlem': row['işlem'],
+                                'Zemin': row['zemin'],
+                                'Başvuru Durumu': row['başvuru durumu'],
+                                'Başvuru Açıklama': row['başvuru açıklama']
+                            }));
+        
+                            const ws = XLSX.utils.json_to_sheet(dataToExport);
+                            const cols = [{ wch: 30 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 20 }, { wch: 40 }, { wch: 25 }, { wch: 50 }];
+                            ws['!cols'] = cols;
+        
+                            const range = XLSX.utils.decode_range(ws['!ref']);
+                            for (let R = range.s.r + 1; R <= range.e.r; ++R) {
+                                const cell_address = { c: 0, r: R };
+                                const cell_ref = XLSX.utils.encode_cell(cell_address);
+                                if (ws[cell_ref] && ws[cell_ref].v) {
+                                    if (!ws[cell_ref].s) ws[cell_ref].s = {};
+                                    ws[cell_ref].s.alignment = { wrapText: true, vertical: 'top' };
+                                }
+                            }
+        
+                            const sheetName = engineerName.replace(/[\\/*?:]/g, "").substring(0, 31);
+                            XLSX.utils.book_append_sheet(wb, ws, sheetName);
+                        }
+                    });
+        
+                    XLSX.writeFile(wb, 'MEGSIS_Muhendis_Raporu.xlsx');
+                } catch (err) {
+                    console.error("MEGSİS Rapor oluşturma hatası:", err);
+                    alert("Rapor oluşturulurken bir hata oluştu.");
+                } finally {
+                    setIsLoading(false);
+                }
+            };
+        
+            return (
+                <div className="ebys-reporter-container" style={{backgroundColor: '#f0f9ff', borderColor: '#bae6fd'}}>
+                    <div className="ebys-reporter-header">
+                        <h3 style={{color: '#075985'}}>MEGSİS Raporlama</h3>
+                    </div>
+                    <div className="ebys-controls">
+                        <p style={{textAlign: 'center', fontSize: '0.9rem', color: '#0369a1'}}>
+                            Yüklenmiş olan MEGSİS verisini kullanarak mühendis bazlı, en eski fen kayıt tarihine göre sıralanmış bir Excel raporu oluşturur.
+                        </p>
+                        <button onClick={handleReportGeneration} disabled={isLoading || data.length === 0}>
+                            {isLoading ? 'Rapor Oluşturuluyor...' : 'Mühendis Bazlı Rapor Al'}
+                        </button>
+                    </div>
+                </div>
+            );
+        }
+
+        // Define App component before using it
         function App(){
             const [data,setData]=useState([]);
             const [engineers, setEngineers] = useState([]);
@@ -2190,7 +2339,7 @@
             const personnelChartRef = useRef(null);
             const waitingChartRef = useRef(null);
             const islemChartRef = useRef(null);
-            const districtChartRef = useRef(null);
+            const districtChartRef = useRef(null); // Ref for the new district chart card
             
             const readExcelFromUrl = async (url) => {
                 try {
@@ -2294,6 +2443,125 @@
                 }
             };
 
+            const handleExportGeneralReport = async () => {
+                setLoading(true);
+                const { jsPDF } = window.jspdf;
+                const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+
+                const signatureImg = new Image();
+                signatureImg.src = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAARgAAAAsCAYAAAD2B2f5AAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAATYSURBVHhe7Z1fSxtRFMfvzC2b7Ya2SbC0sS19KIKVFJAggiAi+AMMPYgIesgXQfTgF4jgQRB68KCIF1EkRARpD0W0VCxYLJCklhKstLXt2mY3s5NfGXZ3t/M6M3u/8MvMvM+ZO+87c3ZndmCCILgYQ0yQIOjA2yA69lB04L2Q2Nen2NenmLUDBrQDBrQDBrQDBrQDBrQDBrQDBrQDBrQDBrQDBrQDBrQDBrQDBrQDBhL3w1sLw5iGfJ/pI+g/BCFfNq5yI6e3e1J6Wf2p+v/H6Gg1wzO4c2i1h12S4GfI8PuyO2bX7R3/tq6u/kE2z6V0e2Lx+jT5GvjV0H5fR+0Y9T0G87oB560y1n4m9n2b7v2+N8a8L3eM9S3X1q/X05kY4xV2zfY/pLp6a3v0c8SnaT7K8lO0G+T/VWUPG5WjK/T/cM8rT7N/oI8j/5A3kd+QN5Bfn9G0M087f5A3kX+Yp5N/kKezf5Cns3+Qp7N/kKeLd7+FfXj/A9bK+e/Qc5B/vX4vTz3/AUc3+vP6f4c8mzyj/M08hzyD/I08gzyN/IM8jfyDPJv/430dOwfJz+R/yB/359M/oI8+/yFvIv8hTy7/IU8u/yFPLv8hTy7/IU8u/yFPJv8/SyL/P0s8/z9LPP8/SwL/P0si/z/LPP8/SyL/P8s8/z/LPP8/Szj/H0s4/z/LPP8/Sxj/P0s4/z/LPP8/Sxj/P0s4/z/LPP8/Sxj/P0s4/z/LPP8/SzT/H0s0/z9LNP8/SzT/H0s0/z9LNP8/SzT/H0s0/z/LNP8/SzD/P8sw/z/LMP8/yzD/P8sw/z/LMP8/yzD/P8sw/z/LMP8/Sxb/P0sW/z9LFv8/Sxb/P0sW/z9LFv8/Sxb/P0sW/z/LMP8/yzD/P8sw/z9r/v8P0t8/yzD/P8sw/z/LMP8/yzD/P8s4/z87B/n/2T/IPyDP/8/Owf5/9g/yD/D8/+/8B/kH+P/ZP8g/wPP/v/Af5B/j/2T/IP8Dz/7/wH+Qf4/9k/yD/A8/+1cZ/8g/z/7Vxn/yD/P/tXGf/IP8/+1cZ/8g/z/7Vxn/yD/P/tXGf/IP8/+1cZ/8g/z/7Vxn/yD/P/tXGf/IP8/+1cZ/8g/z/7Vxn/yD/P/tXGf/IP8/+1cZ/8g/z/7Vxn/yD/P/tXGf/IP8/+1cZ/8g/z/7Vxn/yD/P/ZP8g/z/2T/IP8/+yf5B/n/2T/IP8/+yf5B/n/2T/IP8/+yf5B/n/2T/IP8/+yf5B/n/2T/IP8/+yf5B/n/2T/IP8/+yf5B/n/2T/IP8/+yf5B/n/2T/IP8/+yf5B/n/2P/KP8/+yf5B/n/2D/Kv8/+yf5B/n/2D/Kv8/+wf5V/k/2P/KP8/+wf5V/k/2D/Kv8/9k/yD/P/tX+f/ZP8i/z/7V/n/2T/Iv8/9Vf4z/yD/P/tX+f/ZP8i/z/7V/n/2T/Iv8/9Vf4z/yD/P/tX+f/ZP8i/z/7V/n/2T/Iv8/9Vf5n/kD+f/ZP8i/z/5X/mf+QP5/9k/yL/P/lf+Z/5A/n/2T/Iv8/+V/5n/kD+f/ZP8i/z/5H/mf+QP5/9k/yL/P/k/+Z/wB/gG9i2pD/t6f0AAAAABJRU5ErkJggg==';
+                signatureImg.onload = async () => {
+                    const addElementToPdf = async (element, yPos) => {
+                        const canvas = await html2canvas(element, { scale: 2, backgroundColor: '#ffffff' });
+                        const imgData = canvas.toDataURL('image/png');
+                        const pageWidth = pdf.internal.pageSize.getWidth();
+                        const pageHeight = pdf.internal.pageSize.getHeight();
+                        const margin = 10;
+                        const imgWidth = pageWidth - (margin * 2);
+                        const imgHeight = (canvas.height * imgWidth) / canvas.width;
+                        
+                        if (yPos + imgHeight + margin + 10 > pageHeight && yPos > margin) { // +10 for signature
+                            pdf.addPage();
+                            yPos = margin;
+                        }
+                        pdf.addImage(imgData, 'PNG', margin, yPos, imgWidth, imgHeight);
+                        return yPos + imgHeight + 5; // 5 margin after element
+                    };
+
+                    const addSignature = (y) => {
+                         const pageHeight = pdf.internal.pageSize.getHeight();
+                         const sigHeight = 10;
+                         const sigWidth = 60;
+                         const sigY = pageHeight - sigHeight - 5; // 5mm from bottom
+                         pdf.addImage(signatureImg, 'PNG', 10, sigY, sigWidth, sigHeight);
+                    };
+
+                    let yPosition = 10;
+                    
+                    const currentFilteredData = filteredData.length > 0 ? filteredData : data;
+                    const titleSuffixPdf = selectedIl.length > 0 ? ` (${selectedIl.join(', ')})` : ` (${[...new Set(currentFilteredData.map(d => d._province).filter(Boolean))].join(', ') || 'Tüm İller'})`;
+                    
+                    if (summaryTableRef.current) {
+                         yPosition = await addElementToPdf(summaryTableRef.current, yPosition);
+                    }
+                    
+                    const chartsContainer = document.createElement('div');
+                    chartsContainer.style.display = 'flex';
+                    chartsContainer.style.gap = '20px';
+                    if (personnelChartRef.current) chartsContainer.appendChild(personnelChartRef.current.cloneNode(true));
+                    if (waitingChartRef.current) chartsContainer.appendChild(waitingChartRef.current.cloneNode(true));
+                    if (islemChartRef.current) chartsContainer.appendChild(islemChartRef.current.cloneNode(true));
+
+                    if (chartsContainer.hasChildNodes()) {
+                        yPosition = await addElementToPdf(chartsContainer, yPosition);
+                    }
+
+                    addSignature(); // Add signature to the first page
+
+                    const dynamicChartConfigs = [
+                        { filter: 'tescile_giden', title: `Tescil Edilen(Tescilden Geldi Yapılmayan) ${titleSuffixPdf}` },
+                        { filter: 'iptal_edilen', title: `Tapu İptal Edilen(Tescilden Geldi-Eksiklikten İade Yapılmayan) ${titleSuffixPdf}` },
+                        { filter: 'fen_kayit_alinmayan', title: `Fen Kayıt Alınmayan(Ödemesi Yapılan) ${titleSuffixPdf}` },
+                        { filter: 'plan_ornegi', title: `Plan Örneği-Teknik Bilgi Belge Bekleyen ${titleSuffixPdf}` }
+                    ];
+
+                    for (const config of dynamicChartConfigs) {
+                        const tempChartContainer = document.createElement('div');
+                        tempChartContainer.style.position = 'absolute';
+                        tempChartContainer.style.left = '-9999px';
+                        tempChartContainer.style.width = '1200px';
+                        tempChartContainer.style.height = '800px';
+                        tempChartContainer.style.background = '#ffffff';
+                        tempChartContainer.style.padding = '20px';
+                        document.body.appendChild(tempChartContainer);
+
+                        const chartData = {};
+                        const filteredChartData = currentFilteredData.filter(d => {
+                            const status = String(d['başvuru durumu'] || '').toLocaleLowerCase('tr');
+                            const aciklama = String(d['başvuru açıklama'] || '').toLocaleLowerCase('tr');
+                            const odeme = String(d['ödeme'] || '').toLocaleLowerCase('tr');
+                            const islem = String(d['işlem'] || '').toLocaleLowerCase('tr');
+                            switch(config.filter) {
+                                case 'tescile_giden': return status.includes('tescile gönderildi') && aciklama.includes('tescil edildi');
+                                case 'iptal_edilen': return status.includes('tescile gönderildi') && aciklama.includes('iptal');
+                                case 'fen_kayit_alinmayan': return odeme.includes('ödendi') && (d['fen kayıt no'] === 0 || d['fen kayıt no'] == null);
+                                case 'plan_ornegi': 
+                                    const planOrnegiTerms = ['plan örneği', 'mahke', 'teknik bilgi ve belge örnekleri'];
+                                     const isWaiting = !status.includes('eksiklikten iade edildi') && !status.includes('tescile gönderildi');
+                                    return isWaiting && planOrnegiTerms.some(term => islem.includes(term));
+                                default: return false;
+                            }
+                        });
+                        
+                        filteredChartData.forEach(r => {
+                            const personnel = splitPersonel(r['görevli personel']);
+                            personnel.forEach(p => {
+                                if(p) chartData[p] = (chartData[p] || 0) + 1;
+                            });
+                        });
+                        
+                        if (Object.keys(chartData).length > 0) {
+                            const tempRoot = ReactDOM.createRoot(tempChartContainer);
+                            await new Promise(resolve => {
+                                tempRoot.render(<ZoomedChart chartData={chartData} title={config.title} onRender={resolve} isForPdf={true} isEngineer={isEngineer} />);
+                            });
+
+                            pdf.addPage();
+                            const canvas = await html2canvas(tempChartContainer, { scale: 2 });
+                            const imgData = canvas.toDataURL('image/png');
+                            pdf.addImage(imgData, 'PNG', 10, 10, pdf.internal.pageSize.getWidth() - 20, pdf.internal.pageSize.getHeight() - 30);
+                            addSignature();
+                            tempRoot.unmount();
+                        }
+
+                        document.body.removeChild(tempChartContainer);
+                    }
+
+                    pdf.save('Genel_Rapor.pdf');
+                    setLoading(false);
+                };
+            };
+
             const ilOptions = Array.from(new Set(data.map(d=>d._province).filter(p=>p))).sort((a,b)=>a.localeCompare(b,'tr'));
             const ilceOptions = Array.from(new Set(
                 data
@@ -2301,7 +2569,7 @@
                 .map(d => d._district)
                 .filter(p => p)
             )).sort((a,b)=>a.localeCompare(b,'tr'));
-            const personnelOptions = Array.from(new Set(data.flatMap(d=>splitPersonel(d['görevli personel'])))).sort((a,b)=>a.localeCompare(b,'tr'));
+            const personnelOptions = Array.from(new Set(data.flatMap(d=>parsePersonnelWithStatus(d['görevli personel']).map(p => p.name)))).sort((a,b)=>a.localeCompare(b,'tr'));
             const sortOptions=[
                 {label:'Sıralama Yok',value:''},
                 {label:'Başvuru Tarihine Göre',value:'başvuru tarihi'},
@@ -2322,41 +2590,29 @@
                 let arr=[...data];
                 if(selectedIl.length>0) arr=arr.filter(d=>selectedIl.includes(d._province));
                 if(selectedIlce.length > 0) arr = arr.filter(d => selectedIlce.includes(d._district));
-                if(selectedPersonel.length>0) arr=arr.filter(d=>{const ppl=splitPersonel(d['görevli personel']); return selectedPersonel.some(sp=>ppl.includes(sp));});
+                if(selectedPersonel.length>0) arr=arr.filter(d=>{const ppl=parsePersonnelWithStatus(d['görevli personel']); return selectedPersonel.some(sp=>ppl.some(p => p.name === sp));});
                 
                 if(sortField==='iade edilen') {
                     arr=arr.filter(d=>String(d['başvuru durumu']||'').toLocaleLowerCase('tr').includes('eksiklikten iade edildi'));
-                         arr.sort((a, b) => {
-                            const dx = new Date(a['fen kayıt tarihi']);
-                            const dy = new Date(b['fen kayıt tarihi']);
-                            if (!isNaN(dx) && !isNaN(dy)) return dx - dy;
-                            return 0;
-                        });
                 } else if (sortField === 'tescile_giden') {
                     arr = arr.filter(d => {
                         const status = String(d['başvuru durumu'] || '').toLocaleLowerCase('tr');
                         const aciklama = String(d['başvuru açıklama'] || '').toLocaleLowerCase('tr');
                         return status.includes('tescile gönderildi') && aciklama.includes('tescil edildi');
                     });
-                    arr.sort((a, b) => {
-                        const dx = new Date(a['fen kayıt tarihi']);
-                        const dy = new Date(b['fen kayıt tarihi']);
-                        if (!isNaN(dx) && !isNaN(dy)) return dx - dy;
-                        return 0;
-                    });
                 } else if (sortField === 'tescilden_geldi') {
                     arr = arr.filter(d => String(d['başvuru durumu'] || '').toLocaleLowerCase('tr') === 'tescilden geldi');
+                    // Sort by personnel name within 'tescilden_geldi'
+                     arr.sort((a,b) => {
+                         const pa = a['görevli personel'] || '';
+                         const pb = b['görevli personel'] || '';
+                         return pa.localeCompare(pb, 'tr');
+                     });
                 } else if (sortField === 'iptal_edilen') {
                     arr = arr.filter(d => {
                         const status = String(d['başvuru durumu'] || '').toLocaleLowerCase('tr');
                         const aciklama = String(d['başvuru açıklama'] || '').toLocaleLowerCase('tr');
                         return status.includes('tescile gönderildi') && aciklama.includes('iptal');
-                    });
-                    arr.sort((a, b) => {
-                        const dx = new Date(a['fen kayıt tarihi']);
-                        const dy = new Date(b['fen kayıt tarihi']);
-                        if (!isNaN(dx) && !isNaN(dy)) return dx - dy;
-                        return 0;
                     });
                 } else if (sortField === 'fen_kayit_alinmayan') {
                     arr = arr.filter(d => {
@@ -2364,12 +2620,9 @@
                         return odeme.includes('ödendi') && !odeme.includes('ödenmedi') && (d['fen kayıt no'] === 0 || d['fen kayıt no'] == null);
                     });
                 } else if (sortField === 'plan_ornegi') {
-                       arr = arr.filter(d => {
+                     arr = arr.filter(d => {
                          const islem = String(d['işlem'] || '').toLocaleLowerCase('tr');
-                         const isPlanOrnegi = islem === 'plan örneği';
-                         const isMahkemePlanOrnegi = islem === 'mahkeme plan örneği';
-                         const isTeknikBilgi = islem === 'teknik bilgi ve belge örnekleri';
-                         return isPlanOrnegi || isMahkemePlanOrnegi || isTeknikBilgi;
+                         return ['plan örneği', 'mahkeme plan örneği', 'teknik bilgi ve belge örnekleri'].includes(islem);
                      });
                 } else if (sortField === 'bekleyen_eski_yeni') {
                     arr = arr.filter(d => {
@@ -2380,6 +2633,8 @@
                         const dx = new Date(a['başvuru tarihi']);
                         const dy = new Date(b['başvuru tarihi']);
                         if (!isNaN(dx) && !isNaN(dy)) return dx - dy;
+                         if (!isNaN(dx)) return -1;
+                         if (!isNaN(dy)) return 1;
                         return 0;
                     });
                 } else if (sortField === 'bekleyen_yeni_eski') {
@@ -2391,6 +2646,8 @@
                         const dx = new Date(a['başvuru tarihi']);
                         const dy = new Date(b['başvuru tarihi']);
                         if (!isNaN(dx) && !isNaN(dy)) return dy - dx;
+                        if (!isNaN(dx)) return -1;
+                        if (!isNaN(dy)) return 1;
                         return 0;
                     });
                 } else if (sortField === 'uygun_olmayan_iade') {
@@ -2414,10 +2671,10 @@
                             const dateA = a[sortField] ? new Date(a[sortField]) : null;
                             const dateB = b[sortField] ? new Date(b[sortField]) : null;
 
-                            if (!dateA || isNaN(dateA)) return 1;
+                            if (!dateA || isNaN(dateA)) return 1; // Put nulls/invalid dates at the end
                             if (!dateB || isNaN(dateB)) return -1;
 
-                            return dateA - dateB;
+                            return dateA - dateB; // Sort asc by default
                         }
                         const valA = a[sortField] || '';
                         const valB = b[sortField] || '';
@@ -2633,113 +2890,9 @@
                 </div>
             );
         };
-
-        function MegsisReporter({ data, isEngineer }) {
-            const [isLoading, setIsLoading] = useState(false);
-        
-            const handleReportGeneration = () => {
-                if (data.length === 0) {
-                    alert("Rapor oluşturmak için lütfen önce bir MEGSİS dosyası yükleyin.");
-                    return;
-                }
-        
-                setIsLoading(true);
-        
-                try {
-                    const wb = XLSX.utils.book_new();
-        
-                    const allEngineersInData = [...new Set(
-                        data.flatMap(row =>
-                            parsePersonnelWithStatus(row['görevli personel'])
-                                .filter(p => isEngineer(p.name))
-                                .map(p => p.name)
-                        )
-                    )].sort((a, b) => a.localeCompare(b, 'tr'));
-        
-                    if (allEngineersInData.length === 0) {
-                        alert("Yüklenen dosyada raporlanacak mühendis bulunamadı.");
-                        setIsLoading(false);
-                        return;
-                    }
-        
-                    allEngineersInData.forEach(engineerName => {
-                        let engineerRows = data.filter(row =>
-                            parsePersonnelWithStatus(row['görevli personel']).some(p => p.name === engineerName && isEngineer(p.name))
-                        );
-        
-                        engineerRows.sort((a, b) => {
-                            const dateA = a['fen kayıt tarihi'] ? new Date(a['fen kayıt tarihi']) : null;
-                            const dateB = b['fen kayıt tarihi'] ? new Date(b['fen kayıt tarihi']) : null;
-                            if (dateA && dateB) return dateA - dateB;
-                            if (dateA) return -1;
-                            if (dateB) return 1;
-                            return 0;
-                        });
-        
-                        if (engineerRows.length > 0) {
-                            const dataToExport = engineerRows.map(row => ({
-                                'Personel': parsePersonnelWithStatus(row['görevli personel'])
-                                    .map(p => isEngineer(p.name) ? `${p.name} (Müh.)` : p.name)
-                                    .join("\n"),
-                                'Fen Kayıt Tarihi': row['fen kayıt tarihi'],
-                                'Fen Kayıt No': row['fen kayıt no'],
-                                'İl': row._province,
-                                'İlçe': row._district,
-                                'İşlem': row['işlem'],
-                                'Zemin': row['zemin'],
-                                'Başvuru Durumu': row['başvuru durumu'],
-                                'Başvuru Açıklama': row['başvuru açıklama']
-                            }));
-        
-                            const ws = XLSX.utils.json_to_sheet(dataToExport);
-                            const cols = [{ wch: 30 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 20 }, { wch: 40 }, { wch: 25 }, { wch: 50 }];
-                            ws['!cols'] = cols;
-        
-                            const range = XLSX.utils.decode_range(ws['!ref']);
-                            for (let R = range.s.r + 1; R <= range.e.r; ++R) {
-                                const cell_address = { c: 0, r: R };
-                                const cell_ref = XLSX.utils.encode_cell(cell_address);
-                                if (ws[cell_ref] && ws[cell_ref].v) {
-                                    if (!ws[cell_ref].s) ws[cell_ref].s = {};
-                                    ws[cell_ref].s.alignment = { wrapText: true, vertical: 'top' };
-                                }
-                            }
-        
-                            const sheetName = engineerName.replace(/[\\/*?:]/g, "").substring(0, 31);
-                            XLSX.utils.book_append_sheet(wb, ws, sheetName);
-                        }
-                    });
-        
-                    XLSX.writeFile(wb, 'MEGSIS_Muhendis_Raporu.xlsx');
-                } catch (err) {
-                    console.error("MEGSİS Rapor oluşturma hatası:", err);
-                    alert("Rapor oluşturulurken bir hata oluştu.");
-                } finally {
-                    setIsLoading(false);
-                }
-            };
-        
-            return (
-                <div className="ebys-reporter-container" style={{backgroundColor: '#f0f9ff', borderColor: '#bae6fd'}}>
-                    <div className="ebys-reporter-header">
-                        <h3 style={{color: '#075985'}}>MEGSİS Raporlama</h3>
-                    </div>
-                    <div className="ebys-controls">
-                        <p style={{textAlign: 'center', fontSize: '0.9rem', color: '#0369a1'}}>
-                            Yüklenmiş olan MEGSİS verisini kullanarak mühendis bazlı, en eski fen kayıt tarihine göre sıralanmış bir Excel raporu oluşturur.
-                        </p>
-                        <button onClick={handleReportGeneration} disabled={isLoading || data.length === 0}>
-                            {isLoading ? 'Rapor Oluşturuluyor...' : 'Mühendis Bazlı Rapor Al'}
-                        </button>
-                    </div>
-                </div>
-            );
-        }
         
         ReactDOM.createRoot(document.getElementById('root')).render(<App />);
     </script>
 </body>
 </html>
-
-
 
