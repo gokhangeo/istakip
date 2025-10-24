@@ -788,6 +788,7 @@
                     const islem = String(r['işlem'] || '').trim();
                     const islemLower = islem.toLowerCase();
                     const district = r._district;
+                    const fenKayitNo = r['fen kayıt no']; // Fen Kayıt No'yu al
                     
                     // Populate districtMap for waiting items
                     if (district && !status.includes('eksiklikten iade edildi') && !status.includes('tescile gönderildi')) {
@@ -818,19 +819,24 @@
                             if(status.includes('tescile gönderildi') && aciklama.includes('iptal')) conditionMet = true;
                             break;
                         case 'fen_kayit_alinmayan':
-                            if(odeme.includes('ödendi') && !odeme.includes('ödenmedi') && (r['fen kayıt no'] === 0 || r['fen kayıt no'] == null)) conditionMet = true;
+                            // This specific filter already checks for fenKayitNo, so we keep it as is.
+                             if(odeme.includes('ödendi') && !odeme.includes('ödenmedi') && (fenKayitNo === 0 || fenKayitNo == null)) conditionMet = true;
                             break;
                         case 'plan_ornegi':
                             const isPlanOrnegi = islemLower === 'plan örneği';
                             const isMahkemePlanOrnegi = islemLower === 'mahkeme plan örneği';
                             const isTeknikBilgi = islemLower === 'teknik bilgi ve belge örnekleri';
                             const isWaiting = !status.includes('eksiklikten iade edildi') && !status.includes('tescile gönderildi');
-                            if (isWaiting && (isPlanOrnegi || isMahkemePlanOrnegi || isTeknikBilgi)) {
+                            // Also check for valid Fen Kayit No when Plan Örneği is selected
+                            if (isWaiting && (isPlanOrnegi || isMahkemePlanOrnegi || isTeknikBilgi) && fenKayitNo != null && fenKayitNo != 0) {
                                  conditionMet = true;
                             }
                             break;
-                        default:
-                            if(!status.includes('eksiklikten iade edildi') && !status.includes('tescile gönderildi')) conditionMet = true;
+                        default: // This includes the default 'Bekleyen İşlem Sayıları'
+                             // Check if it's a waiting task AND has a valid Fen Kayıt No
+                            if(!status.includes('eksiklikten iade edildi') && !status.includes('tescile gönderildi') && fenKayitNo != null && fenKayitNo != 0) {
+                                conditionMet = true;
+                             }
                             break;
                     }
 
@@ -2734,4 +2740,6 @@
     </script>
 </body>
 </html>
+
+
 
