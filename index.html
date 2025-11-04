@@ -2000,22 +2000,40 @@
                         });
         
                         if (engineerRows.length > 0) {
-                            const dataToExport = engineerRows.map(row => ({
-                                'Personel': parsePersonnelWithStatus(row['görevli personel'])
-                                    .map(p => isEngineer(p.name) ? `${p.name} (Müh.)` : p.name)
-                                    .join("\n"),
-                                'Fen Kayıt Tarihi': row['fen kayıt tarihi'],
-                                'Fen Kayıt No': row['fen kayıt no'],
-                                'İl': row._province,
-                                'İlçe': row._district,
-                                'İşlem': row['işlem'],
-                                'Zemin': row['zemin'],
-                                'Başvuru Durumu': row['başvuru durumu'],
-                                'Başvuru Açıklama': row['başvuru açıklama']
-                            }));
+                            const today = new Date();
+                            const dataToExport = engineerRows.map(row => {
+                                const status = String(row['başvuru durumu'] || '').toLocaleLowerCase('tr');
+                                const isClosed = status.includes('eksiklikten iade edildi') || status.includes('tescile gönderildi');
+                                const fStr = row['fen kayıt tarihi'];
+                                let beklemeSuresi = '';
+
+                                if (fStr && !isClosed) {
+                                    const fenKayitDate = new Date(fStr);
+                                    if (!isNaN(fenKayitDate) && fenKayitDate.getFullYear() > 1900) {
+                                        const diffDays = (today - fenKayitDate) / (1000 * 60 * 60 * 24);
+                                        if (diffDays >= 0) {
+                                            beklemeSuresi = Math.floor(diffDays);
+                                        }
+                                    }
+                                }
+
+                                return {
+                                    'Personel': parsePersonnelWithStatus(row['görevli personel'])
+                                        .map(p => isEngineer(p.name) ? `${p.name} (Müh.)` : p.name)
+                                        .join("\n"),
+                                    'Fen Kayıt Tarihi': row['fen kayıt tarihi'],
+                                    'Fen Kayıt No': row['fen kayıt no'],
+                                    'İl': row._province,
+                                    'İlçe': row._district,
+                                    'İşlem': row['işlem'],
+                                    'Zemin': row['zemin'],
+                                    'Başvuru Durumu': row['başvuru durumu'],
+                                    'Bekleme Süresi (Gün)': beklemeSuresi
+                                };
+                            });
         
                             const ws = XLSX.utils.json_to_sheet(dataToExport);
-                            const cols = [{ wch: 30 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 20 }, { wch: 40 }, { wch: 25 }, { wch: 50 }];
+                            const cols = [{ wch: 30 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 20 }, { wch: 40 }, { wch: 25 }, { wch: 20 }];
                             ws['!cols'] = cols;
         
                             const range = XLSX.utils.decode_range(ws['!ref']);
@@ -2803,4 +2821,5 @@
     </script>
 </body>
 </html>
+
 
