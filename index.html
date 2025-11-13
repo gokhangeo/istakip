@@ -843,8 +843,6 @@
                 setDistrictStats(districtMap);
             }, [data, sortField]);
 
-            const titleSuffix = selectedIl.length > 0 ? selectedIl.join(' - ') : ([...new Set(data.map(d => d._province).filter(Boolean))].join(' - ') || 'Tüm İller');
-
             const createSortedChart = (canvasRef, chartRef, chartData, label, isNonPersonnelChart = false) => {
                 try {
                     if (canvasRef.current) {
@@ -865,7 +863,7 @@
                         }
                         
                         const totalCount = dataValues.reduce((sum, val) => sum + val, 0);
-                        const chartLabel = `${label} (${titleSuffix} - Toplam: ${totalCount})`; // Include titleSuffix and total count
+                        const chartLabel = `${label} (Toplam: ${totalCount})`; // İl bilgisi kaldırıldı
 
 
                         if (chartRef.current) chartRef.current.destroy();
@@ -915,22 +913,33 @@
 
             useEffect(() => {
                 createSortedChart(totalRef, totalChartRef, personnelStats.totals, 'Personel İşlem Dağılımı');
-            }, [personnelStats.totals, isEngineer, showOnlyEngineers, selectedIl, titleSuffix]);
+            }, [personnelStats.totals, isEngineer, showOnlyEngineers]);
 
             useEffect(() => {
                 createSortedChart(dynamicRef, dynamicChartRef, personnelStats.dynamic, dynamicTitle);
-            }, [personnelStats.dynamic, isEngineer, showOnlyEngineers, dynamicTitle, selectedIl, titleSuffix]);
+            }, [personnelStats.dynamic, isEngineer, showOnlyEngineers, dynamicTitle]);
 
             useEffect(() => {
                  createSortedChart(islemRef, islemChartRef, islemStats, `İşlem Sayıları`, true);
-            }, [islemStats, selectedIl, titleSuffix]);
+            }, [islemStats]);
 
              useEffect(() => {
                  createSortedChart(districtRef, districtChartRef, districtStats, `İlçe Bazlı Bekleyen İşlemler`, true);
-            }, [districtStats, selectedIl, titleSuffix]);
+            }, [districtStats]);
 
 
             if (!data || data.length === 0) return null;
+
+            // Calculate totals for zoom titles
+            const personnelTotalsData = showOnlyEngineers ? Object.fromEntries(Object.entries(personnelStats.totals).filter(([name]) => isEngineer(name))) : personnelStats.totals;
+            const personnelTotalCount = Object.values(personnelTotalsData).reduce((s, v) => s + v, 0);
+
+            const dynamicTotalsData = showOnlyEngineers ? Object.fromEntries(Object.entries(personnelStats.dynamic).filter(([name]) => isEngineer(name))) : personnelStats.dynamic;
+            const dynamicTotalCount = Object.values(dynamicTotalsData).reduce((s, v) => s + v, 0);
+
+            const islemTotalCount = Object.values(islemStats).reduce((s, v) => s + v, 0);
+            const districtTotalCount = Object.values(districtStats).reduce((s, v) => s + v, 0);
+
 
             return (
                  <div style={{flex: 3, display: 'flex', flexDirection: 'column', gap: '10px', minWidth: '1050px'}}>
@@ -942,22 +951,22 @@
                      </div>
                      <div className="charts-below">
                          <div className="chart-card" ref={personnelChartCardRef}>
-                             <button className="zoom-btn" title="Büyüt" onClick={() => onZoom({ type: 'chart', data: showOnlyEngineers ? Object.fromEntries(Object.entries(personnelStats.totals).filter(([name]) => isEngineer(name))) : personnelStats.totals, title: `Personel İşlem Dağılımı (${titleSuffix})` })}>🔍</button>
+                             <button className="zoom-btn" title="Büyüt" onClick={() => onZoom({ type: 'chart', data: personnelTotalsData, title: `Personel İşlem Dağılımı (Toplam: ${personnelTotalCount})` })}>🔍</button>
                              {/* Title is now handled by Chart.js title plugin */}
                              <div className="chart-wrapper" style={{height: '250px'}}><canvas ref={totalRef}></canvas></div>
                          </div>
                          <div className="chart-card" ref={waitingChartCardRef}>
-                              <button className="zoom-btn" title="Büyüt" onClick={() => onZoom({ type: 'chart', data: showOnlyEngineers ? Object.fromEntries(Object.entries(personnelStats.dynamic).filter(([name]) => isEngineer(name))) : personnelStats.dynamic, title: `${dynamicTitle} (${titleSuffix})` })}>🔍</button>
+                              <button className="zoom-btn" title="Büyüt" onClick={() => onZoom({ type: 'chart', data: dynamicTotalsData, title: `${dynamicTitle} (Toplam: ${dynamicTotalCount})` })}>🔍</button>
                              {/* Title is now handled by Chart.js title plugin */}
                              <div className="chart-wrapper" style={{height: '250px'}}><canvas ref={dynamicRef}></canvas></div>
                          </div>
                           <div className="chart-card" ref={islemChartCardRef}>
-                               <button className="zoom-btn" title="Büyüt" onClick={() => onZoom({ type: 'chart', data: islemStats, title: `İşlem Sayıları (${titleSuffix})` })}>🔍</button>
+                               <button className="zoom-btn" title="Büyüt" onClick={() => onZoom({ type: 'chart', data: islemStats, title: `İşlem Sayıları (Toplam: ${islemTotalCount})` })}>🔍</button>
                              {/* Title is now handled by Chart.js title plugin */}
                              <div className="chart-wrapper" style={{height: '250px'}}><canvas ref={islemRef}></canvas></div>
                          </div>
                          <div className="chart-card" ref={districtChartCardRef}>
-                               <button className="zoom-btn" title="Büyüt" onClick={() => onZoom({ type: 'chart', data: districtStats, title: `İlçe Bazlı Bekleyen İşlemler (${titleSuffix})` })}>🔍</button>
+                               <button className="zoom-btn" title="Büyüt" onClick={() => onZoom({ type: 'chart', data: districtStats, title: `İlçe Bazlı Bekleyen İşlemler (Toplam: ${districtTotalCount})` })}>🔍</button>
                              {/* Title is now handled by Chart.js title plugin */}
                              <div className="chart-wrapper" style={{height: '250px'}}><canvas ref={districtRef}></canvas></div>
                          </div>
@@ -1563,9 +1572,6 @@
                     const labels = sortedData.map(d => isPersonnelChart && isEngineer(d[0]) ? `${d[0]} (Müh.)` : d[0]);
                     const data = sortedData.map(d => d[1]);
                     
-                    const totalCount = data.reduce((sum, val) => sum + val, 0);
-                    const chartTitleWithCount = `${title} (Toplam: ${totalCount})`;
-
                     chartRef.current = new Chart(canvasRef.current, {
                         type: 'bar',
                         data: {
@@ -1581,7 +1587,7 @@
                             responsive: true,
                             maintainAspectRatio: false,
                             plugins: {
-                                title: { display: true, text: chartTitleWithCount, font: { size: 16 } },
+                                title: { display: true, text: title, font: { size: 16 } }, // Title doğrudan kullanılıyor
                                 legend: { display: false },
                                 datalabels: {
                                     anchor: 'end',
@@ -2821,5 +2827,3 @@
     </script>
 </body>
 </html>
-
-
