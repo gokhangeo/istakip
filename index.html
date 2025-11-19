@@ -2381,9 +2381,11 @@
             const [selectedPersonel,setSelectedPersonel]=useState([]);
             const [selectedIl,setSelectedIl]=useState([]);
             const [selectedIlce, setSelectedIlce] = useState([]); 
+            const [selectedIslem, setSelectedIslem] = useState([]); // Yeni İşlem Filtresi State'i
             const [showPersonelModal,setShowPersonelModal]=useState(false);
             const [showIlModal,setShowIlModal]=useState(false);
             const [showIlceModal, setShowIlceModal] = useState(false); 
+            const [showIslemModal, setShowIslemModal] = useState(false); // İşlem Modal State'i
             const [zoomContent, setZoomContent] = useState(null);
             const [showOnlyEngineers, setShowOnlyEngineers] = useState(false);
             const [isFullscreen, setIsFullscreen] = useState(false);
@@ -2506,6 +2508,14 @@
                 .filter(p => p)
             )).sort((a,b)=>a.localeCompare(b,'tr'));
             const personnelOptions = Array.from(new Set(data.flatMap(d=>splitPersonel(d['görevli personel'])))).sort((a,b)=>a.localeCompare(b,'tr'));
+            
+            // İşlem listesi oluşturuluyor
+            const islemOptions = Array.from(new Set(
+                data
+                .map(d => d['işlem'])
+                .filter(i => i && typeof i === 'string' && i.trim() !== '')
+            )).sort((a,b)=>a.localeCompare(b,'tr'));
+
             const sortOptions=[
                 {label:'Sıralama Yok',value:''},
                 {label:'Başvuru Tarihine Göre',value:'başvuru tarihi'},
@@ -2527,6 +2537,7 @@
                 if(selectedIl.length>0) arr=arr.filter(d=>selectedIl.includes(d._province));
                 if(selectedIlce.length > 0) arr = arr.filter(d => selectedIlce.includes(d._district));
                 if(selectedPersonel.length>0) arr=arr.filter(d=>{const ppl=splitPersonel(d['görevli personel']); return selectedPersonel.some(sp=>ppl.includes(sp));});
+                if(selectedIslem.length > 0) arr = arr.filter(d => selectedIslem.includes(d['işlem'])); // İşlem filtresi uygulanıyor
                 
                 if(sortField==='iade edilen') {
                     arr=arr.filter(d=>String(d['başvuru durumu']||'').toLocaleLowerCase('tr').includes('eksiklikten iade edildi'));
@@ -2666,9 +2677,13 @@
                             <label>Personel Filtresi</label>
                             <button onClick={()=>setShowPersonelModal(true)}>{selectedPersonel.length ? `${selectedPersonel.length} personel seçili` : 'Personel Seç'}</button>
                         </div>
+                        <div className="control-group">
+                            <label>İşlem Filtresi</label>
+                            <button onClick={()=>setShowIslemModal(true)}>{selectedIslem.length ? `${selectedIslem.length} işlem seçili` : 'İşlem Seç'}</button>
+                        </div>
                          <div className="control-group">
                             <label>Veri Yönetimi</label>
-                            <button onClick={() => { setData([]); setSelectedIl([]); setSelectedPersonel([]); setSelectedIlce([]); }} style={{backgroundColor: '#ef4444', color: 'white'}}>Verileri Temizle</button>
+                            <button onClick={() => { setData([]); setSelectedIl([]); setSelectedPersonel([]); setSelectedIlce([]); setSelectedIslem([]); }} style={{backgroundColor: '#ef4444', color: 'white'}}>Verileri Temizle</button>
                         </div>
                     </div>
                     <Dashboard data={data} filtered={filteredData} sortField={sortField} selectedPersonel={selectedPersonel} selectedIl={selectedIl} selectedIlce={selectedIlce} />
@@ -2765,6 +2780,24 @@
                                 </div>
                             </div>
                             <div className="modal-footer"><button className="download-btn" onClick={()=>{setSelectedPersonel([]); setShowPersonelModal(false);}}>Temizle & Kapat</button></div>
+                        </div>
+                    </div>
+                )}
+                {showIslemModal && (
+                    <div className="modal-overlay" onClick={() => setShowIslemModal(false)}>
+                        <div className="modal" onClick={e => e.stopPropagation()}>
+                            <div className="modal-header"><h3>İşlem Seç</h3><button className="close-btn" onClick={()=>setShowIslemModal(false)}>×</button></div>
+                            <div className="modal-content">
+                                <div className="filter-list">
+                                    {islemOptions.map(islem => <div className="filter-item" key={islem}><label>
+                                        <input type="checkbox" checked={selectedIslem.includes(islem)} onChange={e=>{
+                                            if(e.target.checked) setSelectedIslem([...selectedIslem, islem]);
+                                            else setSelectedIslem(selectedIslem.filter(i => i !== islem));
+                                        }}/> {islem}
+                                    </label></div>)}
+                                </div>
+                            </div>
+                            <div className="modal-footer"><button className="download-btn" onClick={()=>{setSelectedIslem([]); setShowIslemModal(false);}}>Temizle & Kapat</button></div>
                         </div>
                     </div>
                 )}
