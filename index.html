@@ -1,6 +1,17 @@
 <!DOCTYPE html>
 <html lang="tr">
-<head>
+<!-- PWA Kodları (head içine yapıştır) -->
+<link rel="manifest" href="./manifest.json">
+<meta name="theme-color" content="#4f46e5">
+<link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/1067/1067256.png">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('./service-worker.js');
+    });
+  }
+</script>
     <meta charset="UTF-8" />
     <title>MEGSİS İŞ TAKİP by Gökhan Elgül</title>
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23064e3b'%3E%3Cpath d='M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z'/%3E%3C/svg%3E">
