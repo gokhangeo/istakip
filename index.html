@@ -2045,7 +2045,7 @@
         function MegsisReporter({ data, isEngineer }) {
             const [isLoading, setIsLoading] = useState(false);
         
-            const handleReportGeneration = () => {
+            const generateReport = (type) => {
                 if (data.length === 0) {
                     alert("Rapor oluşturmak için lütfen önce bir MEGSİS dosyası yükleyin.");
                     return;
@@ -2055,27 +2055,28 @@
         
                 try {
                     const wb = XLSX.utils.book_new();
-        
-                    const allEngineersInData = [...new Set(
+                    
+                    // Get unique personnel names based on the selected type
+                    const allPersonnelInData = [...new Set(
                         data.flatMap(row =>
                             parsePersonnelWithStatus(row['görevli personel'])
-                                .filter(p => isEngineer(p.name))
+                                .filter(p => type === 'engineer' ? isEngineer(p.name) : !isEngineer(p.name))
                                 .map(p => p.name)
                         )
                     )].sort((a, b) => a.localeCompare(b, 'tr'));
         
-                    if (allEngineersInData.length === 0) {
-                        alert("Yüklenen dosyada raporlanacak mühendis bulunamadı.");
+                    if (allPersonnelInData.length === 0) {
+                        alert(`Yüklenen dosyada raporlanacak ${type === 'engineer' ? 'mühendis' : 'personel'} bulunamadı.`);
                         setIsLoading(false);
                         return;
                     }
         
-                    allEngineersInData.forEach(engineerName => {
-                        let engineerRows = data.filter(row =>
-                            parsePersonnelWithStatus(row['görevli personel']).some(p => p.name === engineerName && isEngineer(p.name))
+                    allPersonnelInData.forEach(personName => {
+                        let personRows = data.filter(row =>
+                            parsePersonnelWithStatus(row['görevli personel']).some(p => p.name === personName && (type === 'engineer' ? isEngineer(p.name) : !isEngineer(p.name)))
                         );
         
-                        engineerRows.sort((a, b) => {
+                        personRows.sort((a, b) => {
                             const dateA = a['fen kayıt tarihi'] ? new Date(a['fen kayıt tarihi']) : null;
                             const dateB = b['fen kayıt tarihi'] ? new Date(b['fen kayıt tarihi']) : null;
                             if (dateA && dateB) return dateA - dateB;
@@ -2084,9 +2085,9 @@
                             return 0;
                         });
         
-                        if (engineerRows.length > 0) {
+                        if (personRows.length > 0) {
                             const today = new Date();
-                            const dataToExport = engineerRows.map(row => {
+                            const dataToExport = personRows.map(row => {
                                 const status = String(row['başvuru durumu'] || '').toLocaleLowerCase('tr');
                                 const isClosed = status.includes('eksiklikten iade edildi') || status.includes('tescile gönderildi');
                                 const fStr = row['fen kayıt tarihi'];
@@ -2131,12 +2132,13 @@
                                 }
                             }
         
-                            const sheetName = engineerName.replace(/[\\/*?:]/g, "").substring(0, 31);
+                            const sheetName = personName.replace(/[\\/*?:]/g, "").substring(0, 31);
                             XLSX.utils.book_append_sheet(wb, ws, sheetName);
                         }
                     });
-        
-                    XLSX.writeFile(wb, 'MEGSIS_Muhendis_Raporu.xlsx');
+                    
+                    const fileName = type === 'engineer' ? 'MEGSIS_Muhendis_Raporu.xlsx' : 'MEGSIS_Diger_Personel_Raporu.xlsx';
+                    XLSX.writeFile(wb, fileName);
                 } catch (err) {
                     console.error("MEGSİS Rapor oluşturma hatası:", err);
                     alert("Rapor oluşturulurken bir hata oluştu.");
@@ -2151,11 +2153,14 @@
                         <h3 style={{color: '#075985'}}>MEGSİS Raporlama</h3>
                     </div>
                     <div className="ebys-controls">
-                        <p style={{textAlign: 'center', fontSize: '0.9rem', color: '#0369a1'}}>
-                            Yüklenmiş olan MEGSİS verisini kullanarak mühendis bazlı, en eski fen kayıt tarihine göre sıralanmış bir Excel raporu oluşturur.
+                        <p style={{textAlign: 'center', fontSize: '0.9rem', color: '#0369a1', width: '100%', marginBottom: '15px'}}>
+                            Yüklenmiş olan MEGSİS verisini kullanarak personel bazlı, en eski fen kayıt tarihine göre sıralanmış bir Excel raporu oluşturur.
                         </p>
-                        <button onClick={handleReportGeneration} disabled={isLoading || data.length === 0}>
-                            {isLoading ? 'Rapor Oluşturuluyor...' : 'Mühendis Bazlı Rapor Al'}
+                        <button onClick={() => generateReport('engineer')} disabled={isLoading || data.length === 0}>
+                            {isLoading ? 'İşleniyor...' : 'Mühendis Bazlı Rapor Al'}
+                        </button>
+                        <button onClick={() => generateReport('other')} disabled={isLoading || data.length === 0} style={{backgroundColor: '#0ea5e9'}}>
+                            {isLoading ? 'İşleniyor...' : 'Diğer Personel Bazlı Rapor Al'}
                         </button>
                     </div>
                 </div>
