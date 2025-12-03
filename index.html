@@ -439,7 +439,16 @@
         
         const normalizeHeader = (header) => { if (!header) return ""; let s; try { s = header.normalize('NFD').replace(/[\u0300-\u036f]/g, ''); } catch (e) { s = String(header); } s = s.trim().toLocaleLowerCase('tr').replace(/\s+/g, ' '); s = s.replace(/ı/g, 'i').replace(/İ/g, 'i'); return s; }
         const splitPersonel = (text) => { if (text == null) return []; const str = typeof text === 'string' ? text : String(text); return str.split(/[,;–-]/g).map(s => { let part = s.trim(); const arrowIdx = part.indexOf('=>'); if (arrowIdx !== -1) part = part.slice(0, arrowIdx).trim(); return part.replace(/\s*\(Müh\.\)\s*/, '').trim(); }).filter(Boolean); }
-        const parsePersonnelWithStatus = (text) => { if (text == null) return []; const str = typeof text === 'string' ? text : String(text); return str.split(/[,;–-]/g).map(s => { let name = s.trim(); let status = null; const arrowIdx = name.indexOf('=>'); if (arrowIdx !== -1) { const statusRaw = name.slice(arrowIdx + 2).trim().toLocaleLowerCase('tr'); name = name.slice(0, arrowIdx).trim(); if (statusRaw.includes('yapılıyor')) status = 'Yapılıyor'; else if (statusRaw.includes('tamamlandı')) status = 'Tamamlandı'; } name = name.replace(/\s*\(Müh\.\)\s*/, '').trim(); return { name, status }; }).filter(p => p.name); }
+        const parsePersonnelWithStatus = (text) => {
+            if (text == null) return [];
+            const str = typeof text === 'string' ? text : String(text);
+            return str.split(/[,;]/g).map(s => {
+                const parts = s.trim().split('=>');
+                const name = (parts[0] || '').replace(/\s*\(Müh\.\)\s*/, '').trim();
+                const status = parts.length > 1 ? parts[1].trim() : null;
+                return { name, status };
+            }).filter(p => p.name);
+        };
         const formatDate = (val) => { if (!val) return ""; if (typeof val === 'number') { const date = XLSX.SSF.parse_date_code(val); if (!date) return ""; return `${date.y}-${String(date.m).padStart(2,'0')}-${String(date.d).padStart(2,'0')}`; } if (typeof val === 'string') { let match = val.match(/^(\d{4}-\d{2}-\d{2})/); if (match) return match[1]; match = val.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})/); if (match) { const day = String(match[1]).padStart(2, '0'); const month = String(match[2]).padStart(2, '0'); const year = match[3]; return `${year}-${month}-${day}`; } const part = val.split(" ")[0]; const m2 = part.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})/); if (m2) { const day = String(m2[1]).padStart(2, '0'); const month = String(m2[2]).padStart(2, '0'); const year = m2[3]; return `${year}-${month}-${day}`; } return part; } return val; }
         const formatFenKayitNo = (val) => { if (val == null) return ""; if (typeof val === 'number') return val; if (typeof val === 'string') { const num = parseInt(val.replace(/\D/g,''),10); if (!isNaN(num)) return num; return val; } return val; }
         
@@ -742,7 +751,7 @@
             ); 
         }
         
-        function ChartsBelow({ data, onZoom, personnelChartCardRef, waitingChartCardRef, islemChartCardRef, districtChartCardRef, selectedIl, isEngineer, showOnlyEngineers, onToggleEngineers, sortField }) {
+        function ChartsBelow({ data, onZoom, personnelChartCardRef, waitingChartCardRef, islemChartCardRef, districtChartCardRef, selectedIl, isEngineer, personnelFilterType, onFilterChange, sortField }) {
             const totalRef = useRef();
             const dynamicRef = useRef();
             const islemRef = useRef();
@@ -865,9 +874,12 @@
                             labels = sortedData.map(d => d[0]);
                             dataValues = sortedData.map(d => d[1]);
                         } else {
-                            const filteredSortedData = showOnlyEngineers 
-                                ? sortedData.filter(([name]) => isEngineer(name)) 
-                                : sortedData;
+                            let filteredSortedData = sortedData;
+                            if (personnelFilterType === 'engineer') {
+                                filteredSortedData = sortedData.filter(([name]) => isEngineer(name));
+                            } else if (personnelFilterType === 'other') {
+                                filteredSortedData = sortedData.filter(([name]) => !isEngineer(name));
+                            }
                             
                             labels = filteredSortedData.map(d => isEngineer(d[0]) ? `${d[0]} (Müh.)` : d[0]);
                             dataValues = filteredSortedData.map(d => d[1]);
@@ -924,11 +936,11 @@
 
             useEffect(() => {
                 createSortedChart(totalRef, totalChartRef, personnelStats.totals, 'Personel İşlem Dağılımı');
-            }, [personnelStats.totals, isEngineer, showOnlyEngineers]);
+            }, [personnelStats.totals, isEngineer, personnelFilterType]);
 
             useEffect(() => {
                 createSortedChart(dynamicRef, dynamicChartRef, personnelStats.dynamic, dynamicTitle);
-            }, [personnelStats.dynamic, isEngineer, showOnlyEngineers, dynamicTitle]);
+            }, [personnelStats.dynamic, isEngineer, personnelFilterType, dynamicTitle]);
 
             useEffect(() => {
                  createSortedChart(islemRef, islemChartRef, islemStats, `İşlem Sayıları`, true);
@@ -942,10 +954,20 @@
             if (!data || data.length === 0) return null;
 
             // Calculate totals for zoom titles
-            const personnelTotalsData = showOnlyEngineers ? Object.fromEntries(Object.entries(personnelStats.totals).filter(([name]) => isEngineer(name))) : personnelStats.totals;
+            let personnelTotalsData = personnelStats.totals;
+             if (personnelFilterType === 'engineer') {
+                personnelTotalsData = Object.fromEntries(Object.entries(personnelStats.totals).filter(([name]) => isEngineer(name)));
+            } else if (personnelFilterType === 'other') {
+                personnelTotalsData = Object.fromEntries(Object.entries(personnelStats.totals).filter(([name]) => !isEngineer(name)));
+            }
             const personnelTotalCount = Object.values(personnelTotalsData).reduce((s, v) => s + v, 0);
 
-            const dynamicTotalsData = showOnlyEngineers ? Object.fromEntries(Object.entries(personnelStats.dynamic).filter(([name]) => isEngineer(name))) : personnelStats.dynamic;
+             let dynamicTotalsData = personnelStats.dynamic;
+             if (personnelFilterType === 'engineer') {
+                dynamicTotalsData = Object.fromEntries(Object.entries(personnelStats.dynamic).filter(([name]) => isEngineer(name)));
+            } else if (personnelFilterType === 'other') {
+                dynamicTotalsData = Object.fromEntries(Object.entries(personnelStats.dynamic).filter(([name]) => !isEngineer(name)));
+            }
             const dynamicTotalCount = Object.values(dynamicTotalsData).reduce((s, v) => s + v, 0);
 
             const islemTotalCount = Object.values(islemStats).reduce((s, v) => s + v, 0);
@@ -954,11 +976,17 @@
 
             return (
                  <div style={{flex: 3, display: 'flex', flexDirection: 'column', gap: '10px', minWidth: '1050px'}}>
-                     <div style={{alignSelf: 'center'}}>
-                         <label style={{display: 'flex', alignItems: 'center', cursor: 'pointer', fontSize: '0.9rem'}}>
-                             <input type="checkbox" checked={showOnlyEngineers} onChange={onToggleEngineers} />
-                             Grafiklerde Sadece Mühendisleri Göster
-                         </label>
+                     <div style={{alignSelf: 'center', display: 'flex', alignItems: 'center', gap: '10px'}}>
+                         <label style={{fontSize: '0.9rem', fontWeight: 'bold', color: '#334155'}}>Personel Filtrele:</label>
+                         <select 
+                            value={personnelFilterType} 
+                            onChange={(e) => onFilterChange(e.target.value)}
+                            style={{padding: '6px', borderRadius: '4px', border: '1px solid #cbd5e1', fontSize: '0.9rem'}}
+                         >
+                             <option value="all">Tümü</option>
+                             <option value="engineer">Sadece Mühendisler</option>
+                             <option value="other">Diğer Personel</option>
+                         </select>
                      </div>
                      <div className="charts-below">
                          <div className="chart-card" ref={personnelChartCardRef}>
@@ -1044,7 +1072,7 @@
             ); 
         }
         
-        function WarningTable({ data, isEngineer, showOnlyEngineers, onToggleEngineers, sortField }) { 
+        function WarningTable({ data, isEngineer, personnelFilterType, onFilterChange, sortField }) { 
             const [warningRows, setWarningRows] = useState([]); 
             const [dateSortOrder, setDateSortOrder] = useState('asc');
 
@@ -1188,17 +1216,26 @@
                     });
                 }
 
-                if (showOnlyEngineers) {
+                if (personnelFilterType === 'engineer') {
                     finalRows = finalRows.filter(row => parsePersonnelWithStatus(row.personnelRaw).some(p => isEngineer(p.name)));
+                } else if (personnelFilterType === 'other') {
+                    finalRows = finalRows.filter(row => parsePersonnelWithStatus(row.personnelRaw).some(p => !isEngineer(p.name)));
                 }
 
                 setWarningRows(finalRows);
-            }, [data, isEngineer, showOnlyEngineers, sortField, dateSortOrder]); 
+            }, [data, isEngineer, personnelFilterType, sortField, dateSortOrder]); 
 
             const handleExportWarningExcel = () => { 
                 const getPersonnelText = (row) => {
                     const personnelListWithStatus = parsePersonnelWithStatus(row.personnelRaw);
-                    let personnelList = showOnlyEngineers ? personnelListWithStatus.filter(p => isEngineer(p.name)) : personnelListWithStatus;
+                    let personnelList = personnelListWithStatus;
+                    
+                    if (personnelFilterType === 'engineer') {
+                        personnelList = personnelList.filter(p => isEngineer(p.name));
+                    } else if (personnelFilterType === 'other') {
+                        personnelList = personnelList.filter(p => !isEngineer(p.name));
+                    }
+                    
                     return personnelList.map(p => {
                         const namePart = isEngineer(p.name) ? `${p.name} (Müh.)` : p.name;
                         const statusPart = (sortField === 'tescilden_geldi' && p.status) ? ` (${p.status})` : '';
@@ -1271,10 +1308,18 @@
                     <div className="warning-table-header"> 
                         <h3>{warningTitle}</h3> 
                         <div className="button-group"> 
-                             <label style={{display: 'flex', alignItems: 'center', cursor: 'pointer', marginRight: '10px'}}>
-                                <input type="checkbox" checked={showOnlyEngineers} onChange={onToggleEngineers} />
-                                Sadece Müh. Göster
-                            </label>
+                             <div style={{display: 'flex', alignItems: 'center', marginRight: '10px'}}>
+                                 <label style={{fontSize: '0.9rem', fontWeight: 'bold', color: '#991b1b', marginRight: '5px'}}>Filtre:</label>
+                                 <select 
+                                    value={personnelFilterType} 
+                                    onChange={(e) => onFilterChange(e.target.value)}
+                                    style={{padding: '6px', borderRadius: '4px', border: '1px solid #fecaca', fontSize: '0.9rem', color: '#991b1b'}}
+                                 >
+                                     <option value="all">Tümü</option>
+                                     <option value="engineer">Sadece Mühendisler</option>
+                                     <option value="other">Diğer Personel</option>
+                                 </select>
+                             </div>
                             <button onClick={handleExportWarningExcel} className="export-btn" title="Excel olarak indir">Excel İndir</button> 
                         </div> 
                     </div> 
@@ -1304,7 +1349,11 @@
                                         <td className="col-personel">
                                             {
                                                 parsePersonnelWithStatus(row.personnelRaw)
-                                                .filter(p => showOnlyEngineers ? isEngineer(p.name) : true)
+                                                .filter(p => {
+                                                    if (personnelFilterType === 'engineer') return isEngineer(p.name);
+                                                    if (personnelFilterType === 'other') return !isEngineer(p.name);
+                                                    return true;
+                                                })
                                                 .map((p, i, arr) => (
                                                     <React.Fragment key={i}>
                                                         <span style={{ color: isEngineer(p.name) ? 'red' : 'inherit' }}>
@@ -1333,14 +1382,19 @@
             ); 
         }
         
-        function DataTable({ data, sortField, isEngineer, showOnlyEngineers, onToggleEngineers }) { 
+        function DataTable({ data, sortField, isEngineer, personnelFilterType, onFilterChange }) { 
             const [searchTerm, setSearchTerm] = useState('');
             let rows = [...(data||[])]; 
 
-            if (showOnlyEngineers) {
+            if (personnelFilterType === 'engineer') {
                 rows = rows.filter(row => {
                     const personnel = splitPersonel(row['görevli personel']);
                     return personnel.some(p => isEngineer(p));
+                });
+            } else if (personnelFilterType === 'other') {
+                rows = rows.filter(row => {
+                    const personnel = splitPersonel(row['görevli personel']);
+                    return personnel.some(p => !isEngineer(p));
                 });
             }
 
@@ -1411,8 +1465,10 @@
                             const rowData = customCols.map(col => {
                                 if (col === 'görevli personel') {
                                     let personnel = splitPersonel(row[col]);
-                                    if (showOnlyEngineers) {
+                                    if (personnelFilterType === 'engineer') {
                                         personnel = personnel.filter(p => isEngineer(p));
+                                    } else if (personnelFilterType === 'other') {
+                                        personnel = personnel.filter(p => !isEngineer(p));
                                     }
                                     return personnel.map(p => isEngineer(p) ? `${p} (Müh.)` : p).join(', ');
                                 }
@@ -1435,8 +1491,10 @@
                             const rowData = ALLOWED_COLS.map(col => {
                                 if (col === 'görevli personel') {
                                     let personnel = splitPersonel(row[col]);
-                                    if (showOnlyEngineers) {
+                                    if (personnelFilterType === 'engineer') {
                                         personnel = personnel.filter(p => isEngineer(p));
+                                    } else if (personnelFilterType === 'other') {
+                                        personnel = personnel.filter(p => !isEngineer(p));
                                     }
                                     return personnel.map(p => isEngineer(p) ? `${p} (Müh.)` : p).join(', ');
                                 }
@@ -1490,8 +1548,10 @@
                         {ALLOWED_COLS.map(col => {
                             if (col === 'görevli personel') {
                                 let personnel = splitPersonel(row[col]);
-                                if (showOnlyEngineers) {
+                                if (personnelFilterType === 'engineer') {
                                     personnel = personnel.filter(p => isEngineer(p));
+                                } else if (personnelFilterType === 'other') {
+                                    personnel = personnel.filter(p => !isEngineer(p));
                                 }
                                 return (
                                     <td key={col} className={`col-${col.replace(/\s+/g, '-')}`}>
@@ -1539,10 +1599,18 @@
                     <div className="datatable-header"> 
                         <h3>Tüm İşlemler</h3> 
                         <div style={{display: 'flex', gap: '10px', alignItems: 'center'}}>
-                            <label style={{display: 'flex', alignItems: 'center', cursor: 'pointer'}}>
-                                <input type="checkbox" checked={showOnlyEngineers} onChange={onToggleEngineers} />
-                                Sadece Müh. Göster
-                            </label>
+                             <div style={{display: 'flex', alignItems: 'center', marginRight: '10px'}}>
+                                 <label style={{fontSize: '0.9rem', fontWeight: 'bold', color: '#334155', marginRight: '5px'}}>Filtre:</label>
+                                 <select 
+                                    value={personnelFilterType} 
+                                    onChange={(e) => onFilterChange(e.target.value)}
+                                    style={{padding: '6px', borderRadius: '4px', border: '1px solid #cbd5e1', fontSize: '0.9rem'}}
+                                 >
+                                     <option value="all">Tümü</option>
+                                     <option value="engineer">Sadece Mühendisler</option>
+                                     <option value="other">Diğer Personel</option>
+                                 </select>
+                             </div>
                             <input
                                 type="text"
                                 placeholder="Fen Kayıt No ile Ara..."
@@ -2393,6 +2461,7 @@
             const [selectedIl,setSelectedIl]=useState([]);
             const [selectedIlce, setSelectedIlce] = useState([]); 
             const [selectedIslem, setSelectedIslem] = useState([]); // Yeni İşlem Filtresi State'i
+            const [personnelFilterType, setPersonnelFilterType] = useState('all'); // New state for personnel filter
             const [showPersonelModal,setShowPersonelModal]=useState(false);
             const [showIlModal,setShowIlModal]=useState(false);
             const [showIlceModal, setShowIlceModal] = useState(false); 
@@ -2404,10 +2473,10 @@
 
             const modalContentRef = useRef(null);
             const summaryTableRef = useRef(null);
-            const personnelChartRef = useRef(null);
-            const waitingChartRef = useRef(null);
-            const islemChartRef = useRef(null);
-            const districtChartRef = useRef(null);
+            const personnelChartCardRef = useRef(null);
+            const waitingChartCardRef = useRef(null);
+            const islemChartCardRef = useRef(null);
+            const districtChartCardRef = useRef(null);
             
             const readExcelFromUrl = async (url) => {
                 try {
@@ -2526,6 +2595,15 @@
                 .map(d => d['işlem'])
                 .filter(i => i && typeof i === 'string' && i.trim() !== '')
             )).sort((a,b)=>a.localeCompare(b,'tr'));
+            
+            // İşlem sayıları hesaplanıyor
+            // const islemCounts = {};
+            // data.forEach(d => {
+            //     const i = d['işlem'];
+            //     if (i && typeof i === 'string' && i.trim() !== '') {
+            //         islemCounts[i] = (islemCounts[i] || 0) + 1;
+            //     }
+            // });
 
             const sortOptions=[
                 {label:'Sıralama Yok',value:''},
@@ -2700,14 +2778,14 @@
                     <Dashboard data={data} filtered={filteredData} sortField={sortField} selectedPersonel={selectedPersonel} selectedIl={selectedIl} selectedIlce={selectedIlce} />
                     <div>
                         <div className="charts-below">
-                            <ChartsBelow data={filteredData} onZoom={setZoomContent} personnelChartCardRef={personnelChartRef} waitingChartCardRef={waitingChartRef} islemChartCardRef={islemChartRef} districtChartCardRef={districtChartRef} selectedIl={selectedIl} isEngineer={isEngineer} showOnlyEngineers={showOnlyEngineers} onToggleEngineers={() => setShowOnlyEngineers(!showOnlyEngineers)} sortField={sortField} />
+                            <ChartsBelow data={filteredData} onZoom={setZoomContent} personnelChartCardRef={personnelChartCardRef} waitingChartCardRef={waitingChartCardRef} islemChartCardRef={islemChartCardRef} districtChartCardRef={districtChartCardRef} selectedIl={selectedIl} isEngineer={isEngineer} showOnlyEngineers={showOnlyEngineers} personnelFilterType={personnelFilterType} onFilterChange={setPersonnelFilterType} onToggleEngineers={() => setShowOnlyEngineers(!showOnlyEngineers)} sortField={sortField} />
                         </div>
                         <div style={{marginTop: '24px'}}>
                             <SummaryTable data={data} selectedIl={selectedIl} onZoom={() => setZoomContent({type: 'summary'})} summaryTableRef={summaryTableRef} />
                         </div>
                     </div>
-                    <WarningTable data={filteredData} isEngineer={isEngineer} showOnlyEngineers={showOnlyEngineers} onToggleEngineers={() => setShowOnlyEngineers(!showOnlyEngineers)} sortField={sortField} />
-                    <DataTable data={filteredData} sortField={sortField} isEngineer={isEngineer} showOnlyEngineers={showOnlyEngineers} onToggleEngineers={() => setShowOnlyEngineers(!showOnlyEngineers)} />
+                    <WarningTable data={filteredData} isEngineer={isEngineer} showOnlyEngineers={showOnlyEngineers} personnelFilterType={personnelFilterType} onFilterChange={setPersonnelFilterType} onToggleEngineers={() => setShowOnlyEngineers(!showOnlyEngineers)} sortField={sortField} />
+                    <DataTable data={filteredData} sortField={sortField} isEngineer={isEngineer} showOnlyEngineers={showOnlyEngineers} personnelFilterType={personnelFilterType} onFilterChange={setPersonnelFilterType} onToggleEngineers={() => setShowOnlyEngineers(!showOnlyEngineers)} />
                     
                     <ReportComparison engineers={engineers} isEngineer={isEngineer} />
                     <MegsisReporter data={data} isEngineer={isEngineer} />
