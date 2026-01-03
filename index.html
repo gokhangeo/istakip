@@ -2062,27 +2062,79 @@
                 try {
                     const wb = XLSX.utils.book_new();
                     
-                    // Get unique personnel names based on the selected type
-                    const allPersonnelInData = [...new Set(
-                        data.flatMap(row =>
-                            parsePersonnelWithStatus(row['görevli personel'])
-                                .filter(p => type === 'engineer' ? isEngineer(p.name) : !isEngineer(p.name))
-                                .map(p => p.name)
-                        )
-                    )].sort((a, b) => a.localeCompare(b, 'tr'));
-        
-                    if (allPersonnelInData.length === 0) {
-                        alert(`Yüklenen dosyada raporlanacak ${type === 'engineer' ? 'mühendis' : 'personel'} bulunamadı.`);
-                        setIsLoading(false);
-                        return;
+                    // Check if there is only one province in the data
+                    const uniqueProvinces = [...new Set(data.map(d => d._province).filter(Boolean))];
+                    const showProvinceCol = uniqueProvinces.length > 1;
+
+                    let reportItems = [];
+
+                    if (type === 'district') {
+                        // Define custom district groups
+                        const groups = {
+                            "Anamur-Bozyazı": ["anamur", "bozyazı"],
+                            "Silifke-Aydıncık-Gülnar": ["silifke", "aydıncık", "gülnar"],
+                            "Tarsus-Çamlıyayla": ["tarsus", "çamlıyayla"],
+                            "Merkez İlçeler": ["akdeniz", "mezitli", "yenişehir", "toroslar"]
+                        };
+                        
+                        const availableDistricts = [...new Set(data.map(row => row._district).filter(Boolean))];
+                        const groupedDistricts = new Set();
+
+                        // Add groups
+                        Object.entries(groups).forEach(([groupName, groupDistricts]) => {
+                            const hasData = groupDistricts.some(d => availableDistricts.some(ad => ad.toLocaleLowerCase('tr') === d));
+                            if (hasData) {
+                                reportItems.push({
+                                    name: groupName,
+                                    filterFn: (row) => {
+                                        const d = (row._district || '').toLocaleLowerCase('tr');
+                                        return groupDistricts.includes(d);
+                                    }
+                                });
+                                groupDistricts.forEach(d => groupedDistricts.add(d));
+                            }
+                        });
+
+                        // Add remaining districts
+                        availableDistricts.forEach(dist => {
+                            if (!groupedDistricts.has(dist.toLocaleLowerCase('tr'))) {
+                                reportItems.push({
+                                    name: dist,
+                                    filterFn: (row) => row._district === dist
+                                });
+                            }
+                        });
+                        
+                        // Sort report items by name
+                        reportItems.sort((a, b) => a.name.localeCompare(b.name, 'tr'));
+
+                    } else {
+                        // Get unique personnel names based on the selected type
+                        const allPersonnelInData = [...new Set(
+                            data.flatMap(row =>
+                                parsePersonnelWithStatus(row['görevli personel'])
+                                    .filter(p => type === 'engineer' ? isEngineer(p.name) : !isEngineer(p.name))
+                                    .map(p => p.name)
+                            )
+                        )].sort((a, b) => a.localeCompare(b, 'tr'));
+            
+                        if (allPersonnelInData.length === 0) {
+                            let entityName = type === 'engineer' ? 'mühendis' : 'personel';
+                            alert(`Yüklenen dosyada raporlanacak ${entityName} bulunamadı.`);
+                            setIsLoading(false);
+                            return;
+                        }
+
+                        reportItems = allPersonnelInData.map(pName => ({
+                            name: pName,
+                            filterFn: (row) => parsePersonnelWithStatus(row['görevli personel']).some(p => p.name === pName && (type === 'engineer' ? isEngineer(p.name) : !isEngineer(p.name)))
+                        }));
                     }
         
-                    allPersonnelInData.forEach(personName => {
-                        let personRows = data.filter(row =>
-                            parsePersonnelWithStatus(row['görevli personel']).some(p => p.name === personName && (type === 'engineer' ? isEngineer(p.name) : !isEngineer(p.name)))
-                        );
+                    reportItems.forEach(item => {
+                        let filteredRows = data.filter(item.filterFn);
         
-                        personRows.sort((a, b) => {
+                        filteredRows.sort((a, b) => {
                             const dateA = a['fen kayıt tarihi'] ? new Date(a['fen kayıt tarihi']) : null;
                             const dateB = b['fen kayıt tarihi'] ? new Date(b['fen kayıt tarihi']) : null;
                             if (dateA && dateB) return dateA - dateB;
@@ -2091,9 +2143,9 @@
                             return 0;
                         });
         
-                        if (personRows.length > 0) {
+                        if (filteredRows.length > 0) {
                             const today = new Date();
-                            const dataToExport = personRows.map(row => {
+                            const dataToExport = filteredRows.map(row => {
                                 const status = String(row['başvuru durumu'] || '').toLocaleLowerCase('tr');
                                 const isClosed = status.includes('eksiklikten iade edildi') || status.includes('tescile gönderildi');
                                 const fStr = row['fen kayıt tarihi'];
@@ -2109,24 +2161,34 @@
                                     }
                                 }
 
-                                return {
+                                const obj = {
                                     'Personel': parsePersonnelWithStatus(row['görevli personel'])
                                         .map(p => isEngineer(p.name) ? `${p.name} (Müh.)` : p.name)
                                         .join("\n"),
                                     'Fen Kayıt Tarihi': row['fen kayıt tarihi'],
-                                    'Fen Kayıt No': row['fen kayıt no'],
-                                    'İl': row._province,
-                                    'İlçe': row._district,
-                                    'İşlem': row['işlem'],
-                                    'Zemin': row['zemin'],
-                                    'Başvuru Durumu': row['başvuru durumu'],
-                                    'Bekleme Süresi (Gün)': beklemeSuresi
+                                    'Fen Kayıt No': row['fen kayıt no']
                                 };
+
+                                if (showProvinceCol) {
+                                    obj['İl'] = row._province;
+                                }
+
+                                obj['İlçe'] = row._district;
+                                obj['İşlem'] = row['işlem'];
+                                obj['Zemin'] = row['zemin'];
+                                obj['Başvuru Durumu'] = row['başvuru durumu'];
+                                obj['Bekleme Süresi (Gün)'] = beklemeSuresi;
+
+                                return obj;
                             });
         
                             const ws = XLSX.utils.json_to_sheet(dataToExport);
-                            const cols = [{ wch: 30 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 20 }, { wch: 40 }, { wch: 25 }, { wch: 20 }];
-                            ws['!cols'] = cols;
+                            
+                            const colWidths = [30, 15, 15]; // Personel, Tarih, No
+                            if (showProvinceCol) colWidths.push(15); // İl
+                            colWidths.push(15, 20, 40, 25, 20); // İlçe, İşlem, Zemin, Durum, Süre
+
+                            ws['!cols'] = colWidths.map(w => ({ wch: w }));
         
                             const range = XLSX.utils.decode_range(ws['!ref']);
                             for (let R = range.s.r + 1; R <= range.e.r; ++R) {
@@ -2138,12 +2200,16 @@
                                 }
                             }
         
-                            const sheetName = personName.replace(/[\\/*?:]/g, "").substring(0, 31);
+                            const sheetName = item.name.replace(/[\\/*?:]/g, "").substring(0, 31);
                             XLSX.utils.book_append_sheet(wb, ws, sheetName);
                         }
                     });
                     
-                    const fileName = type === 'engineer' ? 'MEGSIS_Muhendis_Raporu.xlsx' : 'MEGSIS_Diger_Personel_Raporu.xlsx';
+                    let fileName = 'MEGSIS_Raporu.xlsx';
+                    if (type === 'engineer') fileName = 'MEGSIS_Muhendis_Raporu.xlsx';
+                    else if (type === 'other') fileName = 'MEGSIS_Diger_Personel_Raporu.xlsx';
+                    else if (type === 'district') fileName = 'MEGSIS_Ilce_Raporu.xlsx';
+
                     XLSX.writeFile(wb, fileName);
                 } catch (err) {
                     console.error("MEGSİS Rapor oluşturma hatası:", err);
@@ -2160,13 +2226,16 @@
                     </div>
                     <div className="ebys-controls">
                         <p style={{textAlign: 'center', fontSize: '0.9rem', color: '#0369a1', width: '100%', marginBottom: '15px'}}>
-                            Yüklenmiş olan MEGSİS verisini kullanarak personel bazlı, en eski fen kayıt tarihine göre sıralanmış bir Excel raporu oluşturur.
+                            Yüklenmiş olan MEGSİS verisini kullanarak seçilen türe göre, en eski fen kayıt tarihine göre sıralanmış bir Excel raporu oluşturur.
                         </p>
                         <button onClick={() => generateReport('engineer')} disabled={isLoading || data.length === 0}>
                             {isLoading ? 'İşleniyor...' : 'Mühendis Bazlı Rapor Al'}
                         </button>
                         <button onClick={() => generateReport('other')} disabled={isLoading || data.length === 0} style={{backgroundColor: '#0ea5e9'}}>
                             {isLoading ? 'İşleniyor...' : 'Diğer Personel Bazlı Rapor Al'}
+                        </button>
+                         <button onClick={() => generateReport('district')} disabled={isLoading || data.length === 0} style={{backgroundColor: '#8b5cf6'}}>
+                            {isLoading ? 'İşleniyor...' : 'İlçe Bazlı Rapor Al'}
                         </button>
                     </div>
                 </div>
