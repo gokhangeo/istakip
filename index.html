@@ -1075,10 +1075,17 @@
         function WarningTable({ data, isEngineer, personnelFilterType, onFilterChange, sortField }) { 
             const [warningRows, setWarningRows] = useState([]); 
             const [dateSortOrder, setDateSortOrder] = useState('asc');
+            const [warningPersonnelFilter, setWarningPersonnelFilter] = useState([]);
+            const [showWarningPersonnelModal, setShowWarningPersonnelModal] = useState(false);
 
             const toggleDateSort = () => {
                 setDateSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
             };
+
+            // Reset local filter when main sort field changes
+            useEffect(() => {
+                setWarningPersonnelFilter([]);
+            }, [sortField]);
 
             useEffect(() => {
                 const today = new Date();
@@ -1226,6 +1233,31 @@
                 setWarningRows(finalRows);
             }, [data, isEngineer, personnelFilterType, sortField, dateSortOrder]); 
 
+            // Calculate options based on current warning rows
+            const warningPersonnelOptions = React.useMemo(() => {
+                const names = new Set();
+                warningRows.forEach(row => {
+                    const pList = parsePersonnelWithStatus(row.personnelRaw);
+                    pList.forEach(p => {
+                        // Respect the global engineer filter logic for the list
+                        if (personnelFilterType === 'engineer' && !isEngineer(p.name)) return;
+                        if (personnelFilterType === 'other' && isEngineer(p.name)) return;
+                        names.add(p.name);
+                    });
+                });
+                return [...names].sort((a, b) => a.localeCompare(b, 'tr'));
+            }, [warningRows, personnelFilterType, isEngineer]);
+
+            // Determine displayed rows based on local filter
+            const displayedRows = React.useMemo(() => {
+                if (warningPersonnelFilter.length === 0) return warningRows;
+                return warningRows.filter(row => {
+                     const pList = parsePersonnelWithStatus(row.personnelRaw);
+                     return pList.some(p => warningPersonnelFilter.includes(p.name));
+                });
+            }, [warningRows, warningPersonnelFilter]);
+
+
             const handleExportWarningExcel = () => { 
                 const getPersonnelText = (row) => {
                     const personnelListWithStatus = parsePersonnelWithStatus(row.personnelRaw);
@@ -1246,9 +1278,12 @@
 
                 let dataToExport;
                 let cols = [];
+                
+                // Use displayedRows instead of warningRows to respect the filter
+                const rowsToExport = displayedRows;
 
                 if (sortField === 'uygun_olmayan_iade' || sortField === 'onemli_isler') {
-                    dataToExport = warningRows.map(row => ({ 
+                    dataToExport = rowsToExport.map(row => ({ 
                         'Personel': getPersonnelText(row),
                         'Fen Kayıt Tarihi': row.fenKayitTarihi,
                         'Fen Kayıt No': row.fenKayitNo, 
@@ -1261,7 +1296,7 @@
                     }));
                     cols = [ { wch: 30 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 20 }, { wch: 40 }, { wch: 25 }, { wch: 50 }];
                 } else {
-                    dataToExport = warningRows.map(row => ({
+                    dataToExport = rowsToExport.map(row => ({
                         'Personel': getPersonnelText(row),
                         'Fen Kayıt Tarihi': row.fenKayitTarihi,
                         'Fen Kayıt No': row.fenKayitNo, 
@@ -1297,12 +1332,12 @@
             const isOnemliIslerMode = sortField === 'onemli_isler';
 
             const warningTitle = isOnemliIslerMode
-                ? `Son 150 Gündeki Önemli İşler (Toplam: ${warningRows.length})`
+                ? `Son 150 Gündeki Önemli İşler (Toplam: ${displayedRows.length})`
                 : (isUygunOlmayanIadeMode
-                    ? `Son 100 Gün İçindeki İadeler (Toplam: ${warningRows.length})`
+                    ? `Son 100 Gün İçindeki İadeler (Toplam: ${displayedRows.length})`
                     : (sortField === 'plan_ornegi' 
-                        ? `1 Günden Fazla Bekleyen İşlemler (Uyarı) (Toplam: ${warningRows.length})`
-                        : `7 Günden Fazla Bekleyen İşlemler (Uyarı) (Toplam: ${warningRows.length})`));
+                        ? `1 Günden Fazla Bekleyen İşlemler (Uyarı) (Toplam: ${displayedRows.length})`
+                        : `7 Günden Fazla Bekleyen İşlemler (Uyarı) (Toplam: ${displayedRows.length})`));
             
             return ( 
                 <div className="warning-table-container"> 
@@ -1321,6 +1356,13 @@
                                      <option value="other">Diğer Personel</option>
                                  </select>
                              </div>
+                             <button 
+                                onClick={() => setShowWarningPersonnelModal(true)} 
+                                className="export-btn" 
+                                style={{backgroundColor: '#e11d48', marginRight: '5px'}}
+                             >
+                                 {warningPersonnelFilter.length > 0 ? `${warningPersonnelFilter.length} Kişi Seçili` : 'Personel Filtrele'}
+                             </button>
                             <button onClick={handleExportWarningExcel} className="export-btn" title="Excel olarak indir">Excel İndir</button> 
                         </div> 
                     </div> 
@@ -1345,7 +1387,7 @@
                                 </tr> 
                             </thead> 
                             <tbody> 
-                                {warningRows.map((row, index) => ( 
+                                {displayedRows.map((row, index) => ( 
                                     <tr key={`${row.fenKayitNo}-${row.ilce}-${index}`}> 
                                         <td className="col-personel">
                                             {
@@ -1379,6 +1421,48 @@
                             </tbody> 
                         </table> 
                     </div> 
+
+                    {showWarningPersonnelModal && (
+                        <div className="modal-overlay" onClick={() => setShowWarningPersonnelModal(false)}>
+                            <div className="modal" onClick={e => e.stopPropagation()}>
+                                <div className="modal-header"><h3>Tablodaki Personeli Filtrele</h3><button className="close-btn" onClick={()=>setShowWarningPersonnelModal(false)}>×</button></div>
+                                <div className="modal-content">
+                                    <div className="filter-list">
+                                        <div className="filter-item" key="select-all-warning">
+                                            <label>
+                                                <input
+                                                    type="checkbox"
+                                                    checked={warningPersonnelFilter.length === warningPersonnelOptions.length && warningPersonnelOptions.length > 0}
+                                                    onChange={e => {
+                                                        if (e.target.checked) {
+                                                            setWarningPersonnelFilter(warningPersonnelOptions);
+                                                        } else {
+                                                            setWarningPersonnelFilter([]);
+                                                        }
+                                                    }}
+                                                />
+                                                <b>Tümünü Seç/Bırak</b>
+                                            </label>
+                                        </div>
+                                        {warningPersonnelOptions.map(p => (
+                                            <div className="filter-item" key={p}>
+                                                <label style={{color: isEngineer(p) ? 'red' : 'inherit'}}>
+                                                    <input type="checkbox" checked={warningPersonnelFilter.includes(p)} onChange={e=>{
+                                                        if(e.target.checked) setWarningPersonnelFilter([...warningPersonnelFilter, p]);
+                                                        else setWarningPersonnelFilter(warningPersonnelFilter.filter(item => item !== p));
+                                                    }}/> {p} {isEngineer(p) ? '(Müh.)' : ''}
+                                                </label>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                                <div className="modal-footer">
+                                    <button className="download-btn" onClick={()=>{setWarningPersonnelFilter([]); setShowWarningPersonnelModal(false);}}>Temizle & Kapat</button>
+                                    <button className="download-btn" style={{backgroundColor: '#16a34a'}} onClick={()=> setShowWarningPersonnelModal(false)}>Uygula</button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </div> 
             ); 
         }
