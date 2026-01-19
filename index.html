@@ -1734,59 +1734,125 @@
                     if (chartRef.current) {
                         chartRef.current.destroy();
                     }
-                    const sortedData = Object.entries(chartData).sort(([, a], [, b]) => b - a);
-                    
-                    const isPersonnelChart = title.toLowerCase().includes('personel') || title.toLowerCase().includes('bekleyen');
 
-                    const labels = sortedData.map(d => isPersonnelChart && isEngineer(d[0]) ? `${d[0]} (Müh.)` : d[0]);
-                    const data = sortedData.map(d => d[1]);
-                    
-                    chartRef.current = new Chart(canvasRef.current, {
-                        type: 'bar',
-                        data: {
-                            labels,
-                            datasets: [{
-                                label: title,
-                                data,
-                                backgroundColor: labels.map((_, i) => `hsl(${(i * 360 / labels.length)}, 70%, 60%)`)
-                            }]
-                        },
-                        options: {
-                            indexAxis: 'x', 
-                            responsive: true,
-                            maintainAspectRatio: false,
-                            plugins: {
-                                title: { display: true, text: title, font: { size: 16 } }, // Title doğrudan kullanılıyor
-                                legend: { display: false },
-                                datalabels: {
-                                    anchor: 'end',
-                                    align: 'top',
-                                    color: '#444',
-                                    font: { weight: 'normal', size: 14 },
-                                    formatter: (value) => value > 0 ? value : null,
-                                }
+                    // Check if data is for stacked chart (EBYS) or simple bar chart
+                    const isStacked = Object.values(chartData).some(val => typeof val === 'object');
+
+                    let config = {};
+
+                    if (isStacked) {
+                        // Stacked Chart Logic (EBYS)
+                        const sortedPersonnel = Object.keys(chartData).sort((a, b) => {
+                            const totalA = Object.values(chartData[a]).reduce((s, c) => s + c, 0);
+                            const totalB = Object.values(chartData[b]).reduce((s, c) => s + c, 0);
+                            return totalB - totalA;
+                        });
+
+                        const allYears = [...new Set(
+                            Object.values(chartData).flatMap(yearsObj => Object.keys(yearsObj))
+                        )].sort();
+
+                        const datasets = allYears.map((year, index) => ({
+                            label: year,
+                            data: sortedPersonnel.map(p => chartData[p][year] || 0),
+                            backgroundColor: `hsl(${index * 50 + 200}, 70%, 60%)`, // Different colors for years
+                            stack: 'Stack 0',
+                        }));
+
+                        config = {
+                            type: 'bar',
+                            data: {
+                                labels: sortedPersonnel,
+                                datasets: datasets
                             },
-                            scales: {
-                                x: { 
-                                    beginAtZero: true,
-                                    ticks: {
-                                        autoSkip: false,
-                                        maxRotation: 90,
-                                        minRotation: 45,
-                                        color: (context) => {
-                                            if (!isPersonnelChart) return '#666';
-                                            const originalName = context.tick.label.replace(' (Müh.)', '');
-                                            return isEngineer(originalName) ? 'red' : '#666';
+                            options: {
+                                indexAxis: 'y', // Horizontal bars
+                                responsive: true,
+                                maintainAspectRatio: false,
+                                plugins: {
+                                    title: { display: true, text: title, font: { size: 16 } },
+                                    legend: { display: true, position: 'bottom' },
+                                    datalabels: {
+                                        color: '#fff',
+                                        font: { weight: 'bold', size: 11 },
+                                        formatter: (value) => value > 0 ? value : null,
+                                        display: (context) => {
+                                            return context.dataset.data[context.dataIndex] > 0;
                                         }
                                     }
                                 },
-                                y: { beginAtZero: true }
-                            },
-                            animation: {
-                                onComplete: () => { if (onRender) onRender(); }
+                                scales: {
+                                    x: { 
+                                        stacked: true,
+                                        beginAtZero: true
+                                    },
+                                    y: { 
+                                        stacked: true,
+                                        ticks: { autoSkip: false }
+                                    }
+                                },
+                                animation: {
+                                    onComplete: () => { if (onRender) onRender(); }
+                                }
                             }
-                        }
-                    });
+                        };
+                    } else {
+                        // Existing Simple Chart Logic
+                        const sortedData = Object.entries(chartData).sort(([, a], [, b]) => b - a);
+                        
+                        const isPersonnelChart = title.toLowerCase().includes('personel') || title.toLowerCase().includes('bekleyen');
+                        const labels = sortedData.map(d => isPersonnelChart && isEngineer && isEngineer(d[0]) ? `${d[0]} (Müh.)` : d[0]);
+                        const data = sortedData.map(d => d[1]);
+
+                        config = {
+                            type: 'bar',
+                            data: {
+                                labels,
+                                datasets: [{
+                                    label: title,
+                                    data,
+                                    backgroundColor: labels.map((_, i) => `hsl(${(i * 360 / labels.length)}, 70%, 60%)`)
+                                }]
+                            },
+                            options: {
+                                indexAxis: 'x', // Vertical bars for normal charts
+                                responsive: true,
+                                maintainAspectRatio: false,
+                                plugins: {
+                                    title: { display: true, text: title, font: { size: 16 } },
+                                    legend: { display: false },
+                                    datalabels: {
+                                        anchor: 'end',
+                                        align: 'top',
+                                        color: '#444',
+                                        font: { weight: 'normal', size: 14 },
+                                        formatter: (value) => value > 0 ? value : null,
+                                    }
+                                },
+                                scales: {
+                                    x: { 
+                                        beginAtZero: true,
+                                        ticks: {
+                                            autoSkip: false,
+                                            maxRotation: 90,
+                                            minRotation: 45,
+                                            color: (context) => {
+                                                if (!isPersonnelChart || !isEngineer) return '#666';
+                                                const originalName = context.tick.label.replace(' (Müh.)', '');
+                                                return isEngineer(originalName) ? 'red' : '#666';
+                                            }
+                                        }
+                                    },
+                                    y: { beginAtZero: true }
+                                },
+                                animation: {
+                                    onComplete: () => { if (onRender) onRender(); }
+                                }
+                            }
+                        };
+                    }
+                    
+                    chartRef.current = new Chart(canvasRef.current, config);
                 }
                 return () => {
                     if (chartRef.current) {
@@ -2325,8 +2391,7 @@
                 </div>
             );
         }
-
-        function EbysReporter() {
+        function EbysReporter({ onZoom }) {
             const [ebysData, setEbysData] = useState([]);
             const [personnelOptions, setPersonnelOptions] = useState([]);
             const [selectedPersonnel, setSelectedPersonnel] = useState([]);
@@ -2336,6 +2401,7 @@
             const [totalEbysDocs, setTotalEbysDocs] = useState(0);
             const ebysChartRef = useRef(null);
             const ebysChartInstance = useRef(null);
+            const [stackedChartData, setStackedChartData] = useState(null);
             
             const parseEbysDate = (val) => {
                 if (typeof val === 'number') {
@@ -2494,44 +2560,76 @@
                  }
              }, [reportReady, ebysData, selectedPersonnel]);
 
+             // Prepare stacked chart data
              useEffect(() => {
-                 if(ebysData.length > 0 && ebysChartRef.current){
-                     const personnelHeader = Object.keys(ebysData[0]).find(h => normalizeHeader(h).includes('bekleyen') && (normalizeHeader(h).includes('kullanıcı') || normalizeHeader(h).includes('kullanici')));
-                     const counts = {};
-                     ebysData.forEach(row => {
-                         const p = row[personnelHeader];
-                         if(p) counts[p] = (counts[p] || 0) + 1;
-                     });
+                 if (ebysData.length > 0) {
+                    const personnelHeader = Object.keys(ebysData[0]).find(h => normalizeHeader(h).includes('bekleyen') && (normalizeHeader(h).includes('kullanıcı') || normalizeHeader(h).includes('kullanici')));
+                    const dateHeader = Object.keys(ebysData[0]).find(h => normalizeHeader(h) === 'tarih');
+                    
+                    const pData = {};
+                    
+                    ebysData.forEach(row => {
+                        const p = row[personnelHeader];
+                        if (p) {
+                            if (!pData[p]) pData[p] = {};
+                            const date = parseEbysDate(row[dateHeader]);
+                            const year = date ? date.getFullYear().toString() : "Tarihsiz";
+                            
+                            pData[p][year] = (pData[p][year] || 0) + 1;
+                        }
+                    });
+                    setStackedChartData(pData);
+                 } else {
+                     setStackedChartData(null);
+                 }
+             }, [ebysData]);
 
-                     const sortedData = Object.entries(counts).sort(([,a],[,b]) => b - a);
-                     const labels = sortedData.map(d => d[0]);
-                     const dataValues = sortedData.map(d => d[1]);
-
+             useEffect(() => {
+                 if(stackedChartData && ebysChartRef.current){
                      if(ebysChartInstance.current){
                          ebysChartInstance.current.destroy();
                      }
 
+                     const sortedPersonnel = Object.keys(stackedChartData).sort((a, b) => {
+                        const totalA = Object.values(stackedChartData[a]).reduce((s, c) => s + c, 0);
+                        const totalB = Object.values(stackedChartData[b]).reduce((s, c) => s + c, 0);
+                        return totalB - totalA;
+                     });
+
+                     const allYears = [...new Set(
+                        Object.values(stackedChartData).flatMap(yearsObj => Object.keys(yearsObj))
+                     )].sort();
+
+                     const datasets = allYears.map((year, index) => ({
+                         label: year,
+                         data: sortedPersonnel.map(p => stackedChartData[p][year] || 0),
+                         backgroundColor: `hsl(${index * 50 + 200}, 70%, 60%)`,
+                         stack: 'Stack 0',
+                     }));
+
                      ebysChartInstance.current = new Chart(ebysChartRef.current, {
                          type: 'bar',
                          data: {
-                             labels,
-                             datasets: [{
-                                 label: 'Bekleyen Evrak Sayısı',
-                                 data: dataValues,
-                                 backgroundColor: labels.map((_, i) => `hsl(${(i * 20)}, 70%, 60%)`),
-                             }]
+                             labels: sortedPersonnel,
+                             datasets: datasets
                          },
                          options: {
                              indexAxis: 'y',
                              responsive: true,
                              maintainAspectRatio: false,
                              plugins: {
-                                 legend: { display: false },
-                                 title: { display: true, text: 'EBYS Personel Bekleyen Evrak Sayıları' },
-                                 datalabels: { anchor: 'end', align: 'right', color: '#444', font: { weight: 'bold' } }
+                                 legend: { display: true, position: 'bottom' },
+                                 title: { display: true, text: 'EBYS Personel Bekleyen Evrak (Yıllara Göre)' },
+                                 datalabels: { 
+                                     color: '#fff',
+                                     font: { weight: 'bold', size: 10 },
+                                     formatter: (value) => value > 0 ? value : null,
+                                     display: (context) => context.dataset.data[context.dataIndex] > 0
+                                 }
                              },
                               scales: { 
-                                 x: { beginAtZero: true } 
+                                 x: { stacked: true, beginAtZero: true },
+                                 y: { stacked: true }
                              },
                          }
                      });
@@ -2541,7 +2639,7 @@
                          ebysChartInstance.current = null;
                      }
                  }
-             }, [ebysData]);
+             }, [stackedChartData]);
 
 
             return (
@@ -2570,9 +2668,16 @@
                         <button onClick={clearEbysData} style={{backgroundColor: '#ef4444', color: 'white'}}>Verileri Temizle</button>
                     </div>
 
-                    {ebysData.length > 0 && 
-                        <div className="ebys-chart-container">
-                            <canvas ref={ebysChartRef}></canvas>
+                    {stackedChartData && 
+                        <div className="chart-card" style={{marginTop: '20px', minHeight: '400px'}}>
+                            <button className="zoom-btn" title="Büyüt" onClick={() => onZoom({ 
+                                type: 'chart', 
+                                data: stackedChartData, 
+                                title: `EBYS Bekleyen Evrak Dağılımı (Toplam: ${totalEbysDocs})` 
+                            })}>🔍</button>
+                            <div className="ebys-chart-container">
+                                <canvas ref={ebysChartRef}></canvas>
+                            </div>
                         </div>
                     }
 
@@ -2953,7 +3058,7 @@
                     
                     <ReportComparison engineers={engineers} isEngineer={isEngineer} />
                     <MegsisReporter data={data} isEngineer={isEngineer} />
-                    <EbysReporter />
+                    <EbysReporter onZoom={setZoomContent} />
                 </React.Fragment>}
                 
                 {zoomContent && (
