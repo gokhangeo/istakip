@@ -1,17 +1,12 @@
 <!DOCTYPE html>
 <html lang="tr">
-<!-- PWA Kodları (head içine yapıştır) -->
-<link rel="manifest" href="./manifest.json">
-<meta name="theme-color" content="#4f46e5">
-<link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/1067/1067256.png">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<script>
-  if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./service-worker.js');
-    });
-  }
-</script>
+<head>
+    <!-- PWA Kodları -->
+    <link rel="manifest" href="./manifest.json">
+    <meta name="theme-color" content="#4f46e5">
+    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/1067/1067256.png">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    
     <meta charset="UTF-8" />
     <title>MEGSİS İŞ TAKİP by Gökhan Elgül</title>
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23064e3b'%3E%3Cpath d='M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z'/%3E%3C/svg%3E">
@@ -350,7 +345,7 @@
             color: white;
             font-weight: 500;
             padding: 10px 20px;
-         }
+          }
         .report-comparison-actions button:hover {
             background-color: #7e22ce; /* purple-700 */
         }
@@ -771,6 +766,7 @@
                 case 'iptal_edilen': dynamicTitle = 'Tapu İptal Edilen(Tescilden Geldi-Eksiklikten İade Yapılmayan)'; break;
                 case 'fen_kayit_alinmayan': dynamicTitle = 'Fen Kayıt Alınmayan(Ödemesi Yapılan)'; break;
                 case 'plan_ornegi': dynamicTitle = 'Plan Örneği-Teknik Bilgi Belge Bekleyen'; break;
+                case 'gorevlendirme_yapilmayan': dynamicTitle = 'Görevlendirme Yapılmayan (1+ Gün)'; break;
             }
 
             useEffect(() => {
@@ -800,6 +796,7 @@
                     const islemLower = islem.toLowerCase();
                     const district = r._district;
                     const fenKayitNo = r['fen kayıt no']; // Fen Kayıt No'yu al
+                    const basvuruTarihi = r['başvuru tarihi'];
                     
                     // Populate districtMap for waiting items
                     if (district && !status.includes('eksiklikten iade edildi') && !status.includes('tescile gönderildi')) {
@@ -842,6 +839,11 @@
                             if (isWaiting && (isPlanOrnegi || isMahkemePlanOrnegi || isTeknikBilgi) && fenKayitNo != null && fenKayitNo != 0) {
                                  conditionMet = true;
                             }
+                            break;
+                        case 'gorevlendirme_yapilmayan':
+                            // Bu grafik personel bazlı olduğu için personel olmayanları burada göstermiyoruz.
+                            // Ancak 'Atanmamış' gibi bir bar ekleyebiliriz veya boş bırakabiliriz.
+                            // Kullanıcı ilçe bazlı grafiği istediği için burayı boş geçiyoruz.
                             break;
                         default: // This includes the default 'Bekleyen İşlem Sayıları'
                              // Check if it's a waiting task AND has a valid Fen Kayıt No
@@ -1169,6 +1171,43 @@
                         }
                     });
                     finalRows = Object.values(groupedTasks);
+                } else if (sortField === 'gorevlendirme_yapilmayan') {
+                    const groupedTasks = {};
+                    const oneDayAgo = new Date();
+                    oneDayAgo.setDate(today.getDate() - 1); // 1 gün
+
+                    data.forEach((task, index) => {
+                        const personnel = splitPersonel(task['görevli personel']);
+                        const status = String(task['başvuru durumu'] || '').toLocaleLowerCase('tr');
+                        const isClosed = status.includes('eksiklikten iade edildi') || status.includes('tescile gönderildi');
+                        
+                        if (personnel.length === 0 && !isClosed) {
+                            const bStr = task['başvuru tarihi'];
+                            if (bStr) {
+                                const basvuruDate = new Date(bStr);
+                                if (!isNaN(basvuruDate) && basvuruDate.getFullYear() > 1900) {
+                                    const diffDays = (today - basvuruDate) / (1000 * 60 * 60 * 24);
+                                    if (diffDays >= 1) { // 1 gün ve üzeri
+                                        const key = `${task['fen kayıt no'] || index}-${task['ilçe']}`;
+                                        if (!groupedTasks[key]) {
+                                            groupedTasks[key] = {
+                                                fenKayitNo: task['fen kayıt no'],
+                                                il: task._province || '',
+                                                ilce: task['ilçe'] || '',
+                                                islem: task['işlem'] || '',
+                                                zemin: task['zemin'] || '',
+                                                basvuruDurumu: task['başvuru durumu'] || '',
+                                                beklemeSuresi: Math.floor(diffDays),
+                                                personnelRaw: '',
+                                                fenKayitTarihi: task['fen kayıt tarihi'] || ''
+                                            };
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    });
+                    finalRows = Object.values(groupedTasks).sort((a, b) => b.beklemeSuresi - a.beklemeSuresi);
                 } else {
                     let relevantData = data;
                     if (sortField === 'plan_ornegi') {
@@ -1330,6 +1369,7 @@
             
             const isUygunOlmayanIadeMode = sortField === 'uygun_olmayan_iade';
             const isOnemliIslerMode = sortField === 'onemli_isler';
+            const isGorevlendirmeYapilmayan = sortField === 'gorevlendirme_yapilmayan';
 
             const warningTitle = isOnemliIslerMode
                 ? `Son 150 Gündeki Önemli İşler (Toplam: ${displayedRows.length})`
@@ -1337,7 +1377,9 @@
                     ? `Son 100 Gün İçindeki İadeler (Toplam: ${displayedRows.length})`
                     : (sortField === 'plan_ornegi' 
                         ? `1 Günden Fazla Bekleyen İşlemler (Uyarı) (Toplam: ${displayedRows.length})`
-                        : `7 Günden Fazla Bekleyen İşlemler (Uyarı) (Toplam: ${displayedRows.length})`));
+                        : (isGorevlendirmeYapilmayan
+                            ? `1+ Gündür Personel Atanmayan İşler (Uyarı) (Toplam: ${displayedRows.length})`
+                            : `7 Günden Fazla Bekleyen İşlemler (Uyarı) (Toplam: ${displayedRows.length})`)));
             
             return ( 
                 <div className="warning-table-container"> 
@@ -1541,7 +1583,7 @@
                         return;
                     }
                     
-                    const customExportFields = ['tescile_giden', 'iade edilen', 'iptal_edilen', 'fen_kayit_alinmayan', 'plan_ornegi', 'uygun_olmayan_iade', 'onemli_isler'];
+                    const customExportFields = ['tescile_giden', 'iade edilen', 'iptal_edilen', 'fen_kayit_alinmayan', 'plan_ornegi', 'uygun_olmayan_iade', 'onemli_isler', 'gorevlendirme_yapilmayan'];
                     if (customExportFields.includes(sortField)) {
                         const customHeaders = sortField === 'fen_kayit_alinmayan'
                             ? ['İLÇE', 'BAŞVURU TARİHİ', 'FEN KAYIT NO', 'İŞLEM', 'ZEMİN', 'GÖREVLİ PERSONEL', 'BAŞVURU AÇIKLAMA', 'ÖDEME']
@@ -1781,7 +1823,7 @@
                                         }
                                     }
                                 },
-                                scales: {
+                                scales: { 
                                     x: { 
                                         stacked: true,
                                         beginAtZero: true
@@ -1829,7 +1871,7 @@
                                         formatter: (value) => value > 0 ? value : null,
                                     }
                                 },
-                                scales: {
+                                scales: { 
                                     x: { 
                                         beginAtZero: true,
                                         ticks: {
@@ -1979,7 +2021,7 @@
 
                 const newReportMap = new Map();
                 newReport.data.forEach(row => {
-                     const key = (row[fenKayitNoHeaderNew] != null && row[fenKayitNoHeaderNew] != 0) 
+                      const key = (row[fenKayitNoHeaderNew] != null && row[fenKayitNoHeaderNew] != 0) 
                         ? String(row[fenKayitNoHeaderNew])
                         : String(row[zeminHeaderNew] || '');
                     if (key) newReportMap.set(key, row);
@@ -2261,7 +2303,7 @@
                     } else {
                         // Get unique personnel names based on the selected type
                         const allPersonnelInData = [...new Set(
-                            data.flatMap(row =>
+                            data.flatMap(row => 
                                 parsePersonnelWithStatus(row['görevli personel'])
                                     .filter(p => type === 'engineer' ? isEngineer(p.name) : !isEngineer(p.name))
                                     .map(p => p.name)
@@ -2637,7 +2679,7 @@
                       if(ebysChartInstance.current){
                          ebysChartInstance.current.destroy();
                          ebysChartInstance.current = null;
-                     }
+                      }
                  }
              }, [stackedChartData]);
 
@@ -2868,10 +2910,10 @@
             // İşlem sayıları hesaplanıyor
             // const islemCounts = {};
             // data.forEach(d => {
-            //     const i = d['işlem'];
-            //     if (i && typeof i === 'string' && i.trim() !== '') {
-            //         islemCounts[i] = (islemCounts[i] || 0) + 1;
-            //     }
+            //    const i = d['işlem'];
+            //    if (i && typeof i === 'string' && i.trim() !== '') {
+            //        islemCounts[i] = (islemCounts[i] || 0) + 1;
+            //    }
             // });
 
             const sortOptions=[
@@ -2887,7 +2929,8 @@
                 {label:'Bekleyen (Eskiden Yeniye)', value:'bekleyen_eski_yeni'},
                 {label:'Bekleyen (Yeniden Eskiye)', value:'bekleyen_yeni_eski'},
                 {label:'Uygun Olmayan İade Gerekçeleri', value:'uygun_olmayan_iade'},
-                {label:'Önemli İşler', value:'onemli_isler'}
+                {label:'Önemli İşler', value:'onemli_isler'},
+                {label:'Görevlendirme Yapılmayan', value:'gorevlendirme_yapilmayan'}
             ];
             
             const filteredData=(() => {
@@ -2960,6 +3003,25 @@
                         "Mülkiyet Raporu"
                     ];
                     arr = arr.filter(d => onemliIslemler.includes(String(d['işlem'] || '').trim()));
+                } else if (sortField === 'gorevlendirme_yapilmayan') {
+                    const today = new Date();
+                    arr = arr.filter(d => {
+                        const personnel = splitPersonel(d['görevli personel']);
+                        const status = String(d['başvuru durumu'] || '').toLocaleLowerCase('tr');
+                        const isClosed = status.includes('eksiklikten iade edildi') || status.includes('tescile gönderildi');
+                        
+                        if (personnel.length === 0 && !isClosed) {
+                            const bStr = d['başvuru tarihi'];
+                            if (bStr) {
+                                const basvuruDate = new Date(bStr);
+                                if (!isNaN(basvuruDate) && basvuruDate.getFullYear() > 1900) {
+                                    const diffDays = (today - basvuruDate) / (1000 * 60 * 60 * 24);
+                                    if (diffDays >= 1) return true;
+                                }
+                            }
+                        }
+                        return false;
+                    });
                 } else if (sortField) {
                     arr.sort((a, b) => {
                         if (sortField.includes('tarih')) {
@@ -3201,8 +3263,8 @@
                     <input 
                         type="password" 
                         placeholder="Şifre" 
-                        value={password}
-                        onChange={e => setPassword(e.target.value)}
+                        value={password} 
+                        onChange={e => setPassword(e.target.value)} 
                         onKeyPress={e => e.key === 'Enter' && handleLogin()}
                     />
                     {error && <p className="error">{error}</p>}
