@@ -2854,14 +2854,47 @@
                 const files=Array.from(e.target.files||[]);
                 if(!files.length) return;
                 setLoading(true); setErrorMsg("");
-                const newRowsPromises = files.map(f => readExcelPromise(f).catch(err => {
-                    console.error('Excel okuma hatası:',err); 
-                    setErrorMsg(err.message);
-                    return {rows: []};
-                }));
-                const results = await Promise.all(newRowsPromises);
-                const allNewRows = results.flatMap(res => res.rows);
-                setData(prevData => [...prevData, ...allNewRows]); 
+                
+                const engineerFiles = files.filter(f => f.name.toLowerCase().includes('mühendis') || f.name.toLowerCase().includes('muhendis'));
+                const dataFiles = files.filter(f => !f.name.toLowerCase().includes('mühendis') && !f.name.toLowerCase().includes('muhendis'));
+
+                // Handle Engineer Files
+                if (engineerFiles.length > 0) {
+                    try {
+                        const readSimpleList = (file) => new Promise((resolve, reject) => {
+                             const reader = new FileReader();
+                             reader.onload = (e) => {
+                                 const data = new Uint8Array(e.target.result);
+                                 const workbook = XLSX.read(data, { type: 'array' });
+                                 const ws = workbook.Sheets[workbook.SheetNames[0]];
+                                 const json = XLSX.utils.sheet_to_json(ws, { header: 1 });
+                                 const names = json.flat().filter(n => n != null && String(n).trim() !== '').map(String);
+                                 resolve(names);
+                             };
+                             reader.onerror = reject;
+                             reader.readAsArrayBuffer(file);
+                        });
+
+                        const engResults = await Promise.all(engineerFiles.map(readSimpleList));
+                        const newEngineers = [...new Set(engResults.flat())];
+                        setEngineers(prev => [...new Set([...prev, ...newEngineers])]);
+                    } catch (err) {
+                        console.error("Mühendis dosyası okuma hatası", err);
+                    }
+                }
+
+                // Handle Data Files
+                if (dataFiles.length > 0) {
+                    const newRowsPromises = dataFiles.map(f => readExcelPromise(f).catch(err => {
+                        console.error('Excel okuma hatası:',err); 
+                        setErrorMsg(err.message);
+                        return {rows: []};
+                    }));
+                    const results = await Promise.all(newRowsPromises);
+                    const allNewRows = results.flatMap(res => res.rows);
+                    setData(prevData => [...prevData, ...allNewRows]); 
+                }
+                
                 e.target.value = null;
                 setLoading(false);
             };
