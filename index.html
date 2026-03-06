@@ -2432,7 +2432,7 @@
                     else if (type === 'selected_personnel') {
                         const safeNames = selectedPersonnel.map(n => n.replace(/[\\/*?:"<>| ]/g, '_'));
                         const namesStr = safeNames.length <= 3 ? safeNames.join('-') : safeNames.slice(0, 3).join('-') + '-vd';
-                        fileName = `MEGSIS_${namesStr}_Raporu.xlsx`;
+                        fileName = `${namesStr} (MEGSİS).xlsx`;
                     }
 
                     XLSX.writeFile(wb, fileName);
