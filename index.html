@@ -2242,6 +2242,24 @@
 
         function MegsisReporter({ data, isEngineer }) {
             const [isLoading, setIsLoading] = useState(false);
+            const [personnelOptions, setPersonnelOptions] = useState([]);
+            const [selectedPersonnel, setSelectedPersonnel] = useState([]);
+            const [showPersonnelModal, setShowPersonnelModal] = useState(false);
+
+            useEffect(() => {
+                if (data && data.length > 0) {
+                    const allPersonnel = [...new Set(
+                        data.flatMap(row => 
+                            parsePersonnelWithStatus(row['görevli personel'])
+                                .map(p => p.name)
+                        )
+                    )].sort((a, b) => a.localeCompare(b, 'tr'));
+                    setPersonnelOptions(allPersonnel);
+                } else {
+                    setPersonnelOptions([]);
+                    setSelectedPersonnel([]);
+                }
+            }, [data]);
         
             const generateReport = (type) => {
                 if (data.length === 0) {
@@ -2300,6 +2318,16 @@
                         // Sort report items by name
                         reportItems.sort((a, b) => a.name.localeCompare(b.name, 'tr'));
 
+                    } else if (type === 'selected_personnel') {
+                        if (selectedPersonnel.length === 0) {
+                            alert("Lütfen en az bir personel seçin.");
+                            setIsLoading(false);
+                            return;
+                        }
+                        reportItems = selectedPersonnel.map(pName => ({
+                            name: pName,
+                            filterFn: (row) => parsePersonnelWithStatus(row['görevli personel']).some(p => p.name === pName)
+                        }));
                     } else {
                         // Get unique personnel names based on the selected type
                         const allPersonnelInData = [...new Set(
@@ -2401,6 +2429,11 @@
                     if (type === 'engineer') fileName = 'MEGSIS_Muhendis_Raporu.xlsx';
                     else if (type === 'other') fileName = 'MEGSIS_Diger_Personel_Raporu.xlsx';
                     else if (type === 'district') fileName = 'MEGSIS_Ilce_Raporu.xlsx';
+                    else if (type === 'selected_personnel') {
+                        const safeNames = selectedPersonnel.map(n => n.replace(/[\\/*?:"<>| ]/g, '_'));
+                        const namesStr = safeNames.length <= 3 ? safeNames.join('-') : safeNames.slice(0, 3).join('-') + '-vd';
+                        fileName = `MEGSIS_${namesStr}_Raporu.xlsx`;
+                    }
 
                     XLSX.writeFile(wb, fileName);
                 } catch (err) {
@@ -2429,7 +2462,57 @@
                          <button onClick={() => generateReport('district')} disabled={isLoading || data.length === 0} style={{backgroundColor: '#8b5cf6'}}>
                             {isLoading ? 'İşleniyor...' : 'İlçe Bazlı Rapor Al'}
                         </button>
+
+                        {personnelOptions.length > 0 && (
+                            <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginTop: '10px', width: '100%', justifyContent: 'center', borderTop: '1px dashed #bae6fd', paddingTop: '15px' }}>
+                                <button onClick={() => setShowPersonnelModal(true)} style={{backgroundColor: '#f59e0b', color: 'white'}}>
+                                    {selectedPersonnel.length ? `${selectedPersonnel.length} Personel Seçili` : 'Özel Personel Seç'}
+                                </button>
+                                <button onClick={() => generateReport('selected_personnel')} disabled={isLoading || data.length === 0 || selectedPersonnel.length === 0} style={{backgroundColor: '#10b981'}}>
+                                    {isLoading ? 'İşleniyor...' : 'Seçili Personel Raporunu Al'}
+                                </button>
+                            </div>
+                        )}
                     </div>
+
+                    {showPersonnelModal && (
+                        <div className="modal-overlay" onClick={() => setShowPersonnelModal(false)}>
+                            <div className="modal" onClick={e => e.stopPropagation()}>
+                                <div className="modal-header"><h3>MEGSİS Personel Seç</h3><button className="close-btn" onClick={()=>setShowPersonnelModal(false)}>×</button></div>
+                                <div className="modal-content">
+                                    <div className="filter-list">
+                                        <div className="filter-item" key="select-all-megsis">
+                                            <label>
+                                                <input
+                                                    type="checkbox"
+                                                    checked={selectedPersonnel.length === personnelOptions.length && personnelOptions.length > 0}
+                                                    onChange={e => {
+                                                        if (e.target.checked) setSelectedPersonnel(personnelOptions);
+                                                        else setSelectedPersonnel([]);
+                                                    }}
+                                                />
+                                                <b>Tümünü Seç/Bırak</b>
+                                            </label>
+                                        </div>
+                                        {personnelOptions.map(p => (
+                                            <div className="filter-item" key={p}>
+                                                <label style={{color: isEngineer(p) ? 'red' : 'inherit'}}>
+                                                    <input type="checkbox" checked={selectedPersonnel.includes(p)} onChange={e=>{
+                                                        if(e.target.checked) setSelectedPersonnel([...selectedPersonnel, p]);
+                                                        else setSelectedPersonnel(selectedPersonnel.filter(item => item !== p));
+                                                    }}/> {p} {isEngineer(p) ? '(Müh.)' : ''}
+                                                </label>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                                <div className="modal-footer">
+                                    <button className="download-btn" onClick={()=>{setSelectedPersonnel([]); setShowPersonnelModal(false);}}>Temizle & Kapat</button>
+                                    <button className="download-btn" style={{backgroundColor: '#16a34a'}} onClick={()=> setShowPersonnelModal(false)}>Uygula</button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </div>
             );
         }
