@@ -2261,7 +2261,7 @@
                 }
             }, [data]);
         
-            const generateReport = (type) => {
+            const generateReport = async (type) => {
                 if (data.length === 0) {
                     alert("Rapor oluşturmak için lütfen önce bir MEGSİS dosyası yükleyin.");
                     return;
@@ -2270,9 +2270,6 @@
                 setIsLoading(true);
         
                 try {
-                    const wb = XLSX.utils.book_new();
-                    
-                    // Check if there is only one province in the data
                     const uniqueProvinces = [...new Set(data.map(d => d._province).filter(Boolean))];
                     const showProvinceCol = uniqueProvinces.length > 1;
 
@@ -2290,7 +2287,6 @@
                         const availableDistricts = [...new Set(data.map(row => row._district).filter(Boolean))];
                         const groupedDistricts = new Set();
 
-                        // Add groups
                         Object.entries(groups).forEach(([groupName, groupDistricts]) => {
                             const hasData = groupDistricts.some(d => availableDistricts.some(ad => ad.toLocaleLowerCase('tr') === d));
                             if (hasData) {
@@ -2305,7 +2301,6 @@
                             }
                         });
 
-                        // Add remaining districts
                         availableDistricts.forEach(dist => {
                             if (!groupedDistricts.has(dist.toLocaleLowerCase('tr'))) {
                                 reportItems.push({
@@ -2315,7 +2310,6 @@
                             }
                         });
                         
-                        // Sort report items by name
                         reportItems.sort((a, b) => a.name.localeCompare(b.name, 'tr'));
 
                     } else if (type === 'selected_personnel') {
@@ -2329,7 +2323,6 @@
                             filterFn: (row) => parsePersonnelWithStatus(row['görevli personel']).some(p => p.name === pName)
                         }));
                     } else {
-                        // Get unique personnel names based on the selected type
                         const allPersonnelInData = [...new Set(
                             data.flatMap(row => 
                                 parsePersonnelWithStatus(row['görevli personel'])
@@ -2351,7 +2344,10 @@
                         }));
                     }
         
-                    reportItems.forEach(item => {
+                    const mainWb = XLSX.utils.book_new();
+
+                    for (let i = 0; i < reportItems.length; i++) {
+                        const item = reportItems[i];
                         let filteredRows = data.filter(item.filterFn);
         
                         filteredRows.sort((a, b) => {
@@ -2419,23 +2415,30 @@
                                     ws[cell_ref].s.alignment = { wrapText: true, vertical: 'top' };
                                 }
                             }
-        
-                            const sheetName = item.name.replace(/[\\/*?:]/g, "").substring(0, 31);
-                            XLSX.utils.book_append_sheet(wb, ws, sheetName);
+                            
+                            if (type === 'selected_personnel') {
+                                const individualWb = XLSX.utils.book_new();
+                                XLSX.utils.book_append_sheet(individualWb, ws, "Rapor");
+                                const safeName = item.name.replace(/[\\/*?:"<>|]/g, '');
+                                XLSX.writeFile(individualWb, `${safeName} (MEGSİS).xlsx`);
+                                
+                                // Tarayıcı engellemesini önlemek için kısa bir bekleme
+                                await new Promise(resolve => setTimeout(resolve, 200));
+                            } else {
+                                const sheetName = item.name.replace(/[\\/*?:]/g, "").substring(0, 31);
+                                XLSX.utils.book_append_sheet(mainWb, ws, sheetName);
+                            }
                         }
-                    });
-                    
-                    let fileName = 'MEGSIS_Raporu.xlsx';
-                    if (type === 'engineer') fileName = 'MEGSIS_Muhendis_Raporu.xlsx';
-                    else if (type === 'other') fileName = 'MEGSIS_Diger_Personel_Raporu.xlsx';
-                    else if (type === 'district') fileName = 'MEGSIS_Ilce_Raporu.xlsx';
-                    else if (type === 'selected_personnel') {
-                        const safeNames = selectedPersonnel.map(n => n.replace(/[\\/*?:"<>| ]/g, '_'));
-                        const namesStr = safeNames.length <= 3 ? safeNames.join('-') : safeNames.slice(0, 3).join('-') + '-vd';
-                        fileName = `${namesStr} (MEGSİS).xlsx`;
                     }
+                    
+                    if (type !== 'selected_personnel') {
+                        let fileName = 'MEGSIS_Raporu.xlsx';
+                        if (type === 'engineer') fileName = 'MEGSIS_Muhendis_Raporu.xlsx';
+                        else if (type === 'other') fileName = 'MEGSIS_Diger_Personel_Raporu.xlsx';
+                        else if (type === 'district') fileName = 'MEGSIS_Ilce_Raporu.xlsx';
 
-                    XLSX.writeFile(wb, fileName);
+                        XLSX.writeFile(mainWb, fileName);
+                    }
                 } catch (err) {
                     console.error("MEGSİS Rapor oluşturma hatası:", err);
                     alert("Rapor oluşturulurken bir hata oluştu.");
