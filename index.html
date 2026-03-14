@@ -600,6 +600,8 @@
             let yearCounts = {}, tescileGiden = 0, tescilEdilen = 0, iade = 0, iptal = 0, fenKayitAlinmayan = 0;
             let lastWeekOngoing = 0;
             let overdueOngoing = 0;
+            let overdue30 = 0;
+            let overdue60 = 0;
             
             let totalTescilDays = 0;
             let countTescilDays = 0;
@@ -622,9 +624,7 @@
                         
                         if (!excluded && bd.getFullYear() > 1900) {
                             const diffDays = (today - bd) / (1000 * 60 * 60 * 24);
-                            if (diffDays >= 7) {
-                                overdueOngoing++;
-                            } else {
+                            if (diffDays < 7) {
                                 lastWeekOngoing++;
                             }
                             
@@ -656,6 +656,17 @@
                     }
                 }
 
+                if (fStr && !excluded && fStr !== '0001-01-01') {
+                    const fd = new Date(fStr);
+                    const hasValidFenKayitNo = fenKayitNo != null && fenKayitNo !== 0 && fenKayitNo !== '0';
+                    if (!isNaN(fd.getTime()) && fd.getFullYear() > 1900 && hasValidFenKayitNo) {
+                         const diffDays = (today - fd) / (1000 * 60 * 60 * 24);
+                         if (diffDays >= 7) overdueOngoing++;
+                         if (diffDays >= 30) overdue30++;
+                         if (diffDays >= 60) overdue60++;
+                    }
+                }
+
                 if (status.includes('tescile gönderildi')) {
                     tescileGiden++;
                     if (aciklama.includes('tescil edildi')) {
@@ -676,7 +687,7 @@
             const avgDays = countDays > 0 ? Math.round(totalDays / countDays) : 0;
             const totalWaiting = Object.values(yearCounts).reduce((a, b) => a + b, 0);
             const avgTescilSuresi = countTescilDays > 0 ? Math.round(totalTescilDays / countTescilDays) : 0;
-            return { toplam, count2025, avgDays, overdue: overdueOngoing, yearCounts, tescileGiden, tescilEdilen, iade, iptal, fenKayitAlinmayan, totalWaiting, avgTescilSuresi, lastWeekOngoing };
+            return { toplam, count2025, avgDays, overdue: overdueOngoing, overdue30, overdue60, yearCounts, tescileGiden, tescilEdilen, iade, iptal, fenKayitAlinmayan, totalWaiting, avgTescilSuresi, lastWeekOngoing };
         }
         
         function Dashboard({ data, filtered, sortField, selectedPersonel, selectedIl, selectedIlce }) { 
@@ -690,13 +701,12 @@
                 return true;
             }));
 
-            const sumRef = useRef(), overdueRef = useRef(), yearRef = useRef(), lastWeekRef = useRef(); 
-            const sumChartRef = useRef(null), overdueChartRef = useRef(null), yearChartRef = useRef(null), lastWeekChartRef = useRef(null); 
+            const sumRef = useRef(), yearRef = useRef(), lastWeekRef = useRef(); 
+            const sumChartRef = useRef(null), yearChartRef = useRef(null), lastWeekChartRef = useRef(null); 
             
             useEffect(() => { 
                 try { 
                     if (sumRef.current) { if (sumChartRef.current) sumChartRef.current.destroy(); sumChartRef.current = new Chart(sumRef.current, { type:'pie', data:{ labels:['Tümü'], datasets:[{ data:[metrics.toplam], backgroundColor:['hsl(0,70%,60%)'] }] }, options:{ responsive:true, plugins:{ legend:{ display:false } }, maintainAspectRatio:false } }); } 
-                    if (overdueRef.current) { if (overdueChartRef.current) overdueChartRef.current.destroy(); overdueChartRef.current = new Chart(overdueRef.current, { type:'pie', data:{ labels:['7+ Gün Bekleyen'], datasets:[{ data:[metrics.overdue], backgroundColor:['#f87171'] }] }, options:{ responsive:true, plugins:{ legend:{ display:false } }, maintainAspectRatio:false } }); } 
                     if (lastWeekRef.current) { if (lastWeekChartRef.current) lastWeekChartRef.current.destroy(); lastWeekChartRef.current = new Chart(lastWeekRef.current, { type:'pie', data:{ labels:['Son 7 Gün (Aktif)'], datasets:[{ data:[metrics.lastWeekOngoing], backgroundColor:['#34d399'] }] }, options:{ responsive:true, plugins:{ legend:{ display:false } }, maintainAspectRatio:false } }); } 
                     if (yearRef.current) { if (yearChartRef.current) yearChartRef.current.destroy(); const years = Object.keys(metrics.yearCounts).sort(); const labels = years.map(y=>`${y}: ${metrics.yearCounts[y]}`); const dataVals = years.map(y=>metrics.yearCounts[y]); yearChartRef.current = new Chart(yearRef.current, { type:'pie', data:{ labels, datasets:[{ data:dataVals, backgroundColor: years.map((_,i)=>`hsl(${i*360/years.length},70%,60%)`) }] }, options:{ responsive:true, plugins:{ legend:{ position:'bottom', labels:{ boxWidth:12, padding:8 } }, tooltip:{ enabled:true } }, maintainAspectRatio:false } }); } 
                 } catch(err) { console.error("Dashboard chart error:", err); } 
@@ -708,7 +718,14 @@
                 <div className="dashboard"> 
                     <div className="card"><h3>Toplam İşlem</h3><span className="value">{metrics.toplam}</span><div className="subtext">2025 Başvuru: {metrics.count2025}</div><div className="chart-container"><canvas ref={sumRef}></canvas></div></div> 
                     <div className="card"><h3>F.K. Ort. Süre (Son 3 Ay)</h3><span className="value">{metrics.avgDays} gün</span></div> 
-                    <div className="card"><h3>7+ Gün Bekleyen</h3><span className="value">{metrics.overdue}</span><div className="chart-container"><canvas ref={overdueRef}></canvas></div></div> 
+                    <div className="card">
+                        <h3>Bekleyen Başvuru Sayıları</h3>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '8px' }}>
+                            <div><span style={{fontSize: '0.95rem', color: '#334155'}}>7+ Gün: </span><span style={{fontSize: '1.2rem', color: '#ef4444', fontWeight: 'bold'}}>{metrics.overdue}</span></div>
+                            <div><span style={{fontSize: '0.95rem', color: '#334155'}}>30+ Gün: </span><span style={{fontSize: '1.2rem', color: '#ef4444', fontWeight: 'bold'}}>{metrics.overdue30}</span></div>
+                            <div><span style={{fontSize: '0.95rem', color: '#334155'}}>60+ Gün: </span><span style={{fontSize: '1.2rem', color: '#ef4444', fontWeight: 'bold'}}>{metrics.overdue60}</span></div>
+                        </div>
+                    </div> 
                     <div className="card"><h3>Son 7 Gün (Aktif)</h3><span className="value" style={{color: '#059669'}}>{metrics.lastWeekOngoing}</span><div className="chart-container"><canvas ref={lastWeekRef}></canvas></div></div> 
                     <div className="card"><h3>Yıla Göre Bekleyen</h3><div className="chart-container"><canvas ref={yearRef}></canvas></div>{yearLegend}</div> 
                     <div className="card">
@@ -1075,6 +1092,7 @@
             const [dateSortOrder, setDateSortOrder] = useState('asc');
             const [warningPersonnelFilter, setWarningPersonnelFilter] = useState([]);
             const [showWarningPersonnelModal, setShowWarningPersonnelModal] = useState(false);
+            const [warningThreshold, setWarningThreshold] = useState(7); // Yeni süre filtresi durumu
 
             const toggleDateSort = () => {
                 setDateSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
@@ -1169,8 +1187,6 @@
                     finalRows = Object.values(groupedTasks);
                 } else if (sortField === 'gorevlendirme_yapilmayan') {
                     const groupedTasks = {};
-                    const oneDayAgo = new Date();
-                    oneDayAgo.setDate(today.getDate() - 1); // 1 gün
 
                     data.forEach((task, index) => {
                         const personnel = splitPersonel(task['görevli personel']);
@@ -1214,20 +1230,21 @@
                     }
                     
                     const groupedTasks = {};
-                    const daysThreshold = sortField === 'plan_ornegi' ? 1 : 7;
+                    const daysThreshold = sortField === 'plan_ornegi' ? 1 : warningThreshold;
 
                     relevantData.forEach((task, index) => {
-                        const bStr = task['başvuru tarihi'];
-                        if (bStr) {
-                            const basvuruDate = new Date(bStr);
-                            if (!isNaN(basvuruDate) && basvuruDate.getFullYear() > 1900) {
-                                const diffDays = (today - basvuruDate) / (1000 * 60 * 60 * 24);
+                        const fStr = task['fen kayıt tarihi'];
+                        if (fStr && fStr !== '0001-01-01') {
+                            const fenKayitDate = new Date(fStr);
+                            if (!isNaN(fenKayitDate) && fenKayitDate.getFullYear() > 1900) {
+                                const diffDays = (today - fenKayitDate) / (1000 * 60 * 60 * 24);
                                 const status = String(task['başvuru durumu'] || '').toLocaleLowerCase('tr');
                                 const isClosed = status.includes('eksiklikten iade edildi') || status.includes('tescile gönderildi');
                                 const fenKayitNo = task['fen kayıt no'];
+                                const hasValidFenKayitNo = fenKayitNo != null && fenKayitNo !== 0 && fenKayitNo !== '0';
                                 
-                                if (diffDays >= daysThreshold && !isClosed) {
-                                    const key = `${fenKayitNo || 'yok'}-${task['ilçe']}-${index}`;
+                                if (diffDays >= daysThreshold && !isClosed && hasValidFenKayitNo) {
+                                    const key = `${fenKayitNo}-${task['ilçe']}-${index}`;
                                     if (!groupedTasks[key]) {
                                         groupedTasks[key] = {
                                             fenKayitNo: fenKayitNo,
@@ -1265,7 +1282,7 @@
                 }
 
                 setWarningRows(finalRows);
-            }, [data, isEngineer, personnelFilterType, sortField, dateSortOrder]); 
+            }, [data, isEngineer, personnelFilterType, sortField, dateSortOrder, warningThreshold]); 
 
             // Calculate options based on current warning rows
             const warningPersonnelOptions = React.useMemo(() => {
@@ -1374,13 +1391,27 @@
                         ? `1 Günden Fazla Bekleyen İşlemler (Uyarı) (Toplam: ${displayedRows.length})`
                         : (isGorevlendirmeYapilmayan
                             ? `1+ Gündür Personel Atanmayan İşler (Uyarı) (Toplam: ${displayedRows.length})`
-                            : `7 Günden Fazla Bekleyen İşlemler (Uyarı) (Toplam: ${displayedRows.length})`)));
+                            : `${warningThreshold} Günden Fazla Bekleyen İşlemler (Uyarı) (Toplam: ${displayedRows.length})`)));
             
             return ( 
                 <div className="warning-table-container"> 
                     <div className="warning-table-header"> 
                         <h3>{warningTitle}</h3> 
                         <div className="button-group"> 
+                             {(!isOnemliIslerMode && !isUygunOlmayanIadeMode && sortField !== 'plan_ornegi' && !isGorevlendirmeYapilmayan) && (
+                                 <div style={{display: 'flex', alignItems: 'center', marginRight: '10px'}}>
+                                     <label style={{fontSize: '0.9rem', fontWeight: 'bold', color: '#991b1b', marginRight: '5px'}}>Süre:</label>
+                                     <select 
+                                        value={warningThreshold} 
+                                        onChange={(e) => setWarningThreshold(Number(e.target.value))}
+                                        style={{padding: '6px', borderRadius: '4px', border: '1px solid #fecaca', fontSize: '0.9rem', color: '#991b1b'}}
+                                     >
+                                         <option value={1}>1+ Gün</option>
+                                         <option value={7}>7+ Gün</option>
+                                     </select>
+                                 </div>
+                             )}
+
                              <div style={{display: 'flex', alignItems: 'center', marginRight: '10px'}}>
                                  <label style={{fontSize: '0.9rem', fontWeight: 'bold', color: '#991b1b', marginRight: '5px'}}>Filtre:</label>
                                  <select 
