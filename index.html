@@ -598,7 +598,8 @@
 
             let toplam = arr.length, count2025 = 0, totalDays = 0, countDays = 0;
             let yearCounts = {}, tescileGiden = 0, tescilEdilen = 0, iade = 0, iptal = 0, fenKayitAlinmayan = 0;
-            const overdueFenKayitNos = new Set();
+            let lastWeekOngoing = 0;
+            let overdueOngoing = 0;
             
             let totalTescilDays = 0;
             let countTescilDays = 0;
@@ -612,10 +613,25 @@
                 const odeme = String(d['ödeme'] || '').toLocaleLowerCase('tr');
                 const tescilTalepBilgisi = d['tescil talep bilgisi'];
 
+                const excluded = status.includes('eksiklikten iade edildi') || status.includes('tescile gönderildi');
+
                 if (bStr) {
                     const bd = new Date(bStr);
                     if (!isNaN(bd.getTime())) {
                         if (bd.getFullYear() === 2025) count2025++;
+                        
+                        if (!excluded && bd.getFullYear() > 1900) {
+                            const diffDays = (today - bd) / (1000 * 60 * 60 * 24);
+                            if (diffDays >= 7) {
+                                overdueOngoing++;
+                            } else {
+                                lastWeekOngoing++;
+                            }
+                            
+                            const y = bd.getFullYear();
+                            yearCounts[y] = (yearCounts[y] || 0) + 1;
+                        }
+
                         if (fStr) {
                             const fd = new Date(fStr);
                             if (!isNaN(fd.getTime()) && fd.getFullYear() > 1900 && fd >= threeMonthsAgo) {
@@ -640,27 +656,6 @@
                     }
                 }
 
-                const excluded = status.includes('eksiklikten iade edildi') || status.includes('tescile gönderildi');
-                
-                if (fStr && !excluded) {
-                    const fd = new Date(fStr);
-                    const hasValidFenKayitNo = fenKayitNo != null && fenKayitNo != 0;
-                    if (!isNaN(fd.getTime()) && fd.getFullYear() > 1900 && hasValidFenKayitNo) {
-                         const diff = (today - fd) / (1000 * 60 * 60 * 24);
-                         if (diff >= 7) { 
-                             overdueFenKayitNos.add(fenKayitNo);
-                         }
-                    }
-                }
-                
-                if(bStr && !excluded) {
-                    const bd = new Date(bStr);
-                    if (!isNaN(bd.getTime()) && bd.getFullYear() > 1900) {
-                        const y = bd.getFullYear();
-                        yearCounts[y] = (yearCounts[y] || 0) + 1;
-                    }
-                }
-
                 if (status.includes('tescile gönderildi')) {
                     tescileGiden++;
                     if (aciklama.includes('tescil edildi')) {
@@ -678,11 +673,10 @@
                 }
             });
 
-            const overdue = overdueFenKayitNos.size;
             const avgDays = countDays > 0 ? Math.round(totalDays / countDays) : 0;
             const totalWaiting = Object.values(yearCounts).reduce((a, b) => a + b, 0);
             const avgTescilSuresi = countTescilDays > 0 ? Math.round(totalTescilDays / countTescilDays) : 0;
-            return { toplam, count2025, avgDays, overdue, yearCounts, tescileGiden, tescilEdilen, iade, iptal, fenKayitAlinmayan, totalWaiting, avgTescilSuresi };
+            return { toplam, count2025, avgDays, overdue: overdueOngoing, yearCounts, tescileGiden, tescilEdilen, iade, iptal, fenKayitAlinmayan, totalWaiting, avgTescilSuresi, lastWeekOngoing };
         }
         
         function Dashboard({ data, filtered, sortField, selectedPersonel, selectedIl, selectedIlce }) { 
@@ -696,13 +690,14 @@
                 return true;
             }));
 
-            const sumRef = useRef(), overdueRef = useRef(), yearRef = useRef(); 
-            const sumChartRef = useRef(null), overdueChartRef = useRef(null), yearChartRef = useRef(null); 
+            const sumRef = useRef(), overdueRef = useRef(), yearRef = useRef(), lastWeekRef = useRef(); 
+            const sumChartRef = useRef(null), overdueChartRef = useRef(null), yearChartRef = useRef(null), lastWeekChartRef = useRef(null); 
             
             useEffect(() => { 
                 try { 
                     if (sumRef.current) { if (sumChartRef.current) sumChartRef.current.destroy(); sumChartRef.current = new Chart(sumRef.current, { type:'pie', data:{ labels:['Tümü'], datasets:[{ data:[metrics.toplam], backgroundColor:['hsl(0,70%,60%)'] }] }, options:{ responsive:true, plugins:{ legend:{ display:false } }, maintainAspectRatio:false } }); } 
                     if (overdueRef.current) { if (overdueChartRef.current) overdueChartRef.current.destroy(); overdueChartRef.current = new Chart(overdueRef.current, { type:'pie', data:{ labels:['7+ Gün Bekleyen'], datasets:[{ data:[metrics.overdue], backgroundColor:['#f87171'] }] }, options:{ responsive:true, plugins:{ legend:{ display:false } }, maintainAspectRatio:false } }); } 
+                    if (lastWeekRef.current) { if (lastWeekChartRef.current) lastWeekChartRef.current.destroy(); lastWeekChartRef.current = new Chart(lastWeekRef.current, { type:'pie', data:{ labels:['Son 7 Gün (Aktif)'], datasets:[{ data:[metrics.lastWeekOngoing], backgroundColor:['#34d399'] }] }, options:{ responsive:true, plugins:{ legend:{ display:false } }, maintainAspectRatio:false } }); } 
                     if (yearRef.current) { if (yearChartRef.current) yearChartRef.current.destroy(); const years = Object.keys(metrics.yearCounts).sort(); const labels = years.map(y=>`${y}: ${metrics.yearCounts[y]}`); const dataVals = years.map(y=>metrics.yearCounts[y]); yearChartRef.current = new Chart(yearRef.current, { type:'pie', data:{ labels, datasets:[{ data:dataVals, backgroundColor: years.map((_,i)=>`hsl(${i*360/years.length},70%,60%)`) }] }, options:{ responsive:true, plugins:{ legend:{ position:'bottom', labels:{ boxWidth:12, padding:8 } }, tooltip:{ enabled:true } }, maintainAspectRatio:false } }); } 
                 } catch(err) { console.error("Dashboard chart error:", err); } 
             }, [metrics]); 
@@ -714,6 +709,7 @@
                     <div className="card"><h3>Toplam İşlem</h3><span className="value">{metrics.toplam}</span><div className="subtext">2025 Başvuru: {metrics.count2025}</div><div className="chart-container"><canvas ref={sumRef}></canvas></div></div> 
                     <div className="card"><h3>F.K. Ort. Süre (Son 3 Ay)</h3><span className="value">{metrics.avgDays} gün</span></div> 
                     <div className="card"><h3>7+ Gün Bekleyen</h3><span className="value">{metrics.overdue}</span><div className="chart-container"><canvas ref={overdueRef}></canvas></div></div> 
+                    <div className="card"><h3>Son 7 Gün (Aktif)</h3><span className="value" style={{color: '#059669'}}>{metrics.lastWeekOngoing}</span><div className="chart-container"><canvas ref={lastWeekRef}></canvas></div></div> 
                     <div className="card"><h3>Yıla Göre Bekleyen</h3><div className="chart-container"><canvas ref={yearRef}></canvas></div>{yearLegend}</div> 
                     <div className="card">
                         <h3>İşlem Durumları</h3>
@@ -1218,21 +1214,20 @@
                     }
                     
                     const groupedTasks = {};
-                    // Plan örneği için eşik değerini 1 gün olarak güncelledim
                     const daysThreshold = sortField === 'plan_ornegi' ? 1 : 7;
 
                     relevantData.forEach((task, index) => {
-                        const fStr = task['fen kayıt tarihi'];
-                        if (fStr) {
-                            const fenKayitDate = new Date(fStr);
-                            if (!isNaN(fenKayitDate) && fenKayitDate.getFullYear() > 1900) {
-                                const diffDays = (today - fenKayitDate) / (1000 * 60 * 60 * 24);
+                        const bStr = task['başvuru tarihi'];
+                        if (bStr) {
+                            const basvuruDate = new Date(bStr);
+                            if (!isNaN(basvuruDate) && basvuruDate.getFullYear() > 1900) {
+                                const diffDays = (today - basvuruDate) / (1000 * 60 * 60 * 24);
                                 const status = String(task['başvuru durumu'] || '').toLocaleLowerCase('tr');
                                 const isClosed = status.includes('eksiklikten iade edildi') || status.includes('tescile gönderildi');
                                 const fenKayitNo = task['fen kayıt no'];
-                                const hasValidFenKayitNo = fenKayitNo != null && fenKayitNo != 0;
-                                if (diffDays >= daysThreshold && !isClosed && hasValidFenKayitNo) {
-                                    const key = `${fenKayitNo}-${task['ilçe']}-${index}`;
+                                
+                                if (diffDays >= daysThreshold && !isClosed) {
+                                    const key = `${fenKayitNo || 'yok'}-${task['ilçe']}-${index}`;
                                     if (!groupedTasks[key]) {
                                         groupedTasks[key] = {
                                             fenKayitNo: fenKayitNo,
