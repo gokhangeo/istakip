@@ -664,7 +664,6 @@
 
                 if (fStr && !excluded && fStr !== '0001-01-01') {
                     const fd = new Date(fStr);
-                    const hasValidFenKayitNo = fenKayitNo != null && fenKayitNo !== 0 && fenKayitNo !== '0';
                     if (!isNaN(fd.getTime()) && fd.getFullYear() > 1900 && hasValidFenKayitNo) {
                          const diffDays = (today - fd) / (1000 * 60 * 60 * 24);
                          if (diffDays >= 7) overdueOngoing++;
@@ -685,7 +684,7 @@
                 if (status.includes('eksiklikten iade edildi')) {
                     iade++;
                 }
-                if (odeme.includes('ödendi') && !odeme.includes('ödenmedi') && (fenKayitNo === 0 || fenKayitNo == null)) {
+                if (odeme.includes('ödendi') && !odeme.includes('ödenmedi') && !hasValidFenKayitNo) {
                     fenKayitAlinmayan++;
                 }
             });
@@ -792,6 +791,7 @@
                 case 'fen_kayit_alinmayan': dynamicTitle = 'Fen Kayıt Alınmayan(Ödemesi Yapılan)'; break;
                 case 'plan_ornegi': dynamicTitle = 'Plan Örneği-Teknik Bilgi Belge Bekleyen'; break;
                 case 'gorevlendirme_yapilmayan': dynamicTitle = 'Görevlendirme Yapılmayan (1+ Gün)'; break;
+                case 'harci_yatirilmayan': dynamicTitle = 'Harcı Yatırılmayan İşlem Sayıları'; break;
             }
 
             useEffect(() => {
@@ -854,6 +854,9 @@
                         case 'fen_kayit_alinmayan':
                             // This specific filter already checks for fenKayitNo, so we keep it as is.
                              if(odeme.includes('ödendi') && !odeme.includes('ödenmedi') && (fenKayitNo === 0 || fenKayitNo == null)) conditionMet = true;
+                            break;
+                        case 'harci_yatirilmayan':
+                            if(odeme.includes('ödenmedi')) conditionMet = true;
                             break;
                         case 'plan_ornegi':
                             const isPlanOrnegi = islemLower === 'plan örneği';
@@ -1264,6 +1267,38 @@
                         }
                     });
                     finalRows = Object.values(groupedTasks).sort((a, b) => b.beklemeSuresi - a.beklemeSuresi);
+                } else if (sortField === 'harci_yatirilmayan') {
+                    const groupedTasks = {};
+                    data.forEach((task, index) => {
+                        const odeme = String(task['ödeme'] || '').toLocaleLowerCase('tr');
+                        const status = String(task['başvuru durumu'] || '').toLocaleLowerCase('tr');
+                        const isClosed = status.includes('eksiklikten iade edildi') || status.includes('tescile gönderildi');
+                        
+                        if (odeme.includes('ödenmedi') && !isClosed) {
+                            const bStr = task['başvuru tarihi'];
+                            let diffDays = 0;
+                            if (bStr) {
+                                const basvuruDate = new Date(bStr);
+                                if (!isNaN(basvuruDate) && basvuruDate.getFullYear() > 1900) {
+                                    diffDays = (today - basvuruDate) / (1000 * 60 * 60 * 24);
+                                }
+                            }
+                            const key = `harci_yatirilmayan-${index}`;
+                            groupedTasks[key] = {
+                                fenKayitNo: task['fen kayıt no'] || 'Yok',
+                                il: task._province || '',
+                                ilce: task['ilçe'] || '',
+                                islem: task['işlem'] || '',
+                                zemin: task['zemin'] || '',
+                                basvuruDurumu: task['başvuru durumu'] || '',
+                                basvuruAciklama: task['başvuru açıklama'] || '',
+                                beklemeSuresi: Math.floor(diffDays),
+                                personnelRaw: task['görevli personel'] || '',
+                                fenKayitTarihi: task['fen kayıt tarihi'] || task['başvuru tarihi'] || ''
+                            };
+                        }
+                    });
+                    finalRows = Object.values(groupedTasks).sort((a, b) => b.beklemeSuresi - a.beklemeSuresi);
                 } else {
                     let relevantData = data;
                     if (sortField === 'plan_ornegi') {
@@ -1390,6 +1425,20 @@
                         'Başvuru Açıklama': row.basvuruAciklama
                     }));
                     cols = [ { wch: 30 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 20 }, { wch: 40 }, { wch: 25 }, { wch: 50 }];
+                } else if (sortField === 'fen_kayit_alinmayan' || sortField === 'harci_yatirilmayan') {
+                    dataToExport = rowsToExport.map(row => ({
+                        'Personel': getPersonnelText(row),
+                        'Başvuru/Fen Kayıt Tarihi': row.fenKayitTarihi,
+                        'Fen Kayıt No': row.fenKayitNo, 
+                        'İl': row.il, 
+                        'İlçe': row.ilce, 
+                        'İşlem': row.islem,
+                        'Zemin': row.zemin, 
+                        'Başvuru Durumu': row.basvuruDurumu,
+                        'Bekleme Süresi (Gün)': row.beklemeSuresi,
+                        'Başvuru Açıklama': row.basvuruAciklama 
+                    }));
+                    cols = [ { wch: 30 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 20 }, { wch: 40 }, { wch: 25 }, { wch: 20 }, { wch: 50 } ];
                 } else {
                     dataToExport = rowsToExport.map(row => ({
                         'Personel': getPersonnelText(row),
@@ -1427,6 +1476,7 @@
             const isOnemliIslerMode = sortField === 'onemli_isler';
             const isGorevlendirmeYapilmayan = sortField === 'gorevlendirme_yapilmayan';
             const isFenKayitAlinmayan = sortField === 'fen_kayit_alinmayan';
+            const isHarciYatirilmayan = sortField === 'harci_yatirilmayan';
 
             const warningTitle = isOnemliIslerMode
                 ? `Son 150 Gündeki Önemli İşler (Toplam: ${displayedRows.length})`
@@ -1434,18 +1484,20 @@
                     ? `Son 100 Gün İçindeki İadeler (Toplam: ${displayedRows.length})`
                     : (isFenKayitAlinmayan
                         ? `Fen Kayıt Alınmayan Başvurular (Toplam: ${displayedRows.length})`
-                        : (sortField === 'plan_ornegi' 
-                            ? `1 Günden Fazla Bekleyen İşlemler (Uyarı) (Toplam: ${displayedRows.length})`
-                            : (isGorevlendirmeYapilmayan
-                                ? `1+ Gündür Personel Atanmayan İşler (Uyarı) (Toplam: ${displayedRows.length})`
-                                : `${warningThreshold} Günden Fazla Bekleyen İşlemler (Uyarı) (Toplam: ${displayedRows.length})`))));
+                        : (isHarciYatirilmayan
+                            ? `Harcı Yatırılmayan Başvurular (Toplam: ${displayedRows.length})`
+                            : (sortField === 'plan_ornegi' 
+                                ? `1 Günden Fazla Bekleyen İşlemler (Uyarı) (Toplam: ${displayedRows.length})`
+                                : (isGorevlendirmeYapilmayan
+                                    ? `1+ Gündür Personel Atanmayan İşler (Uyarı) (Toplam: ${displayedRows.length})`
+                                    : `${warningThreshold} Günden Fazla Bekleyen İşlemler (Uyarı) (Toplam: ${displayedRows.length})`)))));
             
             return ( 
                 <div className="warning-table-container"> 
                     <div className="warning-table-header"> 
                         <h3>{warningTitle}</h3> 
                         <div className="button-group"> 
-                             {(!isOnemliIslerMode && !isUygunOlmayanIadeMode && sortField !== 'plan_ornegi' && !isGorevlendirmeYapilmayan && !isFenKayitAlinmayan) && (
+                             {(!isOnemliIslerMode && !isUygunOlmayanIadeMode && sortField !== 'plan_ornegi' && !isGorevlendirmeYapilmayan && !isFenKayitAlinmayan && !isHarciYatirilmayan) && (
                                  <div style={{display: 'flex', alignItems: 'center', marginRight: '10px'}}>
                                      <label style={{fontSize: '0.9rem', fontWeight: 'bold', color: '#991b1b', marginRight: '5px'}}>Süre:</label>
                                      <select 
@@ -1487,7 +1539,7 @@
                                 <tr> 
                                     <th className="col-personel">Personel</th>
                                     <th>
-                                        {isFenKayitAlinmayan ? 'Başvuru / Fen Kayıt Tarihi' : 'Fen Kayıt Tarihi'}
+                                        {(isFenKayitAlinmayan || isHarciYatirilmayan) ? 'Başvuru / Fen Kayıt Tarihi' : 'Fen Kayıt Tarihi'}
                                         {(isOnemliIslerMode || isUygunOlmayanIadeMode) && (
                                              <span onClick={toggleDateSort} style={{ cursor: 'pointer', userSelect: 'none', padding: '0 5px' }}>{dateSortOrder === 'asc' ? '🔼' : '🔽'}</span>
                                         )}
@@ -1498,7 +1550,7 @@
                                     <th className="col-islem">İşlem</th>
                                     <th className="col-zemin">Zemin</th> 
                                     <th>Başvuru Durumu</th>
-                                    {isUygunOlmayanIadeMode || isOnemliIslerMode ? <th>Başvuru Açıklama</th> : <th className="col-bekleme-süresi-gün">Bekleme Süresi (Gün)</th> }
+                                    {(isUygunOlmayanIadeMode || isOnemliIslerMode || isFenKayitAlinmayan || isHarciYatirilmayan) ? <th>Başvuru Açıklama</th> : <th className="col-bekleme-süresi-gün">Bekleme Süresi (Gün)</th> }
                                 </tr> 
                             </thead> 
                             <tbody> 
@@ -1530,7 +1582,7 @@
                                         <td className="col-islem">{row.islem}</td>
                                         <td className="col-zemin">{row.zemin}</td> 
                                         <td>{row.basvuruDurumu}</td>
-                                        {isUygunOlmayanIadeMode || isOnemliIslerMode ? <td style={{whiteSpace: 'normal', wordBreak: 'break-word'}}>{row.basvuruAciklama}</td> : <td className="col-bekleme-süresi-gün">{row.beklemeSuresi}</td>}
+                                        {(isUygunOlmayanIadeMode || isOnemliIslerMode || isFenKayitAlinmayan || isHarciYatirilmayan) ? <td style={{whiteSpace: 'normal', wordBreak: 'break-word'}}>{row.basvuruAciklama}</td> : <td className="col-bekleme-süresi-gün">{row.beklemeSuresi}</td>}
                                     </tr> 
                                 ))} 
                             </tbody> 
