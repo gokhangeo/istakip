@@ -596,13 +596,15 @@
             const threeMonthsAgo = new Date();
             threeMonthsAgo.setMonth(today.getMonth() - 3);
 
-            let toplam = arr.length, count2025 = 0, totalDays = 0, countDays = 0;
+            let toplam = arr.length, totalDays = 0, countDays = 0;
             let yearCounts = {}, tescileGiden = 0, tescilEdilen = 0, iade = 0, iptal = 0, fenKayitAlinmayan = 0;
             let lastWeekOngoing = 0;
             let overdueOngoing = 0;
             let overdue30 = 0;
             let overdue60 = 0;
             let toplamFenKayitliIslem = 0;
+            let toplamDevamEden = 0;
+            let harciYatirilmayan = 0;
             
             let totalTescilDays = 0;
             let countTescilDays = 0;
@@ -619,15 +621,20 @@
                 const excluded = status.includes('eksiklikten iade edildi') || status.includes('tescile gönderildi');
 
                 const hasValidFenKayitNo = fenKayitNo != null && fenKayitNo !== 0 && fenKayitNo !== '0' && fenKayitNo !== '';
-                if (hasValidFenKayitNo) {
-                    toplamFenKayitliIslem++;
+                
+                if (!excluded) {
+                    toplamDevamEden++;
+                    if (odeme.includes('ödenmedi')) {
+                        harciYatirilmayan++;
+                    }
+                    if (hasValidFenKayitNo) {
+                        toplamFenKayitliIslem++;
+                    }
                 }
 
                 if (bStr) {
                     const bd = new Date(bStr);
                     if (!isNaN(bd.getTime())) {
-                        if (bd.getFullYear() === 2025) count2025++;
-                        
                         if (!excluded && bd.getFullYear() > 1900) {
                             const diffDays = (today - bd) / (1000 * 60 * 60 * 24);
                             if (diffDays < 7) {
@@ -692,7 +699,7 @@
             const avgDays = countDays > 0 ? Math.round(totalDays / countDays) : 0;
             const totalWaiting = Object.values(yearCounts).reduce((a, b) => a + b, 0);
             const avgTescilSuresi = countTescilDays > 0 ? Math.round(totalTescilDays / countTescilDays) : 0;
-            return { toplam, count2025, avgDays, overdue: overdueOngoing, overdue30, overdue60, yearCounts, tescileGiden, tescilEdilen, iade, iptal, fenKayitAlinmayan, totalWaiting, avgTescilSuresi, lastWeekOngoing, toplamFenKayitliIslem };
+            return { toplam, avgDays, overdue: overdueOngoing, overdue30, overdue60, yearCounts, tescileGiden, tescilEdilen, iade, iptal, fenKayitAlinmayan, totalWaiting, avgTescilSuresi, lastWeekOngoing, toplamFenKayitliIslem, toplamDevamEden, harciYatirilmayan };
         }
         
         function Dashboard({ data, filtered, sortField, selectedPersonel, selectedIl, selectedIlce }) { 
@@ -721,11 +728,13 @@
             return (
                 <div className="dashboard"> 
                     <div className="card">
-                        <h3>Toplam Başvuru</h3>
+                        <h3>Toplam Devam Eden</h3>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '8px' }}>
-                            <div><span style={{fontSize: '0.95rem', color: '#334155'}}>Toplam Başvuru: </span><span style={{fontSize: '1.2rem', color: '#1d4ed8', fontWeight: 'bold'}}>{metrics.toplam}</span></div>
+                            <div><span style={{fontSize: '0.95rem', color: '#334155'}}>Toplam Devam Eden: </span><span style={{fontSize: '1.2rem', color: '#1d4ed8', fontWeight: 'bold'}}>{metrics.toplamDevamEden}</span></div>
                             <div><span style={{fontSize: '0.95rem', color: '#334155'}}>Fen Kayıtlı: </span><span style={{fontSize: '1.2rem', color: '#059669', fontWeight: 'bold'}}>{metrics.toplamFenKayitliIslem}</span></div>
-                            <div><span style={{fontSize: '0.95rem', color: '#334155'}}>2025 Başvuru: </span><span style={{fontSize: '1.2rem', color: '#8b5cf6', fontWeight: 'bold'}}>{metrics.count2025}</span></div>
+                            {Object.keys(metrics.yearCounts).sort().map(year => (
+                                <div key={year}><span style={{fontSize: '0.95rem', color: '#334155'}}>{year} Devam Eden: </span><span style={{fontSize: '1.2rem', color: '#8b5cf6', fontWeight: 'bold'}}>{metrics.yearCounts[year]}</span></div>
+                            ))}
                         </div>
                     </div> 
                     <div className="card"><h3>F.K. Ort. Süre (Son 3 Ay)</h3><span className="value">{metrics.avgDays} gün</span></div> 
@@ -760,6 +769,10 @@
                          <div style={{marginTop: '2px'}}>
                             <span style={{fontSize: '0.9rem', color: '#334155'}}>F.K. Alınmayan: </span>
                             <span style={{fontSize: '1.1rem', color: '#1d4ed8', fontWeight: 'bold'}}>{metrics.fenKayitAlinmayan}</span>
+                        </div>
+                        <div style={{marginTop: '2px'}}>
+                            <span style={{fontSize: '0.9rem', color: '#334155'}}>Harcı Yatırılmayan: </span>
+                            <span style={{fontSize: '1.1rem', color: '#dc2626', fontWeight: 'bold'}}>{metrics.harciYatirilmayan}</span>
                         </div>
                         <div style={{marginTop: '2px'}}>
                             <span style={{fontSize: '0.9rem', color: '#334155'}}>Ort. İşlem Süresi: </span>
@@ -3169,6 +3182,7 @@
                 {label:'Tescilden Geldi', value:'tescilden_geldi'},
                 {label:'İptal Edilen', value:'iptal_edilen'},
                 {label:'Fen Kayıt Alınmayan', value:'fen_kayit_alinmayan'},
+                {label:'Harcı Yatırılmayan', value:'harci_yatirilmayan'},
                 {label:'Plan Örneği', value:'plan_ornegi'},
                 {label:'Bekleyen (Eskiden Yeniye)', value:'bekleyen_eski_yeni'},
                 {label:'Bekleyen (Yeniden Eskiye)', value:'bekleyen_yeni_eski'},
