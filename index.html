@@ -602,6 +602,7 @@
             let overdueOngoing = 0;
             let overdue30 = 0;
             let overdue60 = 0;
+            let toplamFenKayitliIslem = 0;
             
             let totalTescilDays = 0;
             let countTescilDays = 0;
@@ -616,6 +617,11 @@
                 const tescilTalepBilgisi = d['tescil talep bilgisi'];
 
                 const excluded = status.includes('eksiklikten iade edildi') || status.includes('tescile gönderildi');
+
+                const hasValidFenKayitNo = fenKayitNo != null && fenKayitNo !== 0 && fenKayitNo !== '0' && fenKayitNo !== '';
+                if (hasValidFenKayitNo) {
+                    toplamFenKayitliIslem++;
+                }
 
                 if (bStr) {
                     const bd = new Date(bStr);
@@ -687,7 +693,7 @@
             const avgDays = countDays > 0 ? Math.round(totalDays / countDays) : 0;
             const totalWaiting = Object.values(yearCounts).reduce((a, b) => a + b, 0);
             const avgTescilSuresi = countTescilDays > 0 ? Math.round(totalTescilDays / countTescilDays) : 0;
-            return { toplam, count2025, avgDays, overdue: overdueOngoing, overdue30, overdue60, yearCounts, tescileGiden, tescilEdilen, iade, iptal, fenKayitAlinmayan, totalWaiting, avgTescilSuresi, lastWeekOngoing };
+            return { toplam, count2025, avgDays, overdue: overdueOngoing, overdue30, overdue60, yearCounts, tescileGiden, tescilEdilen, iade, iptal, fenKayitAlinmayan, totalWaiting, avgTescilSuresi, lastWeekOngoing, toplamFenKayitliIslem };
         }
         
         function Dashboard({ data, filtered, sortField, selectedPersonel, selectedIl, selectedIlce }) { 
@@ -701,12 +707,11 @@
                 return true;
             }));
 
-            const sumRef = useRef(), yearRef = useRef(), lastWeekRef = useRef(); 
-            const sumChartRef = useRef(null), yearChartRef = useRef(null), lastWeekChartRef = useRef(null); 
+            const yearRef = useRef(), lastWeekRef = useRef(); 
+            const yearChartRef = useRef(null), lastWeekChartRef = useRef(null); 
             
             useEffect(() => { 
                 try { 
-                    if (sumRef.current) { if (sumChartRef.current) sumChartRef.current.destroy(); sumChartRef.current = new Chart(sumRef.current, { type:'pie', data:{ labels:['Tümü'], datasets:[{ data:[metrics.toplam], backgroundColor:['hsl(0,70%,60%)'] }] }, options:{ responsive:true, plugins:{ legend:{ display:false } }, maintainAspectRatio:false } }); } 
                     if (lastWeekRef.current) { if (lastWeekChartRef.current) lastWeekChartRef.current.destroy(); lastWeekChartRef.current = new Chart(lastWeekRef.current, { type:'pie', data:{ labels:['Son 7 Gün (Aktif)'], datasets:[{ data:[metrics.lastWeekOngoing], backgroundColor:['#34d399'] }] }, options:{ responsive:true, plugins:{ legend:{ display:false } }, maintainAspectRatio:false } }); } 
                     if (yearRef.current) { if (yearChartRef.current) yearChartRef.current.destroy(); const years = Object.keys(metrics.yearCounts).sort(); const labels = years.map(y=>`${y}: ${metrics.yearCounts[y]}`); const dataVals = years.map(y=>metrics.yearCounts[y]); yearChartRef.current = new Chart(yearRef.current, { type:'pie', data:{ labels, datasets:[{ data:dataVals, backgroundColor: years.map((_,i)=>`hsl(${i*360/years.length},70%,60%)`) }] }, options:{ responsive:true, plugins:{ legend:{ position:'bottom', labels:{ boxWidth:12, padding:8 } }, tooltip:{ enabled:true } }, maintainAspectRatio:false } }); } 
                 } catch(err) { console.error("Dashboard chart error:", err); } 
@@ -716,7 +721,14 @@
             
             return (
                 <div className="dashboard"> 
-                    <div className="card"><h3>Toplam İşlem</h3><span className="value">{metrics.toplam}</span><div className="subtext">2025 Başvuru: {metrics.count2025}</div><div className="chart-container"><canvas ref={sumRef}></canvas></div></div> 
+                    <div className="card">
+                        <h3>Toplam Başvuru</h3>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '8px' }}>
+                            <div><span style={{fontSize: '0.95rem', color: '#334155'}}>Toplam Başvuru: </span><span style={{fontSize: '1.2rem', color: '#1d4ed8', fontWeight: 'bold'}}>{metrics.toplam}</span></div>
+                            <div><span style={{fontSize: '0.95rem', color: '#334155'}}>Fen Kayıtlı: </span><span style={{fontSize: '1.2rem', color: '#059669', fontWeight: 'bold'}}>{metrics.toplamFenKayitliIslem}</span></div>
+                            <div><span style={{fontSize: '0.95rem', color: '#334155'}}>2025 Başvuru: </span><span style={{fontSize: '1.2rem', color: '#8b5cf6', fontWeight: 'bold'}}>{metrics.count2025}</span></div>
+                        </div>
+                    </div> 
                     <div className="card"><h3>F.K. Ort. Süre (Son 3 Ay)</h3><span className="value">{metrics.avgDays} gün</span></div> 
                     <div className="card">
                         <h3>Bekleyen Başvuru Sayıları</h3>
