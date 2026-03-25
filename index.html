@@ -1171,6 +1171,7 @@
                                     basvuruDurumu: d['başvuru durumu'] || '',
                                     basvuruAciklama: d['başvuru açıklama'] || '',
                                     personnelRaw: d['görevli personel'] || '',
+                                    basvuruTarihi: d['başvuru tarihi'] || '',
                                     fenKayitTarihi: d['fen kayıt tarihi'] || ''
                                 };
                             }
@@ -1207,6 +1208,7 @@
                                     basvuruDurumu: d['başvuru durumu'] || '',
                                     basvuruAciklama: d['başvuru açıklama'] || '',
                                     personnelRaw: d['görevli personel'] || '',
+                                    basvuruTarihi: d['başvuru tarihi'] || '',
                                     fenKayitTarihi: d['fen kayıt tarihi'] || ''
                                 };
                             }
@@ -1239,6 +1241,7 @@
                                                 basvuruDurumu: task['başvuru durumu'] || '',
                                                 beklemeSuresi: Math.floor(diffDays),
                                                 personnelRaw: '',
+                                                basvuruTarihi: task['başvuru tarihi'] || '',
                                                 fenKayitTarihi: task['fen kayıt tarihi'] || ''
                                             };
                                         }
@@ -1275,7 +1278,8 @@
                                 basvuruAciklama: task['başvuru açıklama'] || '',
                                 beklemeSuresi: Math.floor(diffDays),
                                 personnelRaw: task['görevli personel'] || '',
-                                fenKayitTarihi: task['fen kayıt tarihi'] || task['başvuru tarihi'] || ''
+                                basvuruTarihi: task['başvuru tarihi'] || '',
+                                fenKayitTarihi: task['fen kayıt tarihi'] || ''
                             };
                         }
                     });
@@ -1307,7 +1311,8 @@
                                 basvuruAciklama: task['başvuru açıklama'] || '',
                                 beklemeSuresi: Math.floor(diffDays),
                                 personnelRaw: task['görevli personel'] || '',
-                                fenKayitTarihi: task['fen kayıt tarihi'] || task['başvuru tarihi'] || ''
+                                basvuruTarihi: task['başvuru tarihi'] || '',
+                                fenKayitTarihi: task['fen kayıt tarihi'] || ''
                             };
                         }
                     });
@@ -1347,6 +1352,7 @@
                                             basvuruDurumu: task['başvuru durumu'] || '',
                                             beklemeSuresi: Math.floor(diffDays),
                                             personnelRaw: task['görevli personel'] || '',
+                                            basvuruTarihi: task['başvuru tarihi'] || '',
                                             fenKayitTarihi: task['fen kayıt tarihi'] || ''
                                         };
                                     }
@@ -1441,7 +1447,8 @@
                 } else if (sortField === 'fen_kayit_alinmayan' || sortField === 'harci_yatirilmayan') {
                     dataToExport = rowsToExport.map(row => ({
                         'Personel': getPersonnelText(row),
-                        'Başvuru/Fen Kayıt Tarihi': row.fenKayitTarihi,
+                        'Başvuru Tarihi': row.basvuruTarihi,
+                        'Fen Kayıt Tarihi': row.fenKayitTarihi,
                         'Fen Kayıt No': row.fenKayitNo, 
                         'İl': row.il, 
                         'İlçe': row.ilce, 
@@ -1451,7 +1458,7 @@
                         'Bekleme Süresi (Gün)': row.beklemeSuresi,
                         'Başvuru Açıklama': row.basvuruAciklama 
                     }));
-                    cols = [ { wch: 30 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 20 }, { wch: 40 }, { wch: 25 }, { wch: 20 }, { wch: 50 } ];
+                    cols = [ { wch: 30 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 20 }, { wch: 40 }, { wch: 25 }, { wch: 20 }, { wch: 50 } ];
                 } else {
                     dataToExport = rowsToExport.map(row => ({
                         'Personel': getPersonnelText(row),
@@ -1551,8 +1558,9 @@
                             <thead> 
                                 <tr> 
                                     <th className="col-personel">Personel</th>
+                                    {(isFenKayitAlinmayan || isHarciYatirilmayan) && <th>Başvuru Tarihi</th>}
                                     <th>
-                                        {(isFenKayitAlinmayan || isHarciYatirilmayan) ? 'Başvuru / Fen Kayıt Tarihi' : 'Fen Kayıt Tarihi'}
+                                        Fen Kayıt Tarihi
                                         {(isOnemliIslerMode || isUygunOlmayanIadeMode) && (
                                              <span onClick={toggleDateSort} style={{ cursor: 'pointer', userSelect: 'none', padding: '0 5px' }}>{dateSortOrder === 'asc' ? '🔼' : '🔽'}</span>
                                         )}
@@ -1588,6 +1596,7 @@
                                                 ))
                                             }
                                         </td>
+                                        {(isFenKayitAlinmayan || isHarciYatirilmayan) && <td>{row.basvuruTarihi}</td>}
                                         <td>{row.fenKayitTarihi}</td>
                                         <td className="col-fen-kayit-no">{row.fenKayitNo}</td> 
                                         <td className="col-il">{row.il}</td> 
