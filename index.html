@@ -1120,7 +1120,7 @@
             const [dateSortOrder, setDateSortOrder] = useState('asc');
             const [warningPersonnelFilter, setWarningPersonnelFilter] = useState([]);
             const [showWarningPersonnelModal, setShowWarningPersonnelModal] = useState(false);
-            const [warningThreshold, setWarningThreshold] = useState(7); // Yeni süre filtresi durumu
+            const [warningThreshold, setWarningThreshold] = useState(0); // Başlangıçta 0 gün (Tüm Süre)
 
             const toggleDateSort = () => {
                 setDateSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
@@ -1530,6 +1530,10 @@
             const isHarciYatirilmayan = sortField === 'harci_yatirilmayan';
             const isIadeEdilen = sortField === 'iade edilen';
 
+            const generalWarningTitle = warningThreshold === 0 
+                ? `Tüm Bekleyen İşlemler (Uyarı) (Toplam: ${displayedRows.length})` 
+                : `${warningThreshold} Günden Fazla Bekleyen İşlemler (Uyarı) (Toplam: ${displayedRows.length})`;
+
             const warningTitle = isOnemliIslerMode
                 ? `Son 150 Gündeki Önemli İşler (Toplam: ${displayedRows.length})`
                 : (isUygunOlmayanIadeMode
@@ -1544,7 +1548,7 @@
                                     ? `1 Günden Fazla Bekleyen İşlemler (Uyarı) (Toplam: ${displayedRows.length})`
                                     : (isGorevlendirmeYapilmayan
                                         ? `1+ Gündür Personel Atanmayan İşler (Uyarı) (Toplam: ${displayedRows.length})`
-                                        : `${warningThreshold} Günden Fazla Bekleyen İşlemler (Uyarı) (Toplam: ${displayedRows.length})`))))));
+                                        : generalWarningTitle))))));
             
             return ( 
                 <div className="warning-table-container"> 
@@ -1559,8 +1563,10 @@
                                         onChange={(e) => setWarningThreshold(Number(e.target.value))}
                                         style={{padding: '6px', borderRadius: '4px', border: '1px solid #fecaca', fontSize: '0.9rem', color: '#991b1b'}}
                                      >
-                                         <option value={1}>1+ Gün</option>
+                                         <option value={0}>Tüm Süre</option>
                                          <option value={7}>7+ Gün</option>
+                                         <option value={15}>15+ Gün</option>
+                                         <option value={30}>30+ Gün</option>
                                      </select>
                                  </div>
                              )}
