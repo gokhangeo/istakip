@@ -797,14 +797,45 @@
             const [districtStats, setDistrictStats] = useState({});
             
             let dynamicTitle = "Bekleyen İşlem Sayıları";
+            let districtTitle = "İlçe Bazlı Bekleyen İşlemler";
+            let islemTitle = "İşlem Sayıları";
+
             switch(sortField) {
-                case 'iade edilen': dynamicTitle = 'İade Edilen İşlem Sayıları'; break;
-                case 'tescile_giden': dynamicTitle = 'Tescil Edilen(Tescilden Geldi Yapılmayan)'; break;
-                case 'iptal_edilen': dynamicTitle = 'Tapu İptal Edilen(Tescilden Geldi-Eksiklikten İade Yapılmayan)'; break;
-                case 'fen_kayit_alinmayan': dynamicTitle = 'Fen Kayıt Alınmayan(Ödemesi Yapılan)'; break;
-                case 'plan_ornegi': dynamicTitle = 'Plan Örneği-Teknik Bilgi Belge Bekleyen'; break;
-                case 'gorevlendirme_yapilmayan': dynamicTitle = 'Görevlendirme Yapılmayan (1+ Gün)'; break;
-                case 'harci_yatirilmayan': dynamicTitle = 'Harcı Yatırılmayan İşlem Sayıları'; break;
+                case 'iade edilen': 
+                    dynamicTitle = 'İade Edilen İşlem Sayıları'; 
+                    districtTitle = 'İlçe Bazlı İade Edilenler';
+                    islemTitle = 'İşlem Sayıları (İade Edilen)';
+                    break;
+                case 'tescile_giden': 
+                    dynamicTitle = 'Tescil Edilen(Tescilden Geldi Yapılmayan)'; 
+                    districtTitle = 'İlçe Bazlı Tescil Edilenler';
+                    islemTitle = 'İşlem Sayıları (Tescil Edilen)';
+                    break;
+                case 'iptal_edilen': 
+                    dynamicTitle = 'Tapu İptal Edilen(Tescilden Geldi-Eksiklikten İade Yapılmayan)'; 
+                    districtTitle = 'İlçe Bazlı İptal Edilenler';
+                    islemTitle = 'İşlem Sayıları (İptal Edilen)';
+                    break;
+                case 'fen_kayit_alinmayan': 
+                    dynamicTitle = 'Fen Kayıt Alınmayan(Ödemesi Yapılan)'; 
+                    districtTitle = 'İlçe Bazlı Fen Kayıt Alınmayanlar';
+                    islemTitle = 'İşlem Sayıları (F.K. Alınmayan)';
+                    break;
+                case 'plan_ornegi': 
+                    dynamicTitle = 'Plan Örneği-Teknik Bilgi Belge Bekleyen'; 
+                    districtTitle = 'İlçe Bazlı Plan Örneği Bekleyenler';
+                    islemTitle = 'İşlem Sayıları (Plan Örneği)';
+                    break;
+                case 'gorevlendirme_yapilmayan': 
+                    dynamicTitle = 'Görevlendirme Yapılmayan (1+ Gün)'; 
+                    districtTitle = 'İlçe Bazlı Görevlendirme Yapılmayanlar';
+                    islemTitle = 'İşlem Sayıları (Atanmamış)';
+                    break;
+                case 'harci_yatirilmayan': 
+                    dynamicTitle = 'Harcı Yatırılmayan İşlem Sayıları'; 
+                    districtTitle = 'İlçe Bazlı Harcı Yatırılmayanlar';
+                    islemTitle = 'İşlem Sayıları (Harcı Yatırılmayan)';
+                    break;
             }
 
             useEffect(() => {
@@ -836,8 +867,14 @@
                     const fenKayitNo = r['fen kayıt no']; // Fen Kayıt No'yu al
                     const basvuruTarihi = r['başvuru tarihi'];
                     
-                    // Populate districtMap for waiting items
-                    if (district && !status.includes('eksiklikten iade edildi') && !status.includes('tescile gönderildi')) {
+                    let includeInDistrict = false;
+                    if (sortField === '' || sortField.startsWith('bekleyen')) {
+                        includeInDistrict = !status.includes('eksiklikten iade edildi') && !status.includes('tescile gönderildi');
+                    } else {
+                        includeInDistrict = true;
+                    }
+
+                    if (district && includeInDistrict) {
                         districtMap[district] = (districtMap[district] || 0) + 1;
                     }
                     
@@ -985,13 +1022,13 @@
                 createSortedChart(dynamicRef, dynamicChartRef, personnelStats.dynamic, dynamicTitle);
             }, [personnelStats.dynamic, isEngineer, personnelFilterType, dynamicTitle]);
 
-            useEffect(() => {
-                 createSortedChart(islemRef, islemChartRef, islemStats, `İşlem Sayıları`, true);
-            }, [islemStats]);
+             useEffect(() => {
+                 createSortedChart(islemRef, islemChartRef, islemStats, islemTitle, true);
+            }, [islemStats, islemTitle]);
 
              useEffect(() => {
-                 createSortedChart(districtRef, districtChartRef, districtStats, `İlçe Bazlı Bekleyen İşlemler`, true);
-            }, [districtStats]);
+                 createSortedChart(districtRef, districtChartRef, districtStats, districtTitle, true);
+            }, [districtStats, districtTitle]);
 
 
             if (!data || data.length === 0) return null;
@@ -1043,12 +1080,12 @@
                              <div className="chart-wrapper" style={{height: '250px'}}><canvas ref={dynamicRef}></canvas></div>
                          </div>
                           <div className="chart-card" ref={islemChartCardRef}>
-                               <button className="zoom-btn" title="Büyüt" onClick={() => onZoom({ type: 'chart', data: islemStats, title: `İşlem Sayıları (Toplam: ${islemTotalCount})` })}>🔍</button>
+                               <button className="zoom-btn" title="Büyüt" onClick={() => onZoom({ type: 'chart', data: islemStats, title: `${islemTitle} (Toplam: ${islemTotalCount})` })}>🔍</button>
                              {/* Title is now handled by Chart.js title plugin */}
                              <div className="chart-wrapper" style={{height: '250px'}}><canvas ref={islemRef}></canvas></div>
                          </div>
                          <div className="chart-card" ref={districtChartCardRef}>
-                               <button className="zoom-btn" title="Büyüt" onClick={() => onZoom({ type: 'chart', data: districtStats, title: `İlçe Bazlı Bekleyen İşlemler (Toplam: ${districtTotalCount})` })}>🔍</button>
+                               <button className="zoom-btn" title="Büyüt" onClick={() => onZoom({ type: 'chart', data: districtStats, title: `${districtTitle} (Toplam: ${districtTotalCount})` })}>🔍</button>
                              {/* Title is now handled by Chart.js title plugin */}
                              <div className="chart-wrapper" style={{height: '250px'}}><canvas ref={districtRef}></canvas></div>
                          </div>
