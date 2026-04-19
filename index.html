@@ -445,6 +445,11 @@
             }).filter(p => p.name);
         };
         const formatDate = (val) => { if (!val) return ""; if (typeof val === 'number') { const date = XLSX.SSF.parse_date_code(val); if (!date) return ""; return `${date.y}-${String(date.m).padStart(2,'0')}-${String(date.d).padStart(2,'0')}`; } if (typeof val === 'string') { let match = val.match(/^(\d{4}-\d{2}-\d{2})/); if (match) return match[1]; match = val.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})/); if (match) { const day = String(match[1]).padStart(2, '0'); const month = String(match[2]).padStart(2, '0'); const year = match[3]; return `${year}-${month}-${day}`; } const part = val.split(" ")[0]; const m2 = part.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})/); if (m2) { const day = String(m2[1]).padStart(2, '0'); const month = String(m2[2]).padStart(2, '0'); const year = m2[3]; return `${year}-${month}-${day}`; } return part; } return val; }
+        const formatToTR = (dateString) => {
+            if (!dateString) return '';
+            const [y, m, d] = dateString.split('-');
+            return `${d}.${m}.${y}`;
+        };
         const formatFenKayitNo = (val) => { if (val == null) return ""; if (typeof val === 'number') return val; if (typeof val === 'string') { const num = parseInt(val.replace(/\D/g,''),10); if (!isNaN(num)) return num; return val; } return val; }
         
         const parseTescilDate = (val) => {
@@ -763,52 +768,29 @@
                 });
             }
 
-            const dynamicYearCounts = {};
             let dynamicTotal = 0;
             let dynamicFenKayitliCount = 0;
 
             dynamicDataToProcess.forEach(d => {
                 dynamicTotal++;
-                const bStr = d['başvuru tarihi'];
                 const fenKayitNo = d['fen kayıt no'];
                 const hasValidFenKayitNo = fenKayitNo != null && fenKayitNo !== 0 && fenKayitNo !== '0' && fenKayitNo !== '';
                 if (hasValidFenKayitNo) {
                     dynamicFenKayitliCount++;
                 }
-
-                if (bStr) {
-                    const bd = new Date(bStr);
-                    if (!isNaN(bd.getTime()) && bd.getFullYear() > 1900) {
-                        const y = bd.getFullYear();
-                        dynamicYearCounts[y] = (dynamicYearCounts[y] || 0) + 1;
-                    }
-                }
             });
 
-            const yearRef = useRef(), lastWeekRef = useRef(); 
-            const yearChartRef = useRef(null), lastWeekChartRef = useRef(null); 
+            const lastWeekRef = useRef(); 
+            const lastWeekChartRef = useRef(null); 
             
-            const dynYearCountsStr = JSON.stringify(dynamicYearCounts);
-
             useEffect(() => { 
                 try { 
                     if (lastWeekRef.current) { 
                         if (lastWeekChartRef.current) lastWeekChartRef.current.destroy(); 
                         lastWeekChartRef.current = new Chart(lastWeekRef.current, { type:'pie', data:{ labels:['Son 7 Gün (Aktif)'], datasets:[{ data:[metrics.lastWeekOngoing], backgroundColor:['#34d399'] }] }, options:{ responsive:true, plugins:{ legend:{ display:false } }, maintainAspectRatio:false } }); 
                     } 
-                    if (yearRef.current) { 
-                        if (yearChartRef.current) yearChartRef.current.destroy(); 
-                        const parsedCounts = JSON.parse(dynYearCountsStr);
-                        const years = Object.keys(parsedCounts).sort(); 
-                        const labels = years.map(y=>`${y}: ${parsedCounts[y]}`); 
-                        const dataVals = years.map(y=>parsedCounts[y]); 
-                        yearChartRef.current = new Chart(yearRef.current, { type:'pie', data:{ labels, datasets:[{ data:dataVals, backgroundColor: years.map((_,i)=>`hsl(${i*360/years.length},70%,60%)`) }] }, options:{ responsive:true, plugins:{ legend:{ position:'bottom', labels:{ boxWidth:12, padding:8 } }, tooltip:{ enabled:true } }, maintainAspectRatio:false } }); 
-                    } 
                 } catch(err) { console.error("Dashboard chart error:", err); } 
-            }, [metrics.lastWeekOngoing, dynYearCountsStr]); 
-            
-            const parsedDynamicCounts = JSON.parse(dynYearCountsStr);
-            const yearLegend = Object.keys(parsedDynamicCounts).sort().map((y,i)=>{ const color=`hsl(${i*360/Object.keys(parsedDynamicCounts).length},70%,60%)`; return (<div key={y} style={{display:'flex',alignItems:'center',marginTop:'4px'}}><span style={{width:'12px',height:'12px',backgroundColor:color,display:'inline-block',marginRight:'6px',borderRadius:'2px'}}></span><span style={{fontSize:'0.85rem',color:'#334155'}}>{y}: {parsedDynamicCounts[y]}</span></div>);}); 
+            }, [metrics.lastWeekOngoing]); 
             
             return (
                 <div className="dashboard"> 
@@ -817,9 +799,6 @@
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '8px' }}>
                             <div><span style={{fontSize: '0.95rem', color: '#334155'}}>Toplam: </span><span style={{fontSize: '1.2rem', color: '#1d4ed8', fontWeight: 'bold'}}>{dynamicTotal}</span></div>
                             {showFenKayitli && <div><span style={{fontSize: '0.95rem', color: '#334155'}}>Fen Kayıtlı: </span><span style={{fontSize: '1.2rem', color: '#059669', fontWeight: 'bold'}}>{dynamicFenKayitliCount}</span></div>}
-                            {Object.keys(parsedDynamicCounts).sort().map(year => (
-                                <div key={year}><span style={{fontSize: '0.95rem', color: '#334155'}}>{year}: </span><span style={{fontSize: '1.2rem', color: '#8b5cf6', fontWeight: 'bold'}}>{parsedDynamicCounts[year]}</span></div>
-                            ))}
                         </div>
                     </div> 
                     <div className="card"><h3>F.K. Ort. Süre (Son 3 Ay)</h3><span className="value">{metrics.avgDays} gün</span></div> 
@@ -832,7 +811,6 @@
                         </div>
                     </div> 
                     <div className="card"><h3>Son 7 Gün (Aktif)</h3><span className="value" style={{color: '#059669'}}>{metrics.lastWeekOngoing}</span><div className="chart-container"><canvas ref={lastWeekRef}></canvas></div></div> 
-                    <div className="card"><h3>Yıla Göre {dynamicItemName}</h3><div className="chart-container"><canvas ref={yearRef}></canvas></div>{yearLegend}</div> 
                     <div className="card">
                         <h3>İşlem Durumları</h3>
                         <div style={{marginTop: '4px'}}>
@@ -949,8 +927,7 @@
                     const islem = String(r['işlem'] || '').trim();
                     const islemLower = islem.toLowerCase();
                     const district = r._district;
-                    const fenKayitNo = r['fen kayıt no']; // Fen Kayıt No'yu al
-                    const basvuruTarihi = r['başvuru tarihi'];
+                    const fenKayitNo = r['fen kayıt no'];
                     
                     let includeInDistrict = false;
                     if (sortField === '' || sortField.startsWith('bekleyen')) {
@@ -963,7 +940,6 @@
                         districtMap[district] = (districtMap[district] || 0) + 1;
                     }
                     
-                    // Populate islemMap with grouping
                     let groupedIslem = islem;
                     if ((islemLower.includes('mahke') && islemLower.includes('plan örneği')) || islemLower.includes('teknik bilgi ve belge örnekleri')) {
                         groupedIslem = 'Plan Örneği';
@@ -974,7 +950,6 @@
                         islemMap[groupedIslem] = (islemMap[groupedIslem] || 0) + 1;
                     }
 
-                    // Populate dynamicMap based on sortField
                     let conditionMet = false;
                     switch(sortField) {
                         case 'iade edilen': 
@@ -987,7 +962,6 @@
                             if(status.includes('tescile gönderildi') && aciklama.includes('iptal')) conditionMet = true;
                             break;
                         case 'fen_kayit_alinmayan':
-                            // This specific filter already checks for fenKayitNo, so we keep it as is.
                              if(odeme.includes('ödendi') && !odeme.includes('ödenmedi') && (fenKayitNo === 0 || fenKayitNo == null)) conditionMet = true;
                             break;
                         case 'harci_yatirilmayan':
@@ -998,18 +972,13 @@
                             const isMahkemePlanOrnegi = islemLower === 'mahkeme plan örneği';
                             const isTeknikBilgi = islemLower === 'teknik bilgi ve belge örnekleri';
                             const isWaiting = !status.includes('eksiklikten iade edildi') && !status.includes('tescile gönderildi');
-                            // Also check for valid Fen Kayit No when Plan Örneği is selected
                             if (isWaiting && (isPlanOrnegi || isMahkemePlanOrnegi || isTeknikBilgi) && fenKayitNo != null && fenKayitNo != 0) {
                                  conditionMet = true;
                             }
                             break;
                         case 'gorevlendirme_yapilmayan':
-                            // Bu grafik personel bazlı olduğu için personel olmayanları burada göstermiyoruz.
-                            // Ancak 'Atanmamış' gibi bir bar ekleyebiliriz veya boş bırakabiliriz.
-                            // Kullanıcı ilçe bazlı grafiği istediği için burayı boş geçiyoruz.
                             break;
-                        default: // This includes the default 'Bekleyen İşlem Sayıları'
-                             // Check if it's a waiting task AND has a valid Fen Kayıt No
+                        default:
                             if(!status.includes('eksiklikten iade edildi') && !status.includes('tescile gönderildi') && fenKayitNo != null && fenKayitNo != 0) {
                                 conditionMet = true;
                              }
@@ -1051,7 +1020,7 @@
                         }
                         
                         const totalCount = dataValues.reduce((sum, val) => sum + val, 0);
-                        const chartLabel = `${label} (Toplam: ${totalCount})`; // İl bilgisi kaldırıldı
+                        const chartLabel = `${label} (Toplam: ${totalCount})`;
 
 
                         if (chartRef.current) chartRef.current.destroy();
@@ -1061,7 +1030,7 @@
                             data: {
                                 labels,
                                 datasets: [{
-                                    label: chartLabel, // Use updated label
+                                    label: chartLabel,
                                     data: dataValues,
                                     backgroundColor: labels.map((_, i) => `hsl(${(i * 360 / labels.length)}, 70%, 60%)`)
                                 }]
@@ -1070,10 +1039,10 @@
                                 indexAxis: 'y',
                                 responsive: true,
                                 plugins: {
-                                    title: { // Use title plugin for better display
+                                    title: {
                                         display: true,
                                         text: chartLabel,
-                                        font: { size: 14 } // Adjust font size if needed
+                                        font: { size: 14 }
                                     },
                                     legend: { display: false },
                                     datalabels: { anchor: 'end', align: 'right', color: '#444', font: { weight: 'bold' } }
@@ -1118,7 +1087,6 @@
 
             if (!data || data.length === 0) return null;
 
-            // Calculate totals for zoom titles
             let personnelTotalsData = personnelStats.totals;
              if (personnelFilterType === 'engineer') {
                 personnelTotalsData = Object.fromEntries(Object.entries(personnelStats.totals).filter(([name]) => isEngineer(name)));
@@ -1156,22 +1124,18 @@
                      <div className="charts-below">
                          <div className="chart-card" ref={personnelChartCardRef}>
                              <button className="zoom-btn" title="Büyüt" onClick={() => onZoom({ type: 'chart', data: personnelTotalsData, title: `Personel İşlem Dağılımı (Toplam: ${personnelTotalCount})` })}>🔍</button>
-                             {/* Title is now handled by Chart.js title plugin */}
                              <div className="chart-wrapper" style={{height: '250px'}}><canvas ref={totalRef}></canvas></div>
                          </div>
                          <div className="chart-card" ref={waitingChartCardRef}>
                               <button className="zoom-btn" title="Büyüt" onClick={() => onZoom({ type: 'chart', data: dynamicTotalsData, title: `${dynamicTitle} (Toplam: ${dynamicTotalCount})` })}>🔍</button>
-                             {/* Title is now handled by Chart.js title plugin */}
                              <div className="chart-wrapper" style={{height: '250px'}}><canvas ref={dynamicRef}></canvas></div>
                          </div>
                           <div className="chart-card" ref={islemChartCardRef}>
                                <button className="zoom-btn" title="Büyüt" onClick={() => onZoom({ type: 'chart', data: islemStats, title: `${islemTitle} (Toplam: ${islemTotalCount})` })}>🔍</button>
-                             {/* Title is now handled by Chart.js title plugin */}
                              <div className="chart-wrapper" style={{height: '250px'}}><canvas ref={islemRef}></canvas></div>
                          </div>
                          <div className="chart-card" ref={districtChartCardRef}>
                                <button className="zoom-btn" title="Büyüt" onClick={() => onZoom({ type: 'chart', data: districtStats, title: `${districtTitle} (Toplam: ${districtTotalCount})` })}>🔍</button>
-                             {/* Title is now handled by Chart.js title plugin */}
                              <div className="chart-wrapper" style={{height: '250px'}}><canvas ref={districtRef}></canvas></div>
                          </div>
                      </div>
@@ -1242,13 +1206,12 @@
             const [dateSortOrder, setDateSortOrder] = useState('asc');
             const [warningPersonnelFilter, setWarningPersonnelFilter] = useState([]);
             const [showWarningPersonnelModal, setShowWarningPersonnelModal] = useState(false);
-            const [warningThreshold, setWarningThreshold] = useState(0); // Başlangıçta 0 gün (Tüm Süre)
+            const [warningThreshold, setWarningThreshold] = useState(0);
 
             const toggleDateSort = () => {
                 setDateSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
             };
 
-            // Reset local filter when main sort field changes
             useEffect(() => {
                 setWarningPersonnelFilter([]);
             }, [sortField]);
@@ -1382,7 +1345,7 @@
                                 const basvuruDate = new Date(bStr);
                                 if (!isNaN(basvuruDate) && basvuruDate.getFullYear() > 1900) {
                                     const diffDays = (today - basvuruDate) / (1000 * 60 * 60 * 24);
-                                    if (diffDays >= 1) { // 1 gün ve üzeri
+                                    if (diffDays >= 1) { 
                                         const key = `${task['fen kayıt no'] || index}-${task['ilçe']}`;
                                         if (!groupedTasks[key]) {
                                             groupedTasks[key] = {
@@ -1535,13 +1498,11 @@
                 setWarningRows(finalRows);
             }, [data, isEngineer, personnelFilterType, sortField, dateSortOrder, warningThreshold]); 
 
-            // Calculate options based on current warning rows
             const warningPersonnelOptions = React.useMemo(() => {
                 const names = new Set();
                 warningRows.forEach(row => {
                     const pList = parsePersonnelWithStatus(row.personnelRaw);
                     pList.forEach(p => {
-                        // Respect the global engineer filter logic for the list
                         if (personnelFilterType === 'engineer' && !isEngineer(p.name)) return;
                         if (personnelFilterType === 'other' && isEngineer(p.name)) return;
                         names.add(p.name);
@@ -1550,7 +1511,6 @@
                 return [...names].sort((a, b) => a.localeCompare(b, 'tr'));
             }, [warningRows, personnelFilterType, isEngineer]);
 
-            // Determine displayed rows based on local filter
             const displayedRows = React.useMemo(() => {
                 if (warningPersonnelFilter.length === 0) return warningRows;
                 return warningRows.filter(row => {
@@ -1581,7 +1541,6 @@
                 let dataToExport;
                 let cols = [];
                 
-                // Use displayedRows instead of warningRows to respect the filter
                 const rowsToExport = displayedRows;
 
                 if (sortField === 'fen_kayit_alinmayan' || sortField === 'harci_yatirilmayan' || sortField === 'iade edilen') {
@@ -1832,7 +1791,7 @@
                     const personnel = splitPersonel(row['görevli personel']);
                     return personnel.some(p => !isEngineer(p));
                 });
-            } else if (showOnlyEngineers) { // Fallback to existing logic if showOnlyEngineers is used elsewhere or legacy
+            } else if (showOnlyEngineers) {
                  rows = rows.filter(row => {
                     const personnel = splitPersonel(row['görevli personel']);
                     return personnel.some(p => isEngineer(p));
@@ -2086,13 +2045,10 @@
                         chartRef.current.destroy();
                     }
 
-                    // Check if data is for stacked chart (EBYS) or simple bar chart
                     const isStacked = Object.values(chartData).some(val => typeof val === 'object');
-
                     let config = {};
 
                     if (isStacked) {
-                        // Stacked Chart Logic (EBYS)
                         const sortedPersonnel = Object.keys(chartData).sort((a, b) => {
                             const totalA = Object.values(chartData[a]).reduce((s, c) => s + c, 0);
                             const totalB = Object.values(chartData[b]).reduce((s, c) => s + c, 0);
@@ -2106,7 +2062,7 @@
                         const datasets = allYears.map((year, index) => ({
                             label: year,
                             data: sortedPersonnel.map(p => chartData[p][year] || 0),
-                            backgroundColor: `hsl(${index * 50 + 200}, 70%, 60%)`, // Different colors for years
+                            backgroundColor: `hsl(${index * 50 + 200}, 70%, 60%)`,
                             stack: 'Stack 0',
                         }));
 
@@ -2117,7 +2073,7 @@
                                 datasets: datasets
                             },
                             options: {
-                                indexAxis: 'y', // Horizontal bars
+                                indexAxis: 'y',
                                 responsive: true,
                                 maintainAspectRatio: false,
                                 plugins: {
@@ -2148,7 +2104,6 @@
                             }
                         };
                     } else {
-                        // Existing Simple Chart Logic
                         const sortedData = Object.entries(chartData).sort(([, a], [, b]) => b - a);
                         
                         const isPersonnelChart = title.toLowerCase().includes('personel') || title.toLowerCase().includes('bekleyen');
@@ -2166,7 +2121,7 @@
                                 }]
                             },
                             options: {
-                                indexAxis: 'x', // Vertical bars for normal charts
+                                indexAxis: 'x',
                                 responsive: true,
                                 maintainAspectRatio: false,
                                 plugins: {
@@ -2409,7 +2364,7 @@
                 summaryData.push(["Mühendis", "Tamamlanan", "Devam Eden", "Yeni Eklenen"]);
 
                 Object.keys(comparisonResult.engineerAnalysis)
-                    .sort((a,b) => a.localeCompare(b, 'tr')) // Sort engineers by name
+                    .sort((a,b) => a.localeCompare(b, 'tr'))
                     .forEach(engineerName => {
                         const analysis = comparisonResult.engineerAnalysis[engineerName];
                         summaryData.push([
@@ -2437,7 +2392,7 @@
                             const rowData = Array.from(headers).map(h => row[h] || "");
                             sheetData.push(rowData);
                         });
-                        sheetData.push([]); // Spacer
+                        sheetData.push([]); 
                     }
                     if(analysis.ongoing.length > 0) {
                         sheetData.push(["--- DEVAM EDEN İŞLER ---"]);
@@ -2446,7 +2401,7 @@
                             const rowData = Array.from(headers).map(h => row[h] || "");
                             sheetData.push(rowData);
                         });
-                         sheetData.push([]); // Spacer
+                         sheetData.push([]); 
                     }
                      if(analysis.added.length > 0) {
                         sheetData.push(["--- YENİ EKLENEN İŞLER ---"]);
@@ -2585,7 +2540,6 @@
                     let reportItems = [];
 
                     if (type === 'district') {
-                        // Define custom district groups
                         const groups = {
                             "Anamur-Bozyazı": ["anamur", "bozyazı"],
                             "Silifke-Aydıncık-Gülnar": ["silifke", "aydıncık", "gülnar"],
@@ -2709,9 +2663,9 @@
         
                             const ws = XLSX.utils.json_to_sheet(dataToExport);
                             
-                            const colWidths = [30, 15, 15]; // Personel, Tarih, No
-                            if (showProvinceCol) colWidths.push(15); // İl
-                            colWidths.push(15, 20, 40, 25, 20); // İlçe, İşlem, Zemin, Durum, Süre
+                            const colWidths = [30, 15, 15]; 
+                            if (showProvinceCol) colWidths.push(15); 
+                            colWidths.push(15, 20, 40, 25, 20); 
 
                             ws['!cols'] = colWidths.map(w => ({ wch: w }));
         
@@ -2731,7 +2685,6 @@
                                 const safeName = item.name.replace(/[\\/*?:"<>|]/g, '');
                                 XLSX.writeFile(individualWb, `${safeName} (MEGSİS).xlsx`);
                                 
-                                // Tarayıcı engellemesini önlemek için kısa bir bekleme
                                 await new Promise(resolve => setTimeout(resolve, 200));
                             } else {
                                 const sheetName = item.name.replace(/[\\/*?:]/g, "").substring(0, 31);
@@ -3163,15 +3116,21 @@
             const [loading,setLoading]=useState(false);
             const [errorMsg,setErrorMsg]=useState("");
             const [sortField,setSortField]=useState('');
+            
+            // Date Filter States
+            const [startDate, setStartDate] = useState('');
+            const [endDate, setEndDate] = useState('');
+            const [showDateModal, setShowDateModal] = useState(false);
+
             const [selectedPersonel,setSelectedPersonel]=useState([]);
             const [selectedIl,setSelectedIl]=useState([]);
             const [selectedIlce, setSelectedIlce] = useState([]); 
-            const [selectedIslem, setSelectedIslem] = useState([]); // Yeni İşlem Filtresi State'i
-            const [personnelFilterType, setPersonnelFilterType] = useState('all'); // New state for personnel filter
+            const [selectedIslem, setSelectedIslem] = useState([]); 
+            const [personnelFilterType, setPersonnelFilterType] = useState('all'); 
             const [showPersonelModal,setShowPersonelModal]=useState(false);
             const [showIlModal,setShowIlModal]=useState(false);
             const [showIlceModal, setShowIlceModal] = useState(false); 
-            const [showIslemModal, setShowIslemModal] = useState(false); // İşlem Modal State'i
+            const [showIslemModal, setShowIslemModal] = useState(false); 
             const [zoomContent, setZoomContent] = useState(null);
             const [showOnlyEngineers, setShowOnlyEngineers] = useState(false);
             const [isFullscreen, setIsFullscreen] = useState(false);
@@ -3188,7 +3147,6 @@
                 try {
                     const response = await fetch(url);
                     if (!response.ok) {
-                        // Silently fail as requested
                         return [];
                     }
                     const arrayBuffer = await response.arrayBuffer();
@@ -3198,7 +3156,6 @@
                     const json = XLSX.utils.sheet_to_json(ws, { header: 1 });
                     return json.flat().filter(name => name != null && name.toString().trim() !== '');
                 } catch (error) {
-                    // Silently fail as requested
                     return [];
                 }
             };
@@ -3253,7 +3210,6 @@
                 const engineerFiles = files.filter(f => f.name.toLowerCase().includes('mühendis') || f.name.toLowerCase().includes('muhendis'));
                 const dataFiles = files.filter(f => !f.name.toLowerCase().includes('mühendis') && !f.name.toLowerCase().includes('muhendis'));
 
-                // Handle Engineer Files
                 if (engineerFiles.length > 0) {
                     try {
                         const readSimpleList = (file) => new Promise((resolve, reject) => {
@@ -3278,7 +3234,6 @@
                     }
                 }
 
-                // Handle Data Files
                 if (dataFiles.length > 0) {
                     const newRowsPromises = dataFiles.map(f => readExcelPromise(f).catch(err => {
                         console.error('Excel okuma hatası:',err); 
@@ -3328,22 +3283,12 @@
             )).sort((a,b)=>a.localeCompare(b,'tr'));
             const personnelOptions = Array.from(new Set(data.flatMap(d=>splitPersonel(d['görevli personel'])))).sort((a,b)=>a.localeCompare(b,'tr'));
             
-            // İşlem listesi oluşturuluyor
             const islemOptions = Array.from(new Set(
                 data
                 .map(d => d['işlem'])
                 .filter(i => i && typeof i === 'string' && i.trim() !== '')
             )).sort((a,b)=>a.localeCompare(b,'tr'));
             
-            // İşlem sayıları hesaplanıyor
-            // const islemCounts = {};
-            // data.forEach(d => {
-            //    const i = d['işlem'];
-            //    if (i && typeof i === 'string' && i.trim() !== '') {
-            //        islemCounts[i] = (islemCounts[i] || 0) + 1;
-            //    }
-            // });
-
             const sortOptions=[
                 {label:'Sıralama Yok',value:''},
                 {label:'Başvuru Tarihine Göre',value:'başvuru tarihi'},
@@ -3364,10 +3309,30 @@
             
             const filteredData=(() => {
                 let arr=[...data];
+                
+                // Date Filter Logic (Based on Fen Kayıt Tarihi, falls back to Başvuru Tarihi)
+                if (startDate) {
+                    const sObj = new Date(startDate);
+                    arr = arr.filter(d => {
+                        const dateVal = d['fen kayıt tarihi'] || d['başvuru tarihi'];
+                        if (!dateVal) return false;
+                        return new Date(dateVal) >= sObj;
+                    });
+                }
+                if (endDate) {
+                    const eObj = new Date(endDate);
+                    eObj.setHours(23, 59, 59, 999);
+                    arr = arr.filter(d => {
+                        const dateVal = d['fen kayıt tarihi'] || d['başvuru tarihi'];
+                        if (!dateVal) return false;
+                        return new Date(dateVal) <= eObj;
+                    });
+                }
+
                 if(selectedIl.length>0) arr=arr.filter(d=>selectedIl.includes(d._province));
                 if(selectedIlce.length > 0) arr = arr.filter(d => selectedIlce.includes(d._district));
                 if(selectedPersonel.length>0) arr=arr.filter(d=>{const ppl=splitPersonel(d['görevli personel']); return selectedPersonel.some(sp=>ppl.includes(sp));});
-                if(selectedIslem.length > 0) arr = arr.filter(d => selectedIslem.includes(d['işlem'])); // İşlem filtresi uygulanıyor
+                if(selectedIslem.length > 0) arr = arr.filter(d => selectedIslem.includes(d['işlem'])); 
                 
                 if(sortField==='iade edilen') {
                     arr=arr.filter(d=>String(d['başvuru durumu']||'').toLocaleLowerCase('tr').includes('eksiklikten iade edildi'));
@@ -3513,6 +3478,12 @@
                             </select>
                         </div>
                         <div className="control-group">
+                            <label>Tarih Filtresi</label>
+                            <button onClick={() => setShowDateModal(true)}>
+                                {startDate || endDate ? `${formatToTR(startDate) || '...'} - ${formatToTR(endDate) || '...'}` : 'Tarih Aralığı Seç'}
+                            </button>
+                        </div>
+                        <div className="control-group">
                             <label>İl Filtresi</label>
                             <button onClick={()=>setShowIlModal(true)}>{selectedIl.length ? `${selectedIl.length} il seçili` : 'İl Seç'}</button>
                         </div>
@@ -3532,7 +3503,7 @@
                         </div>
                          <div className="control-group">
                             <label>Veri Yönetimi</label>
-                            <button onClick={() => { setData([]); setSelectedIl([]); setSelectedPersonel([]); setSelectedIlce([]); setSelectedIslem([]); }} style={{backgroundColor: '#ef4444', color: 'white'}}>Verileri Temizle</button>
+                            <button onClick={() => { setData([]); setSelectedIl([]); setSelectedPersonel([]); setSelectedIlce([]); setSelectedIslem([]); setStartDate(''); setEndDate(''); }} style={{backgroundColor: '#ef4444', color: 'white'}}>Verileri Temizle</button>
                         </div>
                     </div>
                     <Dashboard data={data} filtered={filteredData} sortField={sortField} selectedPersonel={selectedPersonel} selectedIl={selectedIl} selectedIlce={selectedIlce} />
@@ -3574,6 +3545,31 @@
                                     <button className="download-btn" onClick={handleDownloadModalAsJpeg}>JPEG İndir</button>
                                 }
                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Tarih Seçici Modal */}
+                {showDateModal && (
+                    <div className="modal-overlay" onClick={() => setShowDateModal(false)}>
+                        <div className="modal" onClick={e => e.stopPropagation()}>
+                            <div className="modal-header"><h3>Tarih Aralığı Seç</h3><button className="close-btn" onClick={()=>setShowDateModal(false)}>×</button></div>
+                            <div className="modal-content">
+                                <div style={{display: 'flex', flexDirection: 'column', gap: '15px'}}>
+                                    <div>
+                                        <label style={{display:'block', marginBottom:'5px', fontWeight:'bold'}}>Başlangıç Tarihi</label>
+                                        <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} style={{width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc'}} />
+                                    </div>
+                                    <div>
+                                        <label style={{display:'block', marginBottom:'5px', fontWeight:'bold'}}>Bitiş Tarihi</label>
+                                        <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} style={{width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc'}} />
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="modal-footer">
+                                <button className="download-btn" onClick={()=>{setStartDate(''); setEndDate(''); setShowDateModal(false);}}>Temizle & Kapat</button>
+                                <button className="download-btn" style={{backgroundColor: '#16a34a'}} onClick={()=> setShowDateModal(false)}>Uygula</button>
+                            </div>
                         </div>
                     </div>
                 )}
@@ -3667,7 +3663,6 @@
 
             const handleLogin = () => {
                 let userToCheck = username;
-                // Special case for 'mersinkm' - it's already lowercase in users object
                 if (username.toLowerCase() !== 'mersinkm') {
                     userToCheck = username.toUpperCase();
                 }
