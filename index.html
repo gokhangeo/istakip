@@ -713,27 +713,112 @@
                 return true;
             }));
 
+            let dynamicCardTitle = "Toplam Devam Eden";
+            let dynamicItemName = "Devam Eden";
+            let dynamicDataToProcess = filtered;
+            let showFenKayitli = true;
+
+            if (sortField === 'iade edilen' || sortField === 'uygun_olmayan_iade') {
+                dynamicCardTitle = "Toplam İade Edilen";
+                dynamicItemName = "İade";
+                showFenKayitli = false;
+            } else if (sortField === 'tescile_giden') {
+                dynamicCardTitle = "Toplam Tescil Edilen";
+                dynamicItemName = "Tescil";
+                showFenKayitli = false;
+            } else if (sortField === 'tescilden_geldi') {
+                dynamicCardTitle = "Toplam Tescilden Geldi";
+                dynamicItemName = "Tescilden Geldi";
+                showFenKayitli = false;
+            } else if (sortField === 'iptal_edilen') {
+                dynamicCardTitle = "Toplam İptal Edilen";
+                dynamicItemName = "İptal";
+                showFenKayitli = false;
+            } else if (sortField === 'fen_kayit_alinmayan') {
+                dynamicCardTitle = "Toplam F.K. Alınmayan";
+                dynamicItemName = "F.K. Yok";
+                showFenKayitli = false;
+            } else if (sortField === 'harci_yatirilmayan') {
+                dynamicCardTitle = "Toplam Harcı Yatırılmayan";
+                dynamicItemName = "Harcı Yok";
+                showFenKayitli = false;
+            } else if (sortField === 'plan_ornegi') {
+                dynamicCardTitle = "Toplam Plan Örneği";
+                dynamicItemName = "Plan Örneği";
+                showFenKayitli = false;
+            } else if (sortField === 'onemli_isler') {
+                dynamicCardTitle = "Toplam Önemli İşler";
+                dynamicItemName = "Önemli İş";
+                showFenKayitli = true;
+            } else if (sortField === 'gorevlendirme_yapilmayan') {
+                dynamicCardTitle = "Toplam Atanmayan";
+                dynamicItemName = "Atanmayan";
+                showFenKayitli = false;
+            } else {
+                dynamicCardTitle = "Toplam Devam Eden";
+                dynamicItemName = "Devam Eden";
+                dynamicDataToProcess = filtered.filter(d => {
+                     const status = String(d['başvuru durumu'] || '').toLocaleLowerCase('tr');
+                     return !status.includes('eksiklikten iade edildi') && !status.includes('tescile gönderildi');
+                });
+            }
+
+            const dynamicYearCounts = {};
+            let dynamicTotal = 0;
+            let dynamicFenKayitliCount = 0;
+
+            dynamicDataToProcess.forEach(d => {
+                dynamicTotal++;
+                const bStr = d['başvuru tarihi'];
+                const fenKayitNo = d['fen kayıt no'];
+                const hasValidFenKayitNo = fenKayitNo != null && fenKayitNo !== 0 && fenKayitNo !== '0' && fenKayitNo !== '';
+                if (hasValidFenKayitNo) {
+                    dynamicFenKayitliCount++;
+                }
+
+                if (bStr) {
+                    const bd = new Date(bStr);
+                    if (!isNaN(bd.getTime()) && bd.getFullYear() > 1900) {
+                        const y = bd.getFullYear();
+                        dynamicYearCounts[y] = (dynamicYearCounts[y] || 0) + 1;
+                    }
+                }
+            });
+
             const yearRef = useRef(), lastWeekRef = useRef(); 
             const yearChartRef = useRef(null), lastWeekChartRef = useRef(null); 
             
+            const dynYearCountsStr = JSON.stringify(dynamicYearCounts);
+
             useEffect(() => { 
                 try { 
-                    if (lastWeekRef.current) { if (lastWeekChartRef.current) lastWeekChartRef.current.destroy(); lastWeekChartRef.current = new Chart(lastWeekRef.current, { type:'pie', data:{ labels:['Son 7 Gün (Aktif)'], datasets:[{ data:[metrics.lastWeekOngoing], backgroundColor:['#34d399'] }] }, options:{ responsive:true, plugins:{ legend:{ display:false } }, maintainAspectRatio:false } }); } 
-                    if (yearRef.current) { if (yearChartRef.current) yearChartRef.current.destroy(); const years = Object.keys(metrics.yearCounts).sort(); const labels = years.map(y=>`${y}: ${metrics.yearCounts[y]}`); const dataVals = years.map(y=>metrics.yearCounts[y]); yearChartRef.current = new Chart(yearRef.current, { type:'pie', data:{ labels, datasets:[{ data:dataVals, backgroundColor: years.map((_,i)=>`hsl(${i*360/years.length},70%,60%)`) }] }, options:{ responsive:true, plugins:{ legend:{ position:'bottom', labels:{ boxWidth:12, padding:8 } }, tooltip:{ enabled:true } }, maintainAspectRatio:false } }); } 
+                    if (lastWeekRef.current) { 
+                        if (lastWeekChartRef.current) lastWeekChartRef.current.destroy(); 
+                        lastWeekChartRef.current = new Chart(lastWeekRef.current, { type:'pie', data:{ labels:['Son 7 Gün (Aktif)'], datasets:[{ data:[metrics.lastWeekOngoing], backgroundColor:['#34d399'] }] }, options:{ responsive:true, plugins:{ legend:{ display:false } }, maintainAspectRatio:false } }); 
+                    } 
+                    if (yearRef.current) { 
+                        if (yearChartRef.current) yearChartRef.current.destroy(); 
+                        const parsedCounts = JSON.parse(dynYearCountsStr);
+                        const years = Object.keys(parsedCounts).sort(); 
+                        const labels = years.map(y=>`${y}: ${parsedCounts[y]}`); 
+                        const dataVals = years.map(y=>parsedCounts[y]); 
+                        yearChartRef.current = new Chart(yearRef.current, { type:'pie', data:{ labels, datasets:[{ data:dataVals, backgroundColor: years.map((_,i)=>`hsl(${i*360/years.length},70%,60%)`) }] }, options:{ responsive:true, plugins:{ legend:{ position:'bottom', labels:{ boxWidth:12, padding:8 } }, tooltip:{ enabled:true } }, maintainAspectRatio:false } }); 
+                    } 
                 } catch(err) { console.error("Dashboard chart error:", err); } 
-            }, [metrics]); 
+            }, [metrics.lastWeekOngoing, dynYearCountsStr]); 
             
-            const yearLegend = Object.keys(metrics.yearCounts).sort().map((y,i)=>{ const color=`hsl(${i*360/Object.keys(metrics.yearCounts).length},70%,60%)`; return (<div key={y} style={{display:'flex',alignItems:'center',marginTop:'4px'}}><span style={{width:'12px',height:'12px',backgroundColor:color,display:'inline-block',marginRight:'6px',borderRadius:'2px'}}></span><span style={{fontSize:'0.85rem',color:'#334155'}}>{y}: {metrics.yearCounts[y]}</span></div>);}); 
+            const parsedDynamicCounts = JSON.parse(dynYearCountsStr);
+            const yearLegend = Object.keys(parsedDynamicCounts).sort().map((y,i)=>{ const color=`hsl(${i*360/Object.keys(parsedDynamicCounts).length},70%,60%)`; return (<div key={y} style={{display:'flex',alignItems:'center',marginTop:'4px'}}><span style={{width:'12px',height:'12px',backgroundColor:color,display:'inline-block',marginRight:'6px',borderRadius:'2px'}}></span><span style={{fontSize:'0.85rem',color:'#334155'}}>{y}: {parsedDynamicCounts[y]}</span></div>);}); 
             
             return (
                 <div className="dashboard"> 
                     <div className="card">
-                        <h3>Toplam Devam Eden</h3>
+                        <h3>{dynamicCardTitle}</h3>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '8px' }}>
-                            <div><span style={{fontSize: '0.95rem', color: '#334155'}}>Toplam Devam Eden: </span><span style={{fontSize: '1.2rem', color: '#1d4ed8', fontWeight: 'bold'}}>{metrics.toplamDevamEden}</span></div>
-                            <div><span style={{fontSize: '0.95rem', color: '#334155'}}>Fen Kayıtlı: </span><span style={{fontSize: '1.2rem', color: '#059669', fontWeight: 'bold'}}>{metrics.toplamFenKayitliIslem}</span></div>
-                            {Object.keys(metrics.yearCounts).sort().map(year => (
-                                <div key={year}><span style={{fontSize: '0.95rem', color: '#334155'}}>{year} Devam Eden: </span><span style={{fontSize: '1.2rem', color: '#8b5cf6', fontWeight: 'bold'}}>{metrics.yearCounts[year]}</span></div>
+                            <div><span style={{fontSize: '0.95rem', color: '#334155'}}>Toplam: </span><span style={{fontSize: '1.2rem', color: '#1d4ed8', fontWeight: 'bold'}}>{dynamicTotal}</span></div>
+                            {showFenKayitli && <div><span style={{fontSize: '0.95rem', color: '#334155'}}>Fen Kayıtlı: </span><span style={{fontSize: '1.2rem', color: '#059669', fontWeight: 'bold'}}>{dynamicFenKayitliCount}</span></div>}
+                            {Object.keys(parsedDynamicCounts).sort().map(year => (
+                                <div key={year}><span style={{fontSize: '0.95rem', color: '#334155'}}>{year}: </span><span style={{fontSize: '1.2rem', color: '#8b5cf6', fontWeight: 'bold'}}>{parsedDynamicCounts[year]}</span></div>
                             ))}
                         </div>
                     </div> 
@@ -747,7 +832,7 @@
                         </div>
                     </div> 
                     <div className="card"><h3>Son 7 Gün (Aktif)</h3><span className="value" style={{color: '#059669'}}>{metrics.lastWeekOngoing}</span><div className="chart-container"><canvas ref={lastWeekRef}></canvas></div></div> 
-                    <div className="card"><h3>Yıla Göre Bekleyen</h3><div className="chart-container"><canvas ref={yearRef}></canvas></div>{yearLegend}</div> 
+                    <div className="card"><h3>Yıla Göre {dynamicItemName}</h3><div className="chart-container"><canvas ref={yearRef}></canvas></div>{yearLegend}</div> 
                     <div className="card">
                         <h3>İşlem Durumları</h3>
                         <div style={{marginTop: '4px'}}>
