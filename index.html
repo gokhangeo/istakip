@@ -719,55 +719,45 @@
             }));
 
             let dynamicCardTitle = "Toplam Devam Eden";
-            let dynamicItemName = "Devam Eden";
             let dynamicDataToProcess = filtered;
             let showFenKayitli = true;
 
             if (sortField === 'iade edilen' || sortField === 'uygun_olmayan_iade') {
                 dynamicCardTitle = "Toplam İade Edilen";
-                dynamicItemName = "İade";
                 showFenKayitli = false;
             } else if (sortField === 'tescile_giden') {
                 dynamicCardTitle = "Toplam Tescil Edilen";
-                dynamicItemName = "Tescil";
                 showFenKayitli = false;
             } else if (sortField === 'tescilden_geldi') {
                 dynamicCardTitle = "Toplam Tescilden Geldi";
-                dynamicItemName = "Tescilden Geldi";
                 showFenKayitli = false;
             } else if (sortField === 'iptal_edilen') {
                 dynamicCardTitle = "Toplam İptal Edilen";
-                dynamicItemName = "İptal";
                 showFenKayitli = false;
             } else if (sortField === 'fen_kayit_alinmayan') {
                 dynamicCardTitle = "Toplam F.K. Alınmayan";
-                dynamicItemName = "F.K. Yok";
                 showFenKayitli = false;
             } else if (sortField === 'harci_yatirilmayan') {
                 dynamicCardTitle = "Toplam Harcı Yatırılmayan";
-                dynamicItemName = "Harcı Yok";
                 showFenKayitli = false;
             } else if (sortField === 'plan_ornegi') {
                 dynamicCardTitle = "Toplam Plan Örneği";
-                dynamicItemName = "Plan Örneği";
                 showFenKayitli = false;
             } else if (sortField === 'onemli_isler') {
                 dynamicCardTitle = "Toplam Önemli İşler";
-                dynamicItemName = "Önemli İş";
                 showFenKayitli = true;
             } else if (sortField === 'gorevlendirme_yapilmayan') {
                 dynamicCardTitle = "Toplam Atanmayan";
-                dynamicItemName = "Atanmayan";
                 showFenKayitli = false;
             } else {
                 dynamicCardTitle = "Toplam Devam Eden";
-                dynamicItemName = "Devam Eden";
                 dynamicDataToProcess = filtered.filter(d => {
                      const status = String(d['başvuru durumu'] || '').toLocaleLowerCase('tr');
                      return !status.includes('eksiklikten iade edildi') && !status.includes('tescile gönderildi');
                 });
             }
 
+            const dynamicYearCounts = {};
             let dynamicTotal = 0;
             let dynamicFenKayitliCount = 0;
 
@@ -777,6 +767,15 @@
                 const hasValidFenKayitNo = fenKayitNo != null && fenKayitNo !== 0 && fenKayitNo !== '0' && fenKayitNo !== '';
                 if (hasValidFenKayitNo) {
                     dynamicFenKayitliCount++;
+                }
+
+                const bStr = d['başvuru tarihi'];
+                if (bStr) {
+                    const bd = new Date(bStr);
+                    if (!isNaN(bd.getTime()) && bd.getFullYear() > 1900) {
+                        const y = bd.getFullYear();
+                        dynamicYearCounts[y] = (dynamicYearCounts[y] || 0) + 1;
+                    }
                 }
             });
 
@@ -799,6 +798,13 @@
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '8px' }}>
                             <div><span style={{fontSize: '0.95rem', color: '#334155'}}>Toplam: </span><span style={{fontSize: '1.2rem', color: '#1d4ed8', fontWeight: 'bold'}}>{dynamicTotal}</span></div>
                             {showFenKayitli && <div><span style={{fontSize: '0.95rem', color: '#334155'}}>Fen Kayıtlı: </span><span style={{fontSize: '1.2rem', color: '#059669', fontWeight: 'bold'}}>{dynamicFenKayitliCount}</span></div>}
+                            
+                            {Object.keys(dynamicYearCounts).sort().map(year => (
+                                <div key={year}>
+                                    <span style={{fontSize: '0.95rem', color: '#334155'}}>{year}: </span>
+                                    <span style={{fontSize: '1.2rem', color: '#8b5cf6', fontWeight: 'bold'}}>{dynamicYearCounts[year]}</span>
+                                </div>
+                            ))}
                         </div>
                     </div> 
                     <div className="card"><h3>F.K. Ort. Süre (Son 3 Ay)</h3><span className="value">{metrics.avgDays} gün</span></div> 
