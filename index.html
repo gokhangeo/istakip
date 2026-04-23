@@ -444,7 +444,7 @@
                 return { name, status };
             }).filter(p => p.name);
         };
-        const formatDate = (val) => { if (!val) return ""; if (typeof val === 'number') { const date = XLSX.SSF.parse_date_code(val); if (!date) return ""; return `${date.y}-${String(date.m).padStart(2,'0')}-${String(date.d).padStart(2,'0')}`; } if (typeof val === 'string') { let match = val.match(/^(\d{4}-\d{2}-\d{2})/); if (match) return match[1]; match = val.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})/); if (match) { const day = String(match[1]).padStart(2, '0'); const month = String(match[2]).padStart(2, '0'); const year = match[3]; return `${year}-${month}-${day}`; } const part = val.split(" ")[0]; const m2 = part.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})/); if (m2) { const day = String(m2[1]).padStart(2, '0'); const month = String(m2[2]).padStart(2, '0'); const year = m2[3]; return `${year}-${month}-${day}`; } return part; } return val; }
+        const formatDate = (val) => { if (!val) return ""; if (typeof val === 'number') { const date = XLSX.SSF.parse_date_code(val); if (!date) return ""; return `${date.y}-${String(date.m).padStart(2,'0')}-${String(date.d).padStart(2,'0')}`; } if (typeof val === 'string') { let match = val.match(/^(\d{4}-\d{2}-\d{2})/); if (match) return match[1]; match = val.match(/^(\d{1,2})[\.\/](\d{1,2})[\.\/](\d{4})/); if (match) { const day = String(match[1]).padStart(2, '0'); const month = String(match[2]).padStart(2, '0'); const year = match[3]; return `${year}-${month}-${day}`; } const part = val.split(" ")[0]; const m2 = part.match(/^(\d{1,2})[\.\/](\d{1,2})[\.\/](\d{4})/); if (m2) { const day = String(m2[1]).padStart(2, '0'); const month = String(m2[2]).padStart(2, '0'); const year = m2[3]; return `${year}-${month}-${day}`; } return part; } return val; }
         const formatToTR = (dateString) => {
             if (!dateString) return '';
             const [y, m, d] = dateString.split('-');
@@ -455,7 +455,7 @@
         const parseTescilDate = (val) => {
             if (!val || typeof val !== 'string') return null;
             const datePart = val.split(/[\s/]/)[0];
-            const match = datePart.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})/);
+            const match = datePart.match(/^(\d{1,2})[\.\/](\d{1,2})[\.\/](\d{4})/);
             if (match) {
                 const day = String(match[1]).padStart(2, '0');
                 const month = String(match[2]).padStart(2, '0');
@@ -2238,7 +2238,8 @@
             const [analyzeEngineersOnly, setAnalyzeEngineersOnly] = useState(false);
 
             const handleFileChange = async (e, reportType) => {
-                const file = e.target.files[0];
+                const inputElement = e.target;
+                const file = inputElement.files[0];
                 if (!file) return;
                 setIsLoading(true);
                 try {
@@ -2253,7 +2254,7 @@
                     alert(`Hata: ${err.message}`);
                 } finally {
                     setIsLoading(false);
-                    e.target.value = null;
+                    if (inputElement) inputElement.value = null;
                 }
             };
             
@@ -2792,7 +2793,7 @@
             const [personnelOptions, setPersonnelOptions] = useState([]);
             const [selectedPersonnel, setSelectedPersonnel] = useState([]);
             const [isLoading, setIsLoading] = useState(false);
-            const [reportReady, setReportReady] = useState(false);
+            const [reportReady, setReportReady] = useState(null);
             const [fileNames, setFileNames] = useState([]);
             const [totalEbysDocs, setTotalEbysDocs] = useState(0);
             const ebysChartRef = useRef(null);
@@ -2821,7 +2822,8 @@
             };
 
             const handleFileChange = async (e) => {
-                const files = Array.from(e.target.files);
+                const inputElement = e.target;
+                const files = Array.from(inputElement.files);
                 if (files.length === 0) return;
                 setIsLoading(true);
                 
@@ -2866,7 +2868,7 @@
                     alert(`Hata: ${err.message}`);
                 } finally {
                     setIsLoading(false);
-                     e.target.value = null;
+                    if (inputElement) inputElement.value = null;
                 }
             };
             
@@ -2878,12 +2880,16 @@
                 setTotalEbysDocs(0);
             };
 
-            const generateReport = () => {
-                if (selectedPersonnel.length === 0) {
+            const generateReport = (type) => {
+                if (type === 'personnel' && selectedPersonnel.length === 0) {
                     alert("Lütfen en az bir personel seçin.");
                     return;
                 }
-                 setReportReady(true);
+                if (type === 'year' && ebysData.length === 0) {
+                    alert("Raporlanacak veri bulunamadı.");
+                    return;
+                }
+                 setReportReady(type);
             };
             
              useEffect(() => {
@@ -2893,66 +2899,110 @@
                      
                      const wb = XLSX.utils.book_new();
 
-                     // 1. Create Summary Sheet
-                     const summaryData = [];
-                     const years = [...new Set(ebysData.map(row => {
-                         const date = parseEbysDate(row[dateHeader]);
-                         return date ? date.getFullYear() : null;
-                     }).filter(Boolean))].sort();
-
-                     const headers = ["Personel", "Toplam Bekleyen", ...years];
-                     summaryData.push(headers);
-                     
-                     const personTotals = {};
-
-                     selectedPersonnel.forEach(personel => {
-                         const filteredData = ebysData.filter(row => row[personnelHeader] === personel);
-                         const yearCounts = {};
-                         years.forEach(y => yearCounts[y] = 0);
-
-                         filteredData.forEach(row => {
+                     if (reportReady === 'personnel') {
+                         // 1. Create Summary Sheet
+                         const summaryData = [];
+                         const years = [...new Set(ebysData.map(row => {
                              const date = parseEbysDate(row[dateHeader]);
-                             if (date) {
-                                 const year = date.getFullYear();
-                                 if (yearCounts[year] !== undefined) {
-                                     yearCounts[year]++;
-                                 }
-                             }
-                         });
+                             return date ? date.getFullYear() : null;
+                         }).filter(Boolean))].sort();
 
-                         const rowData = [
-                             personel,
-                             filteredData.length,
-                             ...years.map(y => yearCounts[y])
-                         ];
-                         summaryData.push(rowData);
-                     });
-                     
-                     const wsSummary = XLSX.utils.aoa_to_sheet(summaryData);
-                     wsSummary['!cols'] = [{ wch: 30 }, { wch: 15 }, ...years.map(() => ({ wch: 10 }))];
-                     XLSX.utils.book_append_sheet(wb, wsSummary, "Özet");
-
-                     // 2. Create Individual Personnel Sheets
-                     selectedPersonnel.forEach(personel => {
-                         let filteredData = ebysData.filter(row => row[personnelHeader] === personel);
+                         const headers = ["Personel", "Toplam Bekleyen", ...years];
+                         summaryData.push(headers);
                          
-                         filteredData.sort((a, b) => {
-                             const dateA = parseEbysDate(a[dateHeader]);
-                             const dateB = parseEbysDate(b[dateHeader]);
-                             if (dateA && dateB) return dateA - dateB;
-                             if (dateA) return -1;
-                             if (dateB) return 1;
-                             return 0;
+                         const personTotals = {};
+
+                         selectedPersonnel.forEach(personel => {
+                             const filteredData = ebysData.filter(row => row[personnelHeader] === personel);
+                             const yearCounts = {};
+                             years.forEach(y => yearCounts[y] = 0);
+
+                             filteredData.forEach(row => {
+                                 const date = parseEbysDate(row[dateHeader]);
+                                 if (date) {
+                                     const year = date.getFullYear();
+                                     if (yearCounts[year] !== undefined) {
+                                         yearCounts[year]++;
+                                     }
+                                 }
+                             });
+
+                             const rowData = [
+                                 personel,
+                                 filteredData.length,
+                                 ...years.map(y => yearCounts[y])
+                             ];
+                             summaryData.push(rowData);
+                         });
+                         
+                         const wsSummary = XLSX.utils.aoa_to_sheet(summaryData);
+                         wsSummary['!cols'] = [{ wch: 30 }, { wch: 15 }, ...years.map(() => ({ wch: 10 }))];
+                         XLSX.utils.book_append_sheet(wb, wsSummary, "Özet");
+
+                         // 2. Create Individual Personnel Sheets
+                         selectedPersonnel.forEach(personel => {
+                             let filteredData = ebysData.filter(row => row[personnelHeader] === personel);
+                             
+                             filteredData.sort((a, b) => {
+                                 const dateA = parseEbysDate(a[dateHeader]);
+                                 const dateB = parseEbysDate(b[dateHeader]);
+                                 if (dateA && dateB) return dateA - dateB;
+                                 if (dateA) return -1;
+                                 if (dateB) return 1;
+                                 return 0;
+                             });
+
+                             const ws = XLSX.utils.json_to_sheet(filteredData);
+                             const sheetName = personel.replace(/[\\/*?:]/g, "").substring(0, 31);
+                             XLSX.utils.book_append_sheet(wb, ws, sheetName);
+                         });
+                         
+                         XLSX.writeFile(wb, "EBYS_Personel_Raporu.xlsx");
+                     } else if (reportReady === 'year') {
+                         const years = [...new Set(ebysData.map(row => {
+                             const date = parseEbysDate(row[dateHeader]);
+                             return date ? date.getFullYear().toString() : "Tarihsiz";
+                         }))].sort();
+
+                         const summaryData = [["Yıl", "Toplam Bekleyen Evrak"]];
+                         years.forEach(year => {
+                             const count = ebysData.filter(row => {
+                                 const d = parseEbysDate(row[dateHeader]);
+                                 const y = d ? d.getFullYear().toString() : "Tarihsiz";
+                                 return y === year;
+                             }).length;
+                             summaryData.push([year, count]);
                          });
 
-                         const ws = XLSX.utils.json_to_sheet(filteredData);
-                         const sheetName = personel.replace(/[\\/*?:]/g, "").substring(0, 31);
-                         XLSX.utils.book_append_sheet(wb, ws, sheetName);
-                     });
+                         const wsSummary = XLSX.utils.aoa_to_sheet(summaryData);
+                         wsSummary['!cols'] = [{ wch: 15 }, { wch: 25 }];
+                         XLSX.utils.book_append_sheet(wb, wsSummary, "Yıllık Özet");
+
+                         years.forEach(year => {
+                             let filteredData = ebysData.filter(row => {
+                                 const d = parseEbysDate(row[dateHeader]);
+                                 const y = d ? d.getFullYear().toString() : "Tarihsiz";
+                                 return y === year;
+                             });
+                             
+                             filteredData.sort((a, b) => {
+                                 const dateA = parseEbysDate(a[dateHeader]);
+                                 const dateB = parseEbysDate(b[dateHeader]);
+                                 if (dateA && dateB) return dateA - dateB;
+                                 if (dateA) return -1;
+                                 if (dateB) return 1;
+                                 return 0;
+                             });
+
+                             const ws = XLSX.utils.json_to_sheet(filteredData);
+                             const sheetName = year.substring(0, 31);
+                             XLSX.utils.book_append_sheet(wb, ws, sheetName);
+                         });
+                         
+                         XLSX.writeFile(wb, "EBYS_Yila_Gore_Rapor.xlsx");
+                     }
                      
-                     XLSX.writeFile(wb, "EBYS_Personel_Raporu.xlsx");
-                     
-                     setReportReady(false); // Reset for next report
+                     setReportReady(null); // Reset for next report
                  }
              }, [reportReady, ebysData, selectedPersonnel]);
 
@@ -3058,8 +3108,11 @@
                                  </button>
                             </div>
                         }
-                        <button onClick={generateReport} disabled={isLoading || selectedPersonnel.length === 0}>
-                            Rapor Oluştur ve İndir
+                        <button onClick={() => generateReport('personnel')} disabled={isLoading || selectedPersonnel.length === 0}>
+                            Personel Raporu İndir
+                        </button>
+                        <button onClick={() => generateReport('year')} disabled={isLoading || ebysData.length === 0} style={{backgroundColor: '#8b5cf6'}}>
+                            Yıla Göre Rapor İndir
                         </button>
                         <button onClick={clearEbysData} style={{backgroundColor: '#ef4444', color: 'white'}}>Verileri Temizle</button>
                     </div>
@@ -3208,25 +3261,31 @@
                 return engineers.some(eng => normalizeName(eng) === normalizedName);
             };
 
-            const handleFile=async(e)=>{
-                const files=Array.from(e.target.files||[]);
-                if(!files.length) return;
-                setLoading(true); setErrorMsg("");
+            const handleFile = async (e) => {
+                const inputElement = e.target;
+                const files = Array.from(inputElement.files || []);
+                if (!files.length) return;
+                setLoading(true); 
+                setErrorMsg("");
                 
-                const engineerFiles = files.filter(f => f.name.toLowerCase().includes('mühendis') || f.name.toLowerCase().includes('muhendis'));
-                const dataFiles = files.filter(f => !f.name.toLowerCase().includes('mühendis') && !f.name.toLowerCase().includes('muhendis'));
+                try {
+                    const engineerFiles = files.filter(f => f.name.toLowerCase().includes('mühendis') || f.name.toLowerCase().includes('muhendis'));
+                    const dataFiles = files.filter(f => !f.name.toLowerCase().includes('mühendis') && !f.name.toLowerCase().includes('muhendis'));
 
-                if (engineerFiles.length > 0) {
-                    try {
+                    if (engineerFiles.length > 0) {
                         const readSimpleList = (file) => new Promise((resolve, reject) => {
                              const reader = new FileReader();
-                             reader.onload = (e) => {
-                                 const data = new Uint8Array(e.target.result);
-                                 const workbook = XLSX.read(data, { type: 'array' });
-                                 const ws = workbook.Sheets[workbook.SheetNames[0]];
-                                 const json = XLSX.utils.sheet_to_json(ws, { header: 1 });
-                                 const names = json.flat().filter(n => n != null && String(n).trim() !== '').map(String);
-                                 resolve(names);
+                             reader.onload = (ev) => {
+                                 try {
+                                     const data = new Uint8Array(ev.target.result);
+                                     const workbook = XLSX.read(data, { type: 'array' });
+                                     const ws = workbook.Sheets[workbook.SheetNames[0]];
+                                     const json = XLSX.utils.sheet_to_json(ws, { header: 1 });
+                                     const names = json.flat().filter(n => n != null && String(n).trim() !== '').map(String);
+                                     resolve(names);
+                                 } catch (err) {
+                                     reject(err);
+                                 }
                              };
                              reader.onerror = reject;
                              reader.readAsArrayBuffer(file);
@@ -3235,24 +3294,25 @@
                         const engResults = await Promise.all(engineerFiles.map(readSimpleList));
                         const newEngineers = [...new Set(engResults.flat())];
                         setEngineers(prev => [...new Set([...prev, ...newEngineers])]);
-                    } catch (err) {
-                        console.error("Mühendis dosyası okuma hatası", err);
                     }
-                }
 
-                if (dataFiles.length > 0) {
-                    const newRowsPromises = dataFiles.map(f => readExcelPromise(f).catch(err => {
-                        console.error('Excel okuma hatası:',err); 
-                        setErrorMsg(err.message);
-                        return {rows: []};
-                    }));
-                    const results = await Promise.all(newRowsPromises);
-                    const allNewRows = results.flatMap(res => res.rows);
-                    setData(prevData => [...prevData, ...allNewRows]); 
+                    if (dataFiles.length > 0) {
+                        const newRowsPromises = dataFiles.map(f => readExcelPromise(f).catch(err => {
+                            console.error('Excel okuma hatası:', err); 
+                            setErrorMsg(err.message || "Dosya okunamadı. Lütfen geçerli bir Excel dosyası yükleyin.");
+                            return {rows: []};
+                        }));
+                        const results = await Promise.all(newRowsPromises);
+                        const allNewRows = results.flatMap(res => res.rows);
+                        setData(prevData => [...prevData, ...allNewRows]); 
+                    }
+                } catch (err) {
+                    console.error("Genel yükleme hatası:", err);
+                    setErrorMsg("Beklenmeyen bir hata oluştu.");
+                } finally {
+                    if (inputElement) inputElement.value = null;
+                    setLoading(false);
                 }
-                
-                e.target.value = null;
-                setLoading(false);
             };
             
             const handleDownloadModalAsJpeg = () => {
@@ -3468,8 +3528,13 @@
                 </div>
                 
                 {loading && <div style={{position:'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', zIndex: 3000, background: 'rgba(0,0,0,0.7)', color: 'white', padding: '20px', borderRadius: '10px'}}>Yükleniyor...</div>}
-                {data.length === 0 && !loading && !errorMsg && <LandingPage onFileChange={handleFile} />}
-                {errorMsg && <p className="error-message">{errorMsg}</p>}
+                
+                {data.length === 0 && !loading && (
+                    <div style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                        {errorMsg && <p className="error-message" style={{marginBottom: '20px', padding: '10px', background: '#fee2e2', borderRadius: '8px', border: '1px solid #ef4444', textAlign: 'center'}}>{errorMsg}</p>}
+                        <LandingPage onFileChange={handleFile} />
+                    </div>
+                )}
                 
                 {data.length > 0 && <React.Fragment>
                     <div className="controls">
@@ -3509,20 +3574,22 @@
                         </div>
                          <div className="control-group">
                             <label>Veri Yönetimi</label>
-                            <button onClick={() => { setData([]); setSelectedIl([]); setSelectedPersonel([]); setSelectedIlce([]); setSelectedIslem([]); setStartDate(''); setEndDate(''); }} style={{backgroundColor: '#ef4444', color: 'white'}}>Verileri Temizle</button>
+                            <button onClick={() => { setData([]); setSelectedIl([]); setSelectedPersonel([]); setSelectedIlce([]); setSelectedIslem([]); setStartDate(''); setEndDate(''); setErrorMsg(""); }} style={{backgroundColor: '#ef4444', color: 'white'}}>Verileri Temizle</button>
                         </div>
                     </div>
+                    {errorMsg && <p className="error-message" style={{padding: '10px', background: '#fee2e2', borderRadius: '8px', border: '1px solid #ef4444', textAlign: 'center'}}>{errorMsg}</p>}
+                    
                     <Dashboard data={data} filtered={filteredData} sortField={sortField} selectedPersonel={selectedPersonel} selectedIl={selectedIl} selectedIlce={selectedIlce} />
                     <div>
                         <div className="charts-below">
-                            <ChartsBelow data={filteredData} onZoom={setZoomContent} personnelChartCardRef={personnelChartCardRef} waitingChartCardRef={waitingChartCardRef} islemChartCardRef={islemChartCardRef} districtChartCardRef={districtChartCardRef} selectedIl={selectedIl} isEngineer={isEngineer} showOnlyEngineers={showOnlyEngineers} personnelFilterType={personnelFilterType} onFilterChange={setPersonnelFilterType} onToggleEngineers={() => setShowOnlyEngineers(!showOnlyEngineers)} sortField={sortField} />
+                            <ChartsBelow data={filteredData} onZoom={setZoomContent} personnelChartCardRef={personnelChartCardRef} waitingChartCardRef={waitingChartCardRef} islemChartCardRef={islemChartCardRef} districtChartCardRef={districtChartCardRef} selectedIl={selectedIl} isEngineer={isEngineer} showOnlyEngineers={showOnlyEngineers} personnelFilterType={personnelFilterType} onFilterChange={setPersonnelFilterType} sortField={sortField} />
                         </div>
                         <div style={{marginTop: '24px'}}>
                             <SummaryTable data={data} selectedIl={selectedIl} onZoom={() => setZoomContent({type: 'summary'})} summaryTableRef={summaryTableRef} />
                         </div>
                     </div>
-                    <WarningTable data={filteredData} isEngineer={isEngineer} showOnlyEngineers={showOnlyEngineers} personnelFilterType={personnelFilterType} onFilterChange={setPersonnelFilterType} onToggleEngineers={() => setShowOnlyEngineers(!showOnlyEngineers)} sortField={sortField} />
-                    <DataTable data={filteredData} sortField={sortField} isEngineer={isEngineer} showOnlyEngineers={showOnlyEngineers} personnelFilterType={personnelFilterType} onFilterChange={setPersonnelFilterType} onToggleEngineers={() => setShowOnlyEngineers(!showOnlyEngineers)} />
+                    <WarningTable data={filteredData} isEngineer={isEngineer} personnelFilterType={personnelFilterType} onFilterChange={setPersonnelFilterType} sortField={sortField} />
+                    <DataTable data={filteredData} sortField={sortField} isEngineer={isEngineer} personnelFilterType={personnelFilterType} onFilterChange={setPersonnelFilterType} />
                     
                     <ReportComparison engineers={engineers} isEngineer={isEngineer} />
                     <MegsisReporter data={data} isEngineer={isEngineer} />
