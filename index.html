@@ -96,6 +96,7 @@
             min-height: 80vh;
             display: flex;
             flex-direction: column;
+            width: 100%;
         }
         .header-center {
             text-align: center;
@@ -2040,195 +2041,6 @@
                 </div>
             ); 
         }
-        
-        const ZoomedChart = ({ chartData, title, onRender, isForPdf = false, isEngineer }) => {
-            const canvasRef = useRef(null);
-            const chartRef = useRef(null);
-
-            useEffect(() => {
-                if (canvasRef.current && chartData) {
-                    if (chartRef.current) {
-                        chartRef.current.destroy();
-                    }
-
-                    const isStacked = Object.values(chartData).some(val => typeof val === 'object');
-                    let config = {};
-
-                    if (isStacked) {
-                        const sortedPersonnel = Object.keys(chartData).sort((a, b) => {
-                            const totalA = Object.values(chartData[a]).reduce((s, c) => s + c, 0);
-                            const totalB = Object.values(chartData[b]).reduce((s, c) => s + c, 0);
-                            return totalB - totalA;
-                        });
-
-                        const allYears = [...new Set(
-                            Object.values(chartData).flatMap(yearsObj => Object.keys(yearsObj))
-                        )].sort();
-
-                        const datasets = allYears.map((year, index) => ({
-                            label: year,
-                            data: sortedPersonnel.map(p => chartData[p][year] || 0),
-                            backgroundColor: `hsl(${index * 50 + 200}, 70%, 60%)`,
-                            stack: 'Stack 0',
-                        }));
-
-                        config = {
-                            type: 'bar',
-                            data: {
-                                labels: sortedPersonnel,
-                                datasets: datasets
-                            },
-                            options: {
-                                indexAxis: 'y',
-                                responsive: true,
-                                maintainAspectRatio: false,
-                                plugins: {
-                                    title: { display: true, text: title, font: { size: 16 } },
-                                    legend: { display: true, position: 'bottom' },
-                                    datalabels: {
-                                        color: '#fff',
-                                        font: { weight: 'bold', size: 11 },
-                                        formatter: (value) => value > 0 ? value : null,
-                                        display: (context) => {
-                                            return context.dataset.data[context.dataIndex] > 0;
-                                        }
-                                    }
-                                },
-                                scales: { 
-                                    x: { 
-                                        stacked: true,
-                                        beginAtZero: true
-                                    },
-                                    y: { 
-                                        stacked: true,
-                                        ticks: { autoSkip: false }
-                                    }
-                                },
-                                animation: {
-                                    onComplete: () => { if (onRender) onRender(); }
-                                }
-                            }
-                        };
-                    } else {
-                        const sortedData = Object.entries(chartData).sort(([, a], [, b]) => b - a);
-                        
-                        const isPersonnelChart = title.toLowerCase().includes('personel') || title.toLowerCase().includes('bekleyen');
-                        const labels = sortedData.map(d => isPersonnelChart && isEngineer && isEngineer(d[0]) ? `${d[0]} (Müh.)` : d[0]);
-                        const data = sortedData.map(d => d[1]);
-
-                        config = {
-                            type: 'bar',
-                            data: {
-                                labels,
-                                datasets: [{
-                                    label: title,
-                                    data,
-                                    backgroundColor: labels.map((_, i) => `hsl(${(i * 360 / labels.length)}, 70%, 60%)`)
-                                }]
-                            },
-                            options: {
-                                indexAxis: 'x',
-                                responsive: true,
-                                maintainAspectRatio: false,
-                                plugins: {
-                                    title: { display: true, text: title, font: { size: 16 } },
-                                    legend: { display: false },
-                                    datalabels: {
-                                        anchor: 'end',
-                                        align: 'top',
-                                        color: '#444',
-                                        font: { weight: 'normal', size: 14 },
-                                        formatter: (value) => value > 0 ? value : null,
-                                    }
-                                },
-                                scales: { 
-                                    x: { 
-                                        beginAtZero: true,
-                                        ticks: {
-                                            autoSkip: false,
-                                            maxRotation: 90,
-                                            minRotation: 45,
-                                            color: (context) => {
-                                                if (!isPersonnelChart || !isEngineer) return '#666';
-                                                const originalName = context.tick.label.replace(' (Müh.)', '');
-                                                return isEngineer(originalName) ? 'red' : '#666';
-                                            }
-                                        }
-                                    },
-                                    y: { beginAtZero: true }
-                                },
-                                animation: {
-                                    onComplete: () => { if (onRender) onRender(); }
-                                }
-                            }
-                        };
-                    }
-                    
-                    chartRef.current = new Chart(canvasRef.current, config);
-                }
-                return () => {
-                    if (chartRef.current) {
-                        chartRef.current.destroy();
-                        chartRef.current = null;
-                    }
-                };
-            }, [chartData, title, onRender, isEngineer]);
-
-            if (isForPdf) {
-                return (
-                    <div style={{ width: '100%', height: '100%', position: 'relative' }}>
-                        <canvas ref={canvasRef}></canvas>
-                    </div>
-                );
-            }
-
-            const numItems = chartData ? Object.keys(chartData).length : 0;
-            const minWidth = numItems * 40; 
-
-            return (
-                <div style={{ width: '100%', height: '70vh', overflowX: 'auto' }}>
-                    <div style={{ minWidth: `${minWidth}px`, height: '100%', position: 'relative' }}>
-                        <canvas ref={canvasRef}></canvas>
-                    </div>
-                </div>
-            );
-        };
-
-        const ZoomedSummary = ({ data, selectedIl }) => { return <SummaryTable data={data} selectedIl={selectedIl} onZoom={() => {}} />; };
-        
-        const ZoomedWaitingList = ({ data, title }) => {
-            const tableContent = data.length > 0 ? (
-                data.map(item => (
-                    <tr key={item.name}>
-                        <td style={{width:'80%'}}>{item.name}</td>
-                        <td style={{width:'20%', textAlign: 'right'}}>{item.count}</td>
-                    </tr>
-                ))
-            ) : (
-                <tr>
-                    <td colSpan="2" style={{textAlign:'center', color:'#6b7280'}}>Bekleyen işlem yok.</td>
-                </tr>
-            );
-
-            return (
-                <div style={{minWidth: '400px'}}>
-                    <div className="chart-title" style={{textAlign: 'center', fontSize: '1.2rem', marginBottom: '15px'}}>{title}</div>
-                    <div style={{maxHeight:'70vh', overflowY:'auto'}}>
-                        <table className="zoomed-waiting-list-table">
-                            <thead>
-                                <tr>
-                                    <th style={{position:'sticky', top:0, background: '#fff'}}>Personel</th>
-                                    <th style={{textAlign: 'right', position:'sticky', top:0, background: '#fff'}}>Bekleyen İşlem</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {tableContent}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            );
-        };
 
         function ReportComparison({ engineers, isEngineer }) {
             const [oldReport, setOldReport] = useState({ data: [], headers: [], name: '' });
@@ -2788,6 +2600,7 @@
                 </div>
             );
         }
+
         function EbysReporter({ onZoom }) {
             const [ebysData, setEbysData] = useState([]);
             const [personnelOptions, setPersonnelOptions] = useState([]);
@@ -2900,7 +2713,6 @@
                      const wb = XLSX.utils.book_new();
 
                      if (reportReady === 'personnel') {
-                         // 1. Create Summary Sheet
                          const summaryData = [];
                          const years = [...new Set(ebysData.map(row => {
                              const date = parseEbysDate(row[dateHeader]);
@@ -2910,8 +2722,6 @@
                          const headers = ["Personel", "Toplam Bekleyen", ...years];
                          summaryData.push(headers);
                          
-                         const personTotals = {};
-
                          selectedPersonnel.forEach(personel => {
                              const filteredData = ebysData.filter(row => row[personnelHeader] === personel);
                              const yearCounts = {};
@@ -2939,7 +2749,6 @@
                          wsSummary['!cols'] = [{ wch: 30 }, { wch: 15 }, ...years.map(() => ({ wch: 10 }))];
                          XLSX.utils.book_append_sheet(wb, wsSummary, "Özet");
 
-                         // 2. Create Individual Personnel Sheets
                          selectedPersonnel.forEach(personel => {
                              let filteredData = ebysData.filter(row => row[personnelHeader] === personel);
                              
@@ -3002,11 +2811,10 @@
                          XLSX.writeFile(wb, "EBYS_Yila_Gore_Rapor.xlsx");
                      }
                      
-                     setReportReady(null); // Reset for next report
+                     setReportReady(null);
                  }
              }, [reportReady, ebysData, selectedPersonnel]);
 
-             // Prepare stacked chart data
              useEffect(() => {
                  if (ebysData.length > 0) {
                     const personnelHeader = Object.keys(ebysData[0]).find(h => normalizeHeader(h).includes('bekleyen') && (normalizeHeader(h).includes('kullanıcı') || normalizeHeader(h).includes('kullanici')));
@@ -3087,11 +2895,63 @@
                  }
              }, [stackedChartData]);
 
+            const displayRows = React.useMemo(() => {
+                if (!ebysData || ebysData.length === 0) return [];
+
+                const keys = Object.keys(ebysData[0]);
+                const keySayi = keys.find(k => normalizeHeader(k) === 'sayı') || keys.find(k => normalizeHeader(k).includes('sayı')) || 'Sayı';
+                const keyTarih = keys.find(k => normalizeHeader(k) === 'tarih') || keys.find(k => normalizeHeader(k).includes('tarih')) || 'Tarih';
+                const keyKonu = keys.find(k => normalizeHeader(k) === 'konu') || keys.find(k => normalizeHeader(k).includes('konu')) || 'Konu';
+                const keyKullanici = keys.find(k => normalizeHeader(k).includes('işlemde bekleyen') && (normalizeHeader(k).includes('kullanıcı') || normalizeHeader(k).includes('kullanici'))) || 'İşlemde Bekleyen Kullanıcı';
+                const keyYer = keys.find(k => normalizeHeader(k).includes('geldiği yer') || normalizeHeader(k).includes('gönderildiği yer')) || 'Geldiği Yer / Gönderildiği Yer';
+
+                let filtered = ebysData;
+                if (selectedPersonnel.length > 0) {
+                    filtered = filtered.filter(row => selectedPersonnel.includes(row[keyKullanici]));
+                }
+
+                const formatDisplayDate = (val) => {
+                    const d = parseEbysDate(val);
+                    if (d) {
+                        return `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}.${d.getFullYear()}`;
+                    }
+                    return val || '';
+                };
+
+                return filtered.map(row => ({
+                    sayi: row[keySayi],
+                    tarih: formatDisplayDate(row[keyTarih]),
+                    tarihRaw: parseEbysDate(row[keyTarih]),
+                    konu: row[keyKonu],
+                    kullanici: row[keyKullanici],
+                    yer: row[keyYer]
+                })).sort((a, b) => {
+                    if (a.tarihRaw && b.tarihRaw) return a.tarihRaw - b.tarihRaw;
+                    if (a.tarihRaw) return -1;
+                    if (b.tarihRaw) return 1;
+                    return 0;
+                });
+            }, [ebysData, selectedPersonnel]);
+
+            const handleExportEbysTable = () => {
+                const dataToExport = displayRows.map(row => ({
+                    'Sayı': row.sayi,
+                    'Tarih': row.tarih,
+                    'Konu': row.konu,
+                    'İşlemde Bekleyen Kullanıcı': row.kullanici,
+                    'Geldiği Yer / Gönderildiği Yer': row.yer
+                }));
+                const ws = XLSX.utils.json_to_sheet(dataToExport);
+                ws['!cols'] = [{ wch: 15 }, { wch: 15 }, { wch: 50 }, { wch: 25 }, { wch: 40 }];
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, ws, 'EBYS_Evraklar');
+                XLSX.writeFile(wb, 'EBYS_Evrak_Listesi.xlsx');
+            };
 
             return (
-                <div className="ebys-reporter-container">
+                <div className="ebys-reporter-container" style={{backgroundColor: '#f0f9ff', borderColor: '#bae6fd'}}>
                     <div className="ebys-reporter-header">
-                        <h3>EBYS Raporlama</h3>
+                        <h3 style={{color: '#075985'}}>EBYS Raporlama</h3>
                     </div>
                     <div className="ebys-controls">
                         <div className="control-group">
@@ -3129,6 +2989,41 @@
                             </div>
                         </div>
                     }
+
+                    {ebysData.length > 0 && (
+                        <div className="warning-table-container" style={{ marginTop: '20px', borderColor: '#fdba74', backgroundColor: '#fff7ed' }}>
+                            <div className="warning-table-header">
+                                <h3 style={{ color: '#c2410c' }}>EBYS Evrak Listesi (Toplam: {displayRows.length})</h3>
+                                <div className="button-group">
+                                    <button onClick={handleExportEbysTable} className="export-btn" style={{backgroundColor: '#ea580c'}}>Excel İndir</button>
+                                </div>
+                            </div>
+                            <div className="table-wrapper" style={{ maxHeight: '400px' }}>
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th style={{ whiteSpace: 'normal', wordBreak: 'break-word', minWidth: '100px' }}>Sayı</th>
+                                            <th style={{ minWidth: '100px' }}>Tarih</th>
+                                            <th style={{ whiteSpace: 'normal', wordBreak: 'break-word', minWidth: '250px' }}>Konu</th>
+                                            <th style={{ minWidth: '150px' }}>İşlemde Bekleyen Kullanıcı</th>
+                                            <th style={{ whiteSpace: 'normal', wordBreak: 'break-word', minWidth: '200px' }}>Geldiği Yer / Gönderildiği Yer</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {displayRows.map((row, idx) => (
+                                            <tr key={idx}>
+                                                <td style={{ whiteSpace: 'normal', wordBreak: 'break-word' }}>{row.sayi}</td>
+                                                <td>{row.tarih}</td>
+                                                <td style={{ whiteSpace: 'normal', wordBreak: 'break-word' }}>{row.konu}</td>
+                                                <td>{row.kullanici}</td>
+                                                <td style={{ whiteSpace: 'normal', wordBreak: 'break-word' }}>{row.yer}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    )}
 
                      <div id="ebys-personnel-modal" className="modal-overlay" style={{display: 'none'}} onClick={() => document.getElementById('ebys-personnel-modal').style.display = 'none'}>
                          <div className="modal" onClick={e => e.stopPropagation()}>
@@ -3169,14 +3064,13 @@
             );
         }
 
-        function App(){
+        function App() {
             const [data,setData]=useState([]);
             const [engineers, setEngineers] = useState([]);
             const [loading,setLoading]=useState(false);
             const [errorMsg,setErrorMsg]=useState("");
             const [sortField,setSortField]=useState('');
             
-            // Date Filter States
             const [startDate, setStartDate] = useState('');
             const [endDate, setEndDate] = useState('');
             const [showDateModal, setShowDateModal] = useState(false);
@@ -3376,7 +3270,6 @@
             const filteredData=(() => {
                 let arr=[...data];
                 
-                // Date Filter Logic (Based on Fen Kayıt Tarihi, falls back to Başvuru Tarihi)
                 if (startDate) {
                     const sObj = new Date(startDate);
                     arr = arr.filter(d => {
@@ -3582,7 +3475,7 @@
                     <Dashboard data={data} filtered={filteredData} sortField={sortField} selectedPersonel={selectedPersonel} selectedIl={selectedIl} selectedIlce={selectedIlce} />
                     <div>
                         <div className="charts-below">
-                            <ChartsBelow data={filteredData} onZoom={setZoomContent} personnelChartCardRef={personnelChartCardRef} waitingChartCardRef={waitingChartCardRef} islemChartCardRef={islemChartCardRef} districtChartCardRef={districtChartCardRef} selectedIl={selectedIl} isEngineer={isEngineer} showOnlyEngineers={showOnlyEngineers} personnelFilterType={personnelFilterType} onFilterChange={setPersonnelFilterType} sortField={sortField} />
+                            <ChartsBelow data={filteredData} onZoom={setZoomContent} personnelChartCardRef={personnelChartCardRef} waitingChartCardRef={waitingChartCardRef} islemChartCardRef={islemChartCardRef} districtChartCardRef={districtChartCardRef} selectedIl={selectedIl} isEngineer={isEngineer} personnelFilterType={personnelFilterType} onFilterChange={setPersonnelFilterType} sortField={sortField} />
                         </div>
                         <div style={{marginTop: '24px'}}>
                             <SummaryTable data={data} selectedIl={selectedIl} onZoom={() => setZoomContent({type: 'summary'})} summaryTableRef={summaryTableRef} />
