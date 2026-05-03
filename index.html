@@ -70,13 +70,22 @@
         .excel-download-btn { background-color: #4CAF50; }
         
         .table-wrapper { position: relative; overflow-x: auto; max-height: 60vh; border-radius: 8px; border: 1px solid #e5e7eb; background: white;}
-        .datatable-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; padding: 0 5px; }
+        .datatable-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; padding: 0 5px; transition: 0.2s; }
+        .datatable-header:hover { background-color: #f1f5f9; }
         table { border-collapse: collapse; width: 100%; font-size: 0.9rem; }
+        .datatable-container table { min-width: 1800px; table-layout: fixed; }
         th, td { padding: 10px 14px; border-bottom: 1px solid #e5e7eb; text-align: left; vertical-align: middle; }
         th { background: #f9fafb; position: sticky; top: 0; z-index: 3; font-size: 0.85rem; white-space: nowrap; }
         tr:nth-child(even) td { background: #fafafa; }
         tr:hover td { background: #eef2f7; }
-        
+        .datatable-container th:first-child, .datatable-container td:first-child { 
+            position: sticky; 
+            left: 0; 
+            background: inherit; 
+            z-index: 2; 
+        }
+        .col-zemin, .col-personel, .col-kurum-ad, .col-başvuran, .col-tescil-talep-bilgisi, .col-başvuru-açıklama { white-space: normal; word-break: break-word; }
+        .datatable-container .col-zemin { min-width: 250px; }
         .charts-below { display: flex; gap: 24px; margin-top: 20px; flex-wrap: nowrap; overflow-x: auto; }
         .chart-card { background: #f1f5f9; border-radius: 12px; padding: 14px 16px; min-width: 350px; flex: 1; position: relative; }
         .chart-card .chart-wrapper { height: 150px; width: 100%; }
@@ -106,7 +115,7 @@
 <body>
     <div id="root"></div>
     <script type="text/babel">
-        const { useState, useEffect, useRef } = React;
+        const { useState, useEffect, useRef, useMemo } = React;
         Chart.register(ChartDataLabels);
 
         // Sabit Değişkenler
@@ -183,6 +192,8 @@
         const readExcelPromise = (file, isComparison = false) => {
             return new Promise((resolve, reject) => {
                 if (!file) { reject(new Error("Dosya yüklenmedi.")); return; }
+                const validTypes = ['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet','application/vnd.ms-excel'];
+                if (!validTypes.includes(file.type) && !file.name.match(/\.xlsx?$|\.xls?$/i)) { reject(new Error("Lütfen .xls veya .xlsx uzantılı bir dosya seçin.")); return; }
                 const reader = new FileReader();
                 reader.onload = e => {
                     try {
@@ -651,50 +662,11 @@
             );
         };
 
-        const ZoomedSummary = ({ data, selectedIl }) => { return <SummaryTable data={data} selectedIl={selectedIl} onZoom={() => {}} />; };
-
-        function SummaryTable({ data, selectedIl, onZoom, summaryTableRef }) { 
-            const groupArr = {}; 
-            data.forEach(row => { 
-                if (!row._province) return; 
-                const groupKey = row._province; 
-                if (!groupArr[groupKey]) groupArr[groupKey] = []; 
-                groupArr[groupKey].push(row); 
-            }); 
-            const groupKeys = selectedIl.length > 0 ? selectedIl : [...new Set(data.map(d => d._province).filter(Boolean))];
-            
-            const rows = groupKeys.map(key => { const arr = data.filter(d => d._province === key); const m = calcMetrics(arr); return { key, ...m }; }); 
-            
-            const tableBody = rows.length > 0 ? (
-                rows.map(r => (
-                    <tr key={r.key}>
-                        <td>{r.key}</td><td>{r.toplam}</td><td>{r.count2025}</td><td>{r.avgDays} gün</td>
-                        <td>{r.overdue}</td><td>{r.tescileGiden}</td><td>{r.iade}</td><td>{r.totalWaiting}</td>
-                    </tr>
-                ))
-            ) : (<tr><td colSpan={8} style={{textAlign:'center', color:'#6b7280'}}>Veri bulunamadı.</td></tr>);
-
-            return ( 
-                <div className="chart-card" style={{ position:'relative', minWidth:'auto', flex:'1 1 auto' }} ref={summaryTableRef}> 
-                    {groupKeys.length>0 && <button className="zoom-btn" title="Büyüt" onClick={onZoom}>🔍</button>} 
-                    <div className="chart-title">Özet Tablo</div> 
-                    <div style={{overflowX:'auto',background:'#f1f5f9',borderRadius:'12px',padding:'12px',minWidth:'600px'}}> 
-                        <table className="summary-table"> 
-                            <thead><tr><th>İl</th><th>Toplam İşlem</th><th>2025 Başvuru</th><th>F.K. Ort. Süre</th><th>7+ Gün</th><th>Tescile Giden</th><th>İade</th><th>Toplam Bekleyen</th></tr></thead> 
-                            <tbody>{tableBody}</tbody> 
-                        </table> 
-                    </div>
-                    <p style={{ fontSize: '0.8rem', color: '#475569', fontStyle: 'italic', marginTop: '12px', textAlign: 'center' }}>* Tablodaki tüm hesaplamalar, o il için filtrelenmiş veri setindeki tüm işlemleri (Devam Eden, Tescile Giden, İade) kapsamaktadır.</p>
-                </div> 
-            ); 
-        }
-
-        function WarningTable({ data, isEngineer, personnelFilterType, onFilterChange, sortField }) { 
+        function WarningTable({ data, isEngineer, personnelFilterType, onFilterChange, sortField, onWarningRowsChange, warningThreshold, setWarningThreshold }) { 
             const [warningRows, setWarningRows] = useState([]); 
             const [dateSortOrder, setDateSortOrder] = useState('asc');
             const [warningPersonnelFilter, setWarningPersonnelFilter] = useState([]);
             const [showWarningPersonnelModal, setShowWarningPersonnelModal] = useState(false);
-            const [warningThreshold, setWarningThreshold] = useState(0);
 
             const toggleDateSort = () => setDateSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
             useEffect(() => { setWarningPersonnelFilter([]); }, [sortField]);
@@ -715,7 +687,7 @@
                         const fenKayitNo = d['fen kayıt no']; const key = `${fenKayitNo}-${d['ilçe']}-${index}`;
                         if (fenKayitTarihi && fenKayitTarihi >= oneHundredFiftyDaysAgo) {
                             if (fenKayitNo && !groupedTasks[key]) {
-                                groupedTasks[key] = { fenKayitNo: fenKayitNo, il: d._province || '', ilce: d['ilçe'] || '', islem: d['işlem'] || '', zemin: d['zemin'] || '', basvuruDurumu: d['başvuru durumu'] || '', basvuruAciklama: d['başvuru açıklama'] || '', personnelRaw: d['görevli personel'] || '', fenKayitTarihi: d['fen kayıt tarihi'] || '' };
+                                groupedTasks[key] = { fenKayitNo: fenKayitNo, il: d._province || '', ilce: d['ilçe'] || '', islem: d['işlem'] || '', zemin: d['zemin'] || '', basvuruDurumu: d['başvuru durumu'] || '', basvuruAciklama: d['başvuru açıklama'] || '', personnelRaw: d['görevli personel'] || '', fenKayitTarihi: d['fen kayıt tarihi'] || '', rawTask: d };
                             }
                         }
                     });
@@ -732,7 +704,7 @@
                         const fenKayitNo = d['fen kayıt no']; const key = `${fenKayitNo}-${d['ilçe']}-${index}`;
                         if (fenKayitTarihi && fenKayitTarihi >= oneHundredDaysAgo) {
                             if (fenKayitNo && !groupedTasks[key]) {
-                                groupedTasks[key] = { fenKayitNo: fenKayitNo, il: d._province || '', ilce: d['ilçe'] || '', islem: d['işlem'] || '', zemin: d['zemin'] || '', basvuruDurumu: d['başvuru durumu'] || '', basvuruAciklama: d['başvuru açıklama'] || '', personnelRaw: d['görevli personel'] || '', basvuruTarihi: d['başvuru tarihi'] || '', fenKayitTarihi: d['fen kayıt tarihi'] || '' };
+                                groupedTasks[key] = { fenKayitNo: fenKayitNo, il: d._province || '', ilce: d['ilçe'] || '', islem: d['işlem'] || '', zemin: d['zemin'] || '', basvuruDurumu: d['başvuru durumu'] || '', basvuruAciklama: d['başvuru açıklama'] || '', personnelRaw: d['görevli personel'] || '', basvuruTarihi: d['başvuru tarihi'] || '', fenKayitTarihi: d['fen kayıt tarihi'] || '', rawTask: d };
                             }
                         }
                     });
@@ -745,7 +717,7 @@
                             const bStr = task['başvuru tarihi']; let diffDays = 0;
                             if (bStr) { const basvuruDate = new Date(bStr); if (!isNaN(basvuruDate) && basvuruDate.getFullYear() > 1900) { diffDays = (today - basvuruDate) / (1000 * 60 * 60 * 24); } }
                             const fenKayitNo = task['fen kayıt no']; const key = `iade_edilen-${index}`;
-                            groupedTasks[key] = { fenKayitNo: fenKayitNo || 'Yok', il: task._province || '', ilce: task['ilçe'] || '', islem: task['işlem'] || '', zemin: task['zemin'] || '', basvuruDurumu: task['başvuru durumu'] || '', basvuruAciklama: task['başvuru açıklama'] || '', beklemeSuresi: Math.floor(diffDays), personnelRaw: task['görevli personel'] || '', basvuruTarihi: task['başvuru tarihi'] || '', fenKayitTarihi: task['fen kayıt tarihi'] || '' };
+                            groupedTasks[key] = { fenKayitNo: fenKayitNo || 'Yok', il: task._province || '', ilce: task['ilçe'] || '', islem: task['işlem'] || '', zemin: task['zemin'] || '', basvuruDurumu: task['başvuru durumu'] || '', basvuruAciklama: task['başvuru açıklama'] || '', beklemeSuresi: Math.floor(diffDays), personnelRaw: task['görevli personel'] || '', basvuruTarihi: task['başvuru tarihi'] || '', fenKayitTarihi: task['fen kayıt tarihi'] || '', rawTask: task };
                         }
                     });
                     finalRows = Object.values(groupedTasks).sort((a, b) => b.beklemeSuresi - a.beklemeSuresi);
@@ -764,7 +736,7 @@
                                     if (diffDays >= 1) { 
                                         const key = `${task['fen kayıt no'] || index}-${task['ilçe']}`;
                                         if (!groupedTasks[key]) {
-                                            groupedTasks[key] = { fenKayitNo: task['fen kayıt no'], il: task._province || '', ilce: task['ilçe'] || '', islem: task['işlem'] || '', zemin: task['zemin'] || '', basvuruDurumu: task['başvuru durumu'] || '', beklemeSuresi: Math.floor(diffDays), personnelRaw: '', basvuruTarihi: task['başvuru tarihi'] || '', fenKayitTarihi: task['fen kayıt tarihi'] || '' };
+                                            groupedTasks[key] = { fenKayitNo: task['fen kayıt no'], il: task._province || '', ilce: task['ilçe'] || '', islem: task['işlem'] || '', zemin: task['zemin'] || '', basvuruDurumu: task['başvuru durumu'] || '', beklemeSuresi: Math.floor(diffDays), personnelRaw: '', basvuruTarihi: task['başvuru tarihi'] || '', fenKayitTarihi: task['fen kayıt tarihi'] || '', rawTask: task };
                                         }
                                     }
                                 }
@@ -782,7 +754,7 @@
                             const bStr = task['başvuru tarihi']; let diffDays = 0;
                             if (bStr) { const basvuruDate = new Date(bStr); if (!isNaN(basvuruDate) && basvuruDate.getFullYear() > 1900) { diffDays = (today - basvuruDate) / (1000 * 60 * 60 * 24); } }
                             const key = `fen_kayit_yok-${index}`;
-                            groupedTasks[key] = { fenKayitNo: fenKayitNo || 'Yok', il: task._province || '', ilce: task['ilçe'] || '', islem: task['işlem'] || '', zemin: task['zemin'] || '', basvuruDurumu: task['başvuru durumu'] || '', basvuruAciklama: task['başvuru açıklama'] || '', beklemeSuresi: Math.floor(diffDays), personnelRaw: task['görevli personel'] || '', basvuruTarihi: task['başvuru tarihi'] || '', fenKayitTarihi: task['fen kayıt tarihi'] || '' };
+                            groupedTasks[key] = { fenKayitNo: fenKayitNo || 'Yok', il: task._province || '', ilce: task['ilçe'] || '', islem: task['işlem'] || '', zemin: task['zemin'] || '', basvuruDurumu: task['başvuru durumu'] || '', basvuruAciklama: task['başvuru açıklama'] || '', beklemeSuresi: Math.floor(diffDays), personnelRaw: task['görevli personel'] || '', basvuruTarihi: task['başvuru tarihi'] || '', fenKayitTarihi: task['fen kayıt tarihi'] || '', rawTask: task };
                         }
                     });
                     finalRows = Object.values(groupedTasks).sort((a, b) => b.beklemeSuresi - a.beklemeSuresi);
@@ -796,7 +768,7 @@
                             const bStr = task['başvuru tarihi']; let diffDays = 0;
                             if (bStr) { const basvuruDate = new Date(bStr); if (!isNaN(basvuruDate) && basvuruDate.getFullYear() > 1900) { diffDays = (today - basvuruDate) / (1000 * 60 * 60 * 24); } }
                             const key = `harci_yatirilmayan-${index}`;
-                            groupedTasks[key] = { fenKayitNo: task['fen kayıt no'] || 'Yok', il: task._province || '', ilce: task['ilçe'] || '', islem: task['işlem'] || '', zemin: task['zemin'] || '', basvuruDurumu: task['başvuru durumu'] || '', basvuruAciklama: task['başvuru açıklama'] || '', beklemeSuresi: Math.floor(diffDays), personnelRaw: task['görevli personel'] || '', basvuruTarihi: task['başvuru tarihi'] || '', fenKayitTarihi: task['fen kayıt tarihi'] || '' };
+                            groupedTasks[key] = { fenKayitNo: task['fen kayıt no'] || 'Yok', il: task._province || '', ilce: task['ilçe'] || '', islem: task['işlem'] || '', zemin: task['zemin'] || '', basvuruDurumu: task['başvuru durumu'] || '', basvuruAciklama: task['başvuru açıklama'] || '', beklemeSuresi: Math.floor(diffDays), personnelRaw: task['görevli personel'] || '', basvuruTarihi: task['başvuru tarihi'] || '', fenKayitTarihi: task['fen kayıt tarihi'] || '', rawTask: task };
                         }
                     });
                     finalRows = Object.values(groupedTasks).sort((a, b) => b.beklemeSuresi - a.beklemeSuresi);
@@ -818,7 +790,7 @@
                                 if (diffDays >= daysThreshold && !isClosed && hasValidFenKayitNo) {
                                     const key = `${fenKayitNo}-${task['ilçe']}-${index}`;
                                     if (!groupedTasks[key]) {
-                                        groupedTasks[key] = { fenKayitNo: fenKayitNo, il: task._province || '', ilce: task['ilçe'] || '', islem: task['işlem'] || '', zemin: task['zemin'] || '', basvuruDurumu: task['başvuru durumu'] || '', beklemeSuresi: Math.floor(diffDays), personnelRaw: task['görevli personel'] || '', basvuruTarihi: task['başvuru tarihi'] || '', fenKayitTarihi: task['fen kayıt tarihi'] || '' };
+                                        groupedTasks[key] = { fenKayitNo: fenKayitNo, il: task._province || '', ilce: task['ilçe'] || '', islem: task['işlem'] || '', zemin: task['zemin'] || '', basvuruDurumu: task['başvuru durumu'] || '', beklemeSuresi: Math.floor(diffDays), personnelRaw: task['görevli personel'] || '', basvuruTarihi: task['başvuru tarihi'] || '', fenKayitTarihi: task['fen kayıt tarihi'] || '', rawTask: task };
                                     }
                                 }
                             }
@@ -861,6 +833,17 @@
                      return pList.some(p => warningPersonnelFilter.includes(p.name));
                 });
             }, [warningRows, warningPersonnelFilter]);
+
+            const prevKeysRef = useRef("");
+            useEffect(() => {
+                if (onWarningRowsChange) {
+                    const keys = displayedRows.map(r => r.fenKayitNo + r.ilce).join(',');
+                    if (prevKeysRef.current !== keys) {
+                        prevKeysRef.current = keys;
+                        onWarningRowsChange(displayedRows.map(r => r.rawTask));
+                    }
+                }
+            }, [displayedRows, onWarningRowsChange]);
 
             const handleExportWarningExcel = () => { 
                 const getPersonnelText = (row) => {
@@ -979,6 +962,7 @@
         
         function DataTable({ data, sortField, isEngineer, personnelFilterType, onFilterChange }) { 
             const [searchTerm, setSearchTerm] = useState('');
+            const [isOpen, setIsOpen] = useState(false);
             let rows = [...(data||[])]; 
 
             if (personnelFilterType === 'engineer') rows = rows.filter(row => { const personnel = splitPersonel(row['görevli personel']); return personnel.some(p => isEngineer(p)); });
@@ -1069,22 +1053,27 @@
 
             return (
                 <div className="datatable-container"> 
-                    <div className="datatable-header"> 
-                        <h3>Tüm İşlemler</h3> 
-                        <div style={{display: 'flex', gap: '10px', alignItems: 'center'}}>
-                             <div style={{display: 'flex', alignItems: 'center', marginRight: '10px'}}>
-                                 <label style={{fontSize: '0.9rem', fontWeight: 'bold', color: '#334155', marginRight: '5px'}}>Filtre:</label>
-                                 <select value={personnelFilterType} onChange={(e) => onFilterChange(e.target.value)} style={{padding: '6px', borderRadius: '4px', border: '1px solid #cbd5e1', fontSize: '0.9rem'}}>
-                                     <option value="all">Tümü</option><option value="engineer">Sadece Mühendisler</option><option value="other">Diğer Personel</option>
-                                 </select>
-                             </div>
-                            <input type="text" placeholder="Fen Kayıt No ile Ara..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} style={{padding: '6px 10px', borderRadius: '4px', border: '1px solid #d1d5db'}}/>
-                            <button className="export-btn" onClick={exportToExcel} title="Bu tabloyu Excel olarak indir">Excel İndir</button> 
+                    <div className="datatable-header" style={{cursor: 'pointer', background: '#f8fafc', padding: '15px', borderRadius: '8px', border: '1px solid #e2e8f0'}} onClick={() => setIsOpen(!isOpen)}> 
+                        <h3 style={{margin: 0, color: '#0f172a'}}>Tüm İşlemler {isOpen ? '▼' : '▶'}</h3> 
+                        <span style={{fontSize: '0.85rem', color: '#64748b'}}>Tıklayarak {isOpen ? 'gizle' : 'göster'}</span>
+                    </div> 
+                    {isOpen && (
+                        <div style={{marginTop: '15px'}}>
+                            <div style={{display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '15px'}}>
+                                 <div style={{display: 'flex', alignItems: 'center', marginRight: '10px'}}>
+                                     <label style={{fontSize: '0.9rem', fontWeight: 'bold', color: '#334155', marginRight: '5px'}}>Filtre:</label>
+                                     <select value={personnelFilterType} onChange={(e) => onFilterChange(e.target.value)} style={{padding: '6px', borderRadius: '4px', border: '1px solid #cbd5e1', fontSize: '0.9rem'}}>
+                                         <option value="all">Tümü</option><option value="engineer">Sadece Mühendisler</option><option value="other">Diğer Personel</option>
+                                     </select>
+                                 </div>
+                                <input type="text" placeholder="Fen Kayıt No ile Ara..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} style={{padding: '6px 10px', borderRadius: '4px', border: '1px solid #d1d5db'}}/>
+                                <button className="export-btn" onClick={exportToExcel} title="Bu tabloyu Excel olarak indir">Excel İndir</button> 
+                            </div>
+                            <div className="table-wrapper" style={{marginTop: 0}}> 
+                                <table><thead><tr>{ALLOWED_COLS.map(col => <th key={col}>{col.toLocaleUpperCase('tr-TR')}</th>)}</tr></thead><tbody>{tableBody}</tbody></table> 
+                            </div>
                         </div>
-                    </div> 
-                    <div className="table-wrapper" style={{marginTop: 0}}> 
-                        <table><thead><tr>{ALLOWED_COLS.map(col => <th key={col}>{col.toLocaleUpperCase('tr-TR')}</th>)}</tr></thead><tbody>{tableBody}</tbody></table> 
-                    </div> 
+                    )}
                 </div>
             ); 
         }
@@ -1210,7 +1199,7 @@
 
             useEffect(() => {
                 if (data && data.length > 0) {
-                    const allPersonnel = [...new Set(data.flatMap(row => parsePersonnelWithStatus(row['görevli personel']).map(p => p.name)))].sort((a, b) => a.localeCompare(b, 'tr'));
+                    const allPersonnel = [...new Set(data.flatMap(row => parsePersonnelWithStatus(row['görevli personel'] || row.personnelRaw).map(p => p.name)))].sort((a, b) => a.localeCompare(b, 'tr'));
                     setPersonnelOptions(allPersonnel);
                 } else { setPersonnelOptions([]); setSelectedPersonnel([]); }
             }, [data]);
@@ -1220,7 +1209,7 @@
                 setIsLoading(true);
         
                 try {
-                    const uniqueProvinces = [...new Set(data.map(d => d._province).filter(Boolean))];
+                    const uniqueProvinces = [...new Set(data.map(d => d._province || d.il).filter(Boolean))];
                     const showProvinceCol = uniqueProvinces.length > 1;
 
                     let reportItems = [];
@@ -1231,41 +1220,41 @@
                             "Tarsus-Çamlıyayla": ["tarsus", "çamlıyayla"], "Merkez İlçeler": ["akdeniz", "mezitli", "yenişehir", "toroslar"]
                         };
                         
-                        const availableDistricts = [...new Set(data.map(row => row._district).filter(Boolean))];
+                        const availableDistricts = [...new Set(data.map(row => row._district || row.ilce).filter(Boolean))];
                         const groupedDistricts = new Set();
 
                         Object.entries(groups).forEach(([groupName, groupDistricts]) => {
                             const hasData = groupDistricts.some(d => availableDistricts.some(ad => ad.toLocaleLowerCase('tr') === d));
-                            if (hasData) { reportItems.push({ name: groupName, filterFn: (row) => { const d = (row._district || '').toLocaleLowerCase('tr'); return groupDistricts.includes(d); } }); groupDistricts.forEach(d => groupedDistricts.add(d)); }
+                            if (hasData) { reportItems.push({ name: groupName, filterFn: (row) => { const d = (row._district || row.ilce || '').toLocaleLowerCase('tr'); return groupDistricts.includes(d); } }); groupDistricts.forEach(d => groupedDistricts.add(d)); }
                         });
 
-                        availableDistricts.forEach(dist => { if (!groupedDistricts.has(dist.toLocaleLowerCase('tr'))) { reportItems.push({ name: dist, filterFn: (row) => row._district === dist }); } });
+                        availableDistricts.forEach(dist => { if (!groupedDistricts.has(dist.toLocaleLowerCase('tr'))) { reportItems.push({ name: dist, filterFn: (row) => (row._district || row.ilce) === dist }); } });
                         reportItems.sort((a, b) => a.name.localeCompare(b.name, 'tr'));
 
                     } else if (type === 'selected_personnel') {
                         if (selectedPersonnel.length === 0) { alert("Lütfen en az bir personel seçin."); setIsLoading(false); return; }
-                        reportItems = selectedPersonnel.map(pName => ({ name: pName, filterFn: (row) => parsePersonnelWithStatus(row['görevli personel']).some(p => p.name === pName) }));
+                        reportItems = selectedPersonnel.map(pName => ({ name: pName, filterFn: (row) => parsePersonnelWithStatus(row['görevli personel'] || row.personnelRaw).some(p => p.name === pName) }));
                     } else {
-                        const allPersonnelInData = [...new Set(data.flatMap(row => parsePersonnelWithStatus(row['görevli personel']).filter(p => type === 'engineer' ? isEngineer(p.name) : !isEngineer(p.name)).map(p => p.name)))].sort((a, b) => a.localeCompare(b, 'tr'));
+                        const allPersonnelInData = [...new Set(data.flatMap(row => parsePersonnelWithStatus(row['görevli personel'] || row.personnelRaw).filter(p => type === 'engineer' ? isEngineer(p.name) : !isEngineer(p.name)).map(p => p.name)))].sort((a, b) => a.localeCompare(b, 'tr'));
                         if (allPersonnelInData.length === 0) { let entityName = type === 'engineer' ? 'mühendis' : 'personel'; alert(`Yüklenen dosyada raporlanacak ${entityName} bulunamadı.`); setIsLoading(false); return; }
-                        reportItems = allPersonnelInData.map(pName => ({ name: pName, filterFn: (row) => parsePersonnelWithStatus(row['görevli personel']).some(p => p.name === pName && (type === 'engineer' ? isEngineer(p.name) : !isEngineer(p.name))) }));
+                        reportItems = allPersonnelInData.map(pName => ({ name: pName, filterFn: (row) => parsePersonnelWithStatus(row['görevli personel'] || row.personnelRaw).some(p => p.name === pName && (type === 'engineer' ? isEngineer(p.name) : !isEngineer(p.name))) }));
                     }
         
                     const mainWb = XLSX.utils.book_new();
 
                     for (let i = 0; i < reportItems.length; i++) {
                         const item = reportItems[i]; let filteredRows = data.filter(item.filterFn);
-                        filteredRows.sort((a, b) => { const dateA = a['fen kayıt tarihi'] ? new Date(a['fen kayıt tarihi']) : null; const dateB = b['fen kayıt tarihi'] ? new Date(b['fen kayıt tarihi']) : null; if (dateA && dateB) return dateA - dateB; if (dateA) return -1; if (dateB) return 1; return 0; });
+                        filteredRows.sort((a, b) => { const dateA = a['fen kayıt tarihi'] || a.fenKayitTarihi ? new Date(a['fen kayıt tarihi'] || a.fenKayitTarihi) : null; const dateB = b['fen kayıt tarihi'] || b.fenKayitTarihi ? new Date(b['fen kayıt tarihi'] || b.fenKayitTarihi) : null; if (dateA && dateB) return dateA - dateB; if (dateA) return -1; if (dateB) return 1; return 0; });
         
                         if (filteredRows.length > 0) {
                             const today = new Date();
                             const dataToExport = filteredRows.map(row => {
-                                const status = String(row['başvuru durumu'] || '').toLocaleLowerCase('tr'); const isClosed = status.includes('eksiklikten iade edildi') || status.includes('tescile gönderildi');
-                                const fStr = row['fen kayıt tarihi']; let beklemeSuresi = '';
+                                const status = String(row['başvuru durumu'] || row.basvuruDurumu || '').toLocaleLowerCase('tr'); const isClosed = status.includes('eksiklikten iade edildi') || status.includes('tescile gönderildi');
+                                const fStr = row['fen kayıt tarihi'] || row.fenKayitTarihi; let beklemeSuresi = '';
                                 if (fStr && !isClosed) { const fenKayitDate = new Date(fStr); if (!isNaN(fenKayitDate) && fenKayitDate.getFullYear() > 1900) { const diffDays = (today - fenKayitDate) / (1000 * 60 * 60 * 24); if (diffDays >= 0) beklemeSuresi = Math.floor(diffDays); } }
-                                const obj = { 'Personel': parsePersonnelWithStatus(row['görevli personel']).map(p => isEngineer(p.name) ? `${p.name} (Müh.)` : p.name).join("\n"), 'Fen Kayıt Tarihi': row['fen kayıt tarihi'], 'Fen Kayıt No': row['fen kayıt no'] };
-                                if (showProvinceCol) obj['İl'] = row._province;
-                                obj['İlçe'] = row._district; obj['İşlem'] = row['işlem']; obj['Zemin'] = row['zemin']; obj['Başvuru Durumu'] = row['başvuru durumu']; obj['Bekleme Süresi (Gün)'] = beklemeSuresi;
+                                const obj = { 'Personel': parsePersonnelWithStatus(row['görevli personel'] || row.personnelRaw).map(p => isEngineer(p.name) ? `${p.name} (Müh.)` : p.name).join("\n"), 'Fen Kayıt Tarihi': row['fen kayıt tarihi'] || row.fenKayitTarihi, 'Fen Kayıt No': row['fen kayıt no'] || row.fenKayitNo };
+                                if (showProvinceCol) obj['İl'] = row._province || row.il;
+                                obj['İlçe'] = row._district || row.ilce; obj['İşlem'] = row['işlem'] || row.islem; obj['Zemin'] = row['zemin'] || row.zemin; obj['Başvuru Durumu'] = row['başvuru durumu'] || row.basvuruDurumu; obj['Bekleme Süresi (Gün)'] = beklemeSuresi;
                                 return obj;
                             });
         
@@ -1299,7 +1288,7 @@
                 <div className="ebys-reporter-container" style={{backgroundColor: '#f0f9ff', borderColor: '#bae6fd'}}>
                     <div className="ebys-reporter-header"><h3 style={{color: '#075985'}}>MEGSİS Raporlama</h3></div>
                     <div className="ebys-controls">
-                        <p style={{textAlign: 'center', fontSize: '0.9rem', color: '#0369a1', width: '100%', marginBottom: '15px'}}>Yüklenmiş olan MEGSİS verisini kullanarak seçilen türe göre, en eski fen kayıt tarihine göre sıralanmış bir Excel raporu oluşturur.</p>
+                        <p style={{textAlign: 'center', fontSize: '0.9rem', color: '#0369a1', width: '100%', marginBottom: '15px'}}>Yukarıdaki <b>Uyarı Tablosunda</b> listelenen verileri baz alarak rapor oluşturur. Süre ve Filtreleri yukarıdan ayarlayabilirsiniz.</p>
                         <button onClick={() => generateReport('engineer')} disabled={isLoading || data.length === 0}>{isLoading ? 'İşleniyor...' : 'Mühendis Bazlı Rapor Al'}</button>
                         <button onClick={() => generateReport('other')} disabled={isLoading || data.length === 0} style={{backgroundColor: '#0ea5e9'}}>{isLoading ? 'İşleniyor...' : 'Diğer Personel Bazlı Rapor Al'}</button>
                          <button onClick={() => generateReport('district')} disabled={isLoading || data.length === 0} style={{backgroundColor: '#8b5cf6'}}>{isLoading ? 'İşleniyor...' : 'İlçe Bazlı Rapor Al'}</button>
@@ -1522,12 +1511,7 @@
                              <div className="modal-header"><h3>Personel Seç</h3><button className="close-btn" onClick={()=> document.getElementById('ebys-personnel-modal').style.display = 'none'}>×</button></div>
                              <div className="modal-content">
                                  <div className="filter-list">
-                                     <div className="filter-item" key="select-all">
-                                         <label>
-                                             <input type="checkbox" checked={selectedPersonnel.length === personnelOptions.length && personnelOptions.length > 0} onChange={e => { if (e.target.checked) { setSelectedPersonnel(personnelOptions); } else { setSelectedPersonnel([]); } }} />
-                                             <b>Tümünü Seç/Bırak</b>
-                                         </label>
-                                     </div>
+                                     <div className="filter-item" key="select-all"><label><input type="checkbox" checked={selectedPersonnel.length === personnelOptions.length && personnelOptions.length > 0} onChange={e => { if (e.target.checked) { setSelectedPersonnel(personnelOptions); } else { setSelectedPersonnel([]); } }} /><b>Tümünü Seç/Bırak</b></label></div>
                                      {personnelOptions.map(p => <div className="filter-item" key={p}><label><input type="checkbox" checked={selectedPersonnel.includes(p)} onChange={e=>{ if(e.target.checked) setSelectedPersonnel([...selectedPersonnel,p]); else setSelectedPersonnel(selectedPersonnel.filter(sp=>sp!==p)); }}/> {p}</label></div>)}
                                  </div>
                              </div>
@@ -1559,12 +1543,13 @@
             const [showIlceModal, setShowIlceModal] = useState(false); 
             const [showIslemModal, setShowIslemModal] = useState(false); 
             const [zoomContent, setZoomContent] = useState(null);
-            const [showOnlyEngineers, setShowOnlyEngineers] = useState(false);
             const [isFullscreen, setIsFullscreen] = useState(false);
             const [isLoggedIn, setIsLoggedIn] = useState(false);
 
+            const [warningThreshold, setWarningThreshold] = useState(0);
+            const [megsisData, setMegsisData] = useState([]);
+
             const modalContentRef = useRef(null);
-            const summaryTableRef = useRef(null);
             const personnelChartCardRef = useRef(null);
             const waitingChartCardRef = useRef(null);
             const islemChartCardRef = useRef(null);
@@ -1649,7 +1634,6 @@
 
                     if (dataFiles.length > 0) {
                         const newRowsPromises = dataFiles.map(f => readExcelPromise(f).catch(err => {
-                            console.error('Excel okuma hatası:', err); 
                             setErrorMsg(err.message || "Dosya okunamadı. Lütfen geçerli bir Excel dosyası yükleyin.");
                             return {rows: []};
                         }));
@@ -1694,9 +1678,8 @@
                 {label:'Uygun Olmayan İade Gerekçeleri', value:'uygun_olmayan_iade'}, {label:'Önemli İşler', value:'onemli_isler'}, {label:'Görevlendirme Yapılmayan', value:'gorevlendirme_yapilmayan'}
             ];
             
-            const filteredData=(() => {
+            const filteredData = React.useMemo(() => {
                 let arr=[...data];
-                
                 if (startDate) { const sObj = new Date(startDate); arr = arr.filter(d => { const dateVal = d['fen kayıt tarihi'] || d['başvuru tarihi']; if (!dateVal) return false; return new Date(dateVal) >= sObj; }); }
                 if (endDate) { const eObj = new Date(endDate); eObj.setHours(23, 59, 59, 999); arr = arr.filter(d => { const dateVal = d['fen kayıt tarihi'] || d['başvuru tarihi']; if (!dateVal) return false; return new Date(dateVal) <= eObj; }); }
                 if(selectedIl.length>0) arr=arr.filter(d=>selectedIl.includes(d._province));
@@ -1717,7 +1700,7 @@
                 else if (sortField === 'gorevlendirme_yapilmayan') { const today = new Date(); arr = arr.filter(d => { const personnel = splitPersonel(d['görevli personel']); const status = String(d['başvuru durumu'] || '').toLocaleLowerCase('tr'); const isClosed = status.includes('eksiklikten iade edildi') || status.includes('tescile gönderildi'); if (personnel.length === 0 && !isClosed) { const bStr = d['başvuru tarihi']; if (bStr) { const basvuruDate = new Date(bStr); if (!isNaN(basvuruDate) && basvuruDate.getFullYear() > 1900) { const diffDays = (today - basvuruDate) / (1000 * 60 * 60 * 24); if (diffDays >= 1) return true; } } } return false; }); }
                 else if (sortField) { arr.sort((a, b) => { if (sortField.includes('tarih')) { const dateA = a[sortField] ? new Date(a[sortField]) : null; const dateB = b[sortField] ? new Date(b[sortField]) : null; if (!dateA || isNaN(dateA)) return 1; if (!dateB || isNaN(dateB)) return -1; return dateA - dateB; } const valA = a[sortField] || ''; const valB = b[sortField] || ''; if (typeof valA === 'string' && typeof valB === 'string') { return valA.localeCompare(valB, 'tr'); } return valA < valB ? -1 : valA > valB ? 1 : 0; }); }
                 return arr;
-            })();
+            }, [data, startDate, endDate, selectedIl, selectedIlce, selectedPersonel, selectedIslem, sortField]);
             
             const LandingPage = ({onFileChange}) => (
                 <div className="landing-container">
@@ -1754,19 +1737,16 @@
                     {errorMsg && <p className="error-message" style={{padding: '10px', background: '#fee2e2', borderRadius: '8px', border: '1px solid #ef4444', textAlign: 'center'}}>{errorMsg}</p>}
                     
                     <Dashboard data={data} filtered={filteredData} sortField={sortField} selectedPersonel={selectedPersonel} selectedIl={selectedIl} selectedIlce={selectedIlce} />
-                    <div>
-                        <div className="charts-below">
-                            <ChartsBelow data={filteredData} onZoom={setZoomContent} personnelChartCardRef={personnelChartCardRef} waitingChartCardRef={waitingChartCardRef} islemChartCardRef={islemChartCardRef} districtChartCardRef={districtChartCardRef} selectedIl={selectedIl} isEngineer={isEngineer} personnelFilterType={personnelFilterType} onFilterChange={setPersonnelFilterType} sortField={sortField} />
-                        </div>
-                        <div style={{marginTop: '24px'}}>
-                            <SummaryTable data={data} selectedIl={selectedIl} onZoom={() => setZoomContent({type: 'summary'})} summaryTableRef={summaryTableRef} />
-                        </div>
+                    
+                    <div className="charts-below">
+                        <ChartsBelow data={filteredData} onZoom={setZoomContent} personnelChartCardRef={personnelChartCardRef} waitingChartCardRef={waitingChartCardRef} islemChartCardRef={islemChartCardRef} districtChartCardRef={districtChartCardRef} selectedIl={selectedIl} isEngineer={isEngineer} personnelFilterType={personnelFilterType} onFilterChange={setPersonnelFilterType} sortField={sortField} />
                     </div>
-                    <WarningTable data={filteredData} isEngineer={isEngineer} personnelFilterType={personnelFilterType} onFilterChange={setPersonnelFilterType} sortField={sortField} />
+
+                    <WarningTable data={filteredData} isEngineer={isEngineer} personnelFilterType={personnelFilterType} onFilterChange={setPersonnelFilterType} sortField={sortField} onWarningRowsChange={setMegsisData} warningThreshold={warningThreshold} setWarningThreshold={setWarningThreshold} />
                     <DataTable data={filteredData} sortField={sortField} isEngineer={isEngineer} personnelFilterType={personnelFilterType} onFilterChange={setPersonnelFilterType} />
                     
                     <ReportComparison engineers={engineers} isEngineer={isEngineer} />
-                    <MegsisReporter data={data} isEngineer={isEngineer} />
+                    <MegsisReporter data={megsisData} isEngineer={isEngineer} />
                     <EbysReporter onZoom={setZoomContent} />
                 </React.Fragment>}
                 
@@ -1776,7 +1756,6 @@
                            <div className="modal-header"><h3>{zoomContent.title || 'Büyük Görünüm'}</h3><button className="close-btn" onClick={() => setZoomContent(null)}>×</button></div>
                            <div className="modal-content" ref={modalContentRef}>
                                 {zoomContent.type === 'chart' && <ZoomedChart chartData={zoomContent.data} title={zoomContent.title} isEngineer={isEngineer} />}
-                                {zoomContent.type === 'summary' && <ZoomedSummary data={filteredData} selectedIl={selectedIl} />}
                                 {zoomContent.type === 'waitingList' && <ZoomedWaitingList data={zoomContent.data} title={zoomContent.title} />}
                            </div>
                            <div className="modal-footer">
