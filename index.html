@@ -18,6 +18,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
 
     <style>
@@ -96,7 +97,7 @@
         .warning-table-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
         
         .export-btn { background-color: #4CAF50; color: white; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer; transition: 0.3s; }
-        .export-btn:hover { background-color: #388E3C; }
+        .export-btn:hover { filter: brightness(0.9); }
         
         .filter-list { display: flex; flex-direction: column; gap: 5px; }
         .filter-item label { display: block; padding: 8px; border-radius: 4px; cursor: pointer; transition: 0.2s; }
@@ -147,6 +148,20 @@
         };
         const formatFenKayitNo = (val) => { if (val == null) return ""; if (typeof val === 'number') return val; if (typeof val === 'string') { const num = parseInt(val.replace(/\D/g,''),10); if (!isNaN(num)) return num; return val; } return val; }
         
+        // Zemin sütununu 3 satıra sınırlandırma fonksiyonu
+        const formatZemin = (text) => {
+            if (!text) return "";
+            let str = String(text);
+            let lines = str.split(/(?:\r\n|\r|\n)/).map(s => s.trim()).filter(Boolean);
+            if (lines.length === 1 && lines[0].includes(',')) {
+                lines = lines[0].split(',').map(s => s.trim()).filter(Boolean);
+            }
+            if (lines.length > 3) {
+                return lines.slice(0, 3).join('\n') + '\n... (devamı var)';
+            }
+            return lines.join('\n');
+        };
+
         const parseTescilDate = (val) => {
             if (!val || typeof val !== 'string') return null;
             const datePart = val.split(/[\s/]/)[0];
@@ -848,32 +863,32 @@
                 }
             }, [displayedRows, onWarningRowsChange]);
 
-            const handleExportWarningExcel = () => { 
-                const getPersonnelText = (row) => {
-                    const personnelListWithStatus = parsePersonnelWithStatus(row.personnelRaw);
-                    let personnelList = personnelListWithStatus;
-                    if (personnelFilterType === 'engineer') personnelList = personnelList.filter(p => isEngineer(p.name));
-                    else if (personnelFilterType === 'other') personnelList = personnelList.filter(p => !isEngineer(p.name));
-                    
-                    return personnelList.map(p => {
-                        const namePart = isEngineer(p.name) ? `${p.name} (Müh.)` : p.name;
-                        const statusPart = (sortField === 'tescilden_geldi' && p.status) ? ` (${p.status})` : '';
-                        return `${namePart}${statusPart}`;
-                    }).join("\n");
-                };
+            const getPersonnelTextForExport = (row) => {
+                const personnelListWithStatus = parsePersonnelWithStatus(row.personnelRaw);
+                let personnelList = personnelListWithStatus;
+                if (personnelFilterType === 'engineer') personnelList = personnelList.filter(p => isEngineer(p.name));
+                else if (personnelFilterType === 'other') personnelList = personnelList.filter(p => !isEngineer(p.name));
+                
+                return personnelList.map(p => {
+                    const namePart = isEngineer(p.name) ? `${p.name} (Müh.)` : p.name;
+                    const statusPart = (sortField === 'tescilden_geldi' && p.status) ? ` (${p.status})` : '';
+                    return `${namePart}${statusPart}`;
+                }).join("\n");
+            };
 
+            const handleExportWarningExcel = () => { 
                 let dataToExport, cols = [];
                 const rowsToExport = displayedRows;
 
                 if (sortField === 'fen_kayit_alinmayan' || sortField === 'harci_yatirilmayan' || sortField === 'iade edilen') {
-                    dataToExport = rowsToExport.map(row => ({ 'Personel': getPersonnelText(row), 'Başvuru Tarihi': row.basvuruTarihi, 'Fen Kayıt Tarihi': row.fenKayitTarihi, 'Fen Kayıt No': row.fenKayitNo, 'İl': row.il, 'İlçe': row.ilce, 'İşlem': row.islem, 'Zemin': row.zemin, 'Başvuru Durumu': row.basvuruDurumu, 'Bekleme Süresi (Gün)': row.beklemeSuresi, 'Başvuru Açıklama': row.basvuruAciklama }));
-                    cols = [ { wch: 30 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 20 }, { wch: 40 }, { wch: 25 }, { wch: 20 }, { wch: 50 } ];
+                    dataToExport = rowsToExport.map(row => ({ 'Personel': getPersonnelTextForExport(row), 'Başvuru Tarihi': row.basvuruTarihi, 'Fen Kayıt Tarihi': row.fenKayitTarihi, 'Fen Kayıt No': row.fenKayitNo, 'İlçe': row.ilce, 'İşlem': row.islem, 'Zemin': formatZemin(row.zemin), 'Başvuru Durumu': row.basvuruDurumu, 'Bekleme Süresi (Gün)': row.beklemeSuresi, 'Başvuru Açıklama': row.basvuruAciklama }));
+                    cols = [ { wch: 30 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 20 }, { wch: 40 }, { wch: 25 }, { wch: 20 }, { wch: 50 } ];
                 } else if (sortField === 'uygun_olmayan_iade' || sortField === 'onemli_isler') {
-                    dataToExport = rowsToExport.map(row => ({ 'Personel': getPersonnelText(row), 'Fen Kayıt Tarihi': row.fenKayitTarihi, 'Fen Kayıt No': row.fenKayitNo, 'İl': row.il, 'İlçe': row.ilce, 'İşlem': row.islem, 'Zemin': row.zemin, 'Başvuru Durumu': row.basvuruDurumu, 'Başvuru Açıklama': row.basvuruAciklama }));
-                    cols = [ { wch: 30 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 20 }, { wch: 40 }, { wch: 25 }, { wch: 50 }];
+                    dataToExport = rowsToExport.map(row => ({ 'Personel': getPersonnelTextForExport(row), 'Fen Kayıt Tarihi': row.fenKayitTarihi, 'Fen Kayıt No': row.fenKayitNo, 'İlçe': row.ilce, 'İşlem': row.islem, 'Zemin': formatZemin(row.zemin), 'Başvuru Durumu': row.basvuruDurumu, 'Başvuru Açıklama': row.basvuruAciklama }));
+                    cols = [ { wch: 30 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 20 }, { wch: 40 }, { wch: 25 }, { wch: 50 }];
                 } else {
-                    dataToExport = rowsToExport.map(row => ({ 'Personel': getPersonnelText(row), 'Fen Kayıt Tarihi': row.fenKayitTarihi, 'Fen Kayıt No': row.fenKayitNo, 'İl': row.il, 'İlçe': row.ilce, 'İşlem': row.islem, 'Zemin': row.zemin, 'Başvuru Durumu': row.basvuruDurumu, 'Bekleme Süresi (Gün)': row.beklemeSuresi }));
-                    cols = [ { wch: 30 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 20 }, { wch: 40 }, { wch: 25 }, { wch: 20 } ];
+                    dataToExport = rowsToExport.map(row => ({ 'Personel': getPersonnelTextForExport(row), 'Fen Kayıt Tarihi': row.fenKayitTarihi, 'Fen Kayıt No': row.fenKayitNo, 'İlçe': row.ilce, 'İşlem': row.islem, 'Zemin': formatZemin(row.zemin), 'Başvuru Durumu': row.basvuruDurumu, 'Bekleme Süresi (Gün)': row.beklemeSuresi }));
+                    cols = [ { wch: 30 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 20 }, { wch: 40 }, { wch: 25 }, { wch: 20 } ];
                 }
                 
                 const ws = XLSX.utils.json_to_sheet(dataToExport); 
@@ -886,6 +901,69 @@
                 ws['!cols'] = cols; 
                 const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Uyari Raporu'); XLSX.writeFile(wb, 'uyari_raporu.xlsx'); 
             }; 
+
+            const handleExportWarningPdf = () => {
+                const doc = new window.jspdf.jsPDF('l'); 
+                const tr = (str) => {
+                    if (str == null) return '';
+                    return String(str)
+                        .replace(/Ğ/g, 'G').replace(/ğ/g, 'g')
+                        .replace(/Ü/g, 'U').replace(/ü/g, 'u')
+                        .replace(/Ş/g, 'S').replace(/ş/g, 's')
+                        .replace(/İ/g, 'I').replace(/ı/g, 'i')
+                        .replace(/Ö/g, 'O').replace(/ö/g, 'o')
+                        .replace(/Ç/g, 'C').replace(/ç/g, 'c');
+                };
+
+                doc.setFontSize(16);
+                
+                const isUygunOlmayanIadeMode = sortField === 'uygun_olmayan_iade'; const isOnemliIslerMode = sortField === 'onemli_isler'; const isGorevlendirmeYapilmayan = sortField === 'gorevlendirme_yapilmayan'; const isFenKayitAlinmayan = sortField === 'fen_kayit_alinmayan'; const isHarciYatirilmayan = sortField === 'harci_yatirilmayan'; const isIadeEdilen = sortField === 'iade edilen';
+                const generalWarningTitle = warningThreshold === 0 ? `Tum Bekleyen Islemler (Uyari) (Toplam: ${displayedRows.length})` : `${warningThreshold} Gunden Fazla Bekleyen Islemler (Uyari) (Toplam: ${displayedRows.length})`;
+                const warningTitleForPdf = isOnemliIslerMode ? `Son 150 Gundeki Onemli Isler (Toplam: ${displayedRows.length})` : (isUygunOlmayanIadeMode ? `Son 100 Gun Icindeki Iadeler (Toplam: ${displayedRows.length})` : (isFenKayitAlinmayan ? `Fen Kayit Alinmayan Basvurular (Toplam: ${displayedRows.length})` : (isHarciYatirilmayan ? `Harci Yatirilmayan Basvurular (Toplam: ${displayedRows.length})` : (isIadeEdilen ? `Iade Edilen Basvurular (Toplam: ${displayedRows.length})` : (sortField === 'plan_ornegi' ? `1 Gunden Fazla Bekleyen Islemler (Uyari) (Toplam: ${displayedRows.length})` : (isGorevlendirmeYapilmayan ? `1+ Gundur Personel Atanmayan Isler (Uyari) (Toplam: ${displayedRows.length})` : generalWarningTitle))))));
+                
+                doc.text(tr(warningTitleForPdf), 14, 15);
+
+                let head = [];
+                let body = [];
+
+                if (sortField === 'fen_kayit_alinmayan' || sortField === 'harci_yatirilmayan' || sortField === 'iade edilen') {
+                    head = [[tr("Personel"), tr("Basvuru Tar."), tr("Fen Kayit Tar."), tr("F.K. No"), tr("Ilce"), tr("Islem"), tr("Zemin"), tr("Durumu"), tr("Sure"), tr("Aciklama")]];
+                    body = displayedRows.map(row => [
+                        tr(getPersonnelTextForExport(row).replace(/\n/g, ', ')),
+                        row.basvuruTarihi || '', row.fenKayitTarihi || '', row.fenKayitNo || '',
+                        tr(row.ilce), tr(row.islem), tr(formatZemin(row.zemin)), tr(row.basvuruDurumu), row.beklemeSuresi, tr(row.basvuruAciklama)
+                    ]);
+                } else if (sortField === 'uygun_olmayan_iade' || sortField === 'onemli_isler') {
+                    head = [[tr("Personel"), tr("Fen Kayit Tar."), tr("F.K. No"), tr("Ilce"), tr("Islem"), tr("Zemin"), tr("Durumu"), tr("Aciklama")]];
+                    body = displayedRows.map(row => [
+                        tr(getPersonnelTextForExport(row).replace(/\n/g, ', ')),
+                        row.fenKayitTarihi || '', row.fenKayitNo || '',
+                        tr(row.ilce), tr(row.islem), tr(formatZemin(row.zemin)), tr(row.basvuruDurumu), tr(row.basvuruAciklama)
+                    ]);
+                } else {
+                    head = [[tr("Personel"), tr("Fen Kayit Tar."), tr("F.K. No"), tr("Ilce"), tr("Islem"), tr("Zemin"), tr("Durumu"), tr("Bekleme")]];
+                    body = displayedRows.map(row => [
+                        tr(getPersonnelTextForExport(row).replace(/\n/g, ', ')),
+                        row.fenKayitTarihi || '', row.fenKayitNo || '',
+                        tr(row.ilce), tr(row.islem), tr(formatZemin(row.zemin)), tr(row.basvuruDurumu), row.beklemeSuresi
+                    ]);
+                }
+
+                doc.autoTable({
+                    startY: 20,
+                    head: head,
+                    body: body,
+                    theme: 'striped',
+                    styles: { fontSize: 8, cellPadding: 2, overflow: 'linebreak' },
+                    headStyles: { fillColor: [220, 38, 38] }, // Kırmızı tema
+                    columnStyles: {
+                        0: { cellWidth: 35 }, 
+                        5: { cellWidth: 40 }, // Zemin biraz daha geniş olsun
+                    }
+                });
+
+                doc.save('Uyari_Raporu.pdf');
+            };
 
             if (warningRows.length === 0) { return null; } 
             
@@ -913,7 +991,8 @@
                                  </select>
                              </div>
                              <button onClick={() => setShowWarningPersonnelModal(true)} className="export-btn" style={{backgroundColor: '#e11d48', marginRight: '5px'}}>{warningPersonnelFilter.length > 0 ? `${warningPersonnelFilter.length} Kişi Seçili` : 'Personel Filtrele'}</button>
-                            <button onClick={handleExportWarningExcel} className="export-btn" title="Excel olarak indir">Excel İndir</button> 
+                             <button onClick={handleExportWarningPdf} className="export-btn" style={{backgroundColor: '#e11d48', marginRight: '5px'}} title="PDF olarak indir">PDF İndir</button>
+                             <button onClick={handleExportWarningExcel} className="export-btn" title="Excel olarak indir">Excel İndir</button> 
                         </div> 
                     </div> 
                     <div className="table-wrapper" style={{maxHeight: '300px'}}> 
@@ -923,7 +1002,7 @@
                                     <th className="col-personel">Personel</th>
                                     {(isFenKayitAlinmayan || isHarciYatirilmayan || isIadeEdilen) && <th>Başvuru Tarihi</th>}
                                     <th>Fen Kayıt Tarihi {(isOnemliIslerMode || isUygunOlmayanIadeMode || isIadeEdilen) && ( <span onClick={toggleDateSort} style={{ cursor: 'pointer', userSelect: 'none', padding: '0 5px' }}>{dateSortOrder === 'asc' ? '🔼' : '🔽'}</span> )}</th>
-                                    <th className="col-fen-kayit-no">Fen Kayıt No</th><th className="col-il">İl</th><th className="col-ilce">İlçe</th><th className="col-islem">İşlem</th><th className="col-zemin">Zemin</th><th>Başvuru Durumu</th>
+                                    <th className="col-fen-kayit-no">Fen Kayıt No</th><th className="col-ilce">İlçe</th><th className="col-islem">İşlem</th><th className="col-zemin">Zemin</th><th>Başvuru Durumu</th>
                                     {(isUygunOlmayanIadeMode || isOnemliIslerMode || isFenKayitAlinmayan || isHarciYatirilmayan || isIadeEdilen) ? <th>Başvuru Açıklama</th> : <th className="col-bekleme-süresi-gün">Bekleme Süresi (Gün)</th> }
                                 </tr> 
                             </thead> 
@@ -937,8 +1016,10 @@
                                             }
                                         </td>
                                         {(isFenKayitAlinmayan || isHarciYatirilmayan || isIadeEdilen) && <td>{row.basvuruTarihi}</td>}
-                                        <td>{row.fenKayitTarihi}</td><td className="col-fen-kayit-no">{row.fenKayitNo}</td><td className="col-il">{row.il}</td><td className="col-ilce">{row.ilce}</td><td className="col-islem">{row.islem}</td><td className="col-zemin">{row.zemin}</td><td>{row.basvuruDurumu}</td>
-                                        {(isUygunOlmayanIadeMode || isOnemliIslerMode || isFenKayitAlinmayan || isHarciYatirilmayan || isIadeEdilen) ? <td style={{whiteSpace: 'normal', wordBreak: 'break-word'}}>{row.basvuruAciklama}</td> : <td className="col-bekleme-süresi-gün">{row.beklemeSuresi}</td>}
+                                        <td>{row.fenKayitTarihi}</td><td className="col-fen-kayit-no">{row.fenKayitNo}</td><td className="col-ilce">{row.ilce}</td><td className="col-islem">{row.islem}</td>
+                                        <td className="col-zemin" style={{whiteSpace: 'pre-line'}}>{formatZemin(row.zemin)}</td>
+                                        <td>{row.basvuruDurumu}</td>
+                                        {(isUygunOlmayanIadeMode || isOnemliIslerMode || isFenKayitAlinmayan || isHarciYatirilmayan || isIadeEdilen) ? <td style={{whiteSpace: 'pre-line', wordBreak: 'break-word'}}>{row.basvuruAciklama}</td> : <td className="col-bekleme-süresi-gün">{row.beklemeSuresi}</td>}
                                     </tr> 
                                 ))} 
                             </tbody> 
@@ -1001,14 +1082,20 @@
                         const sheetData = [customHeaders];
                         rows.forEach(row => {
                             const rowData = customCols.map(col => {
-                                if (col === 'görevli personel') { let personnel = splitPersonel(row[col]); if (personnelFilterType === 'engineer') personnel = personnel.filter(p => isEngineer(p)); else if (personnelFilterType === 'other') personnel = personnel.filter(p => !isEngineer(p)); return personnel.map(p => isEngineer(p) ? `${p} (Müh.)` : p).join(', '); } return row[col];
+                                if (col === 'görevli personel') { let personnel = splitPersonel(row[col]); if (personnelFilterType === 'engineer') personnel = personnel.filter(p => isEngineer(p)); else if (personnelFilterType === 'other') personnel = personnel.filter(p => !isEngineer(p)); return personnel.map(p => isEngineer(p) ? `${p} (Müh.)` : p).join(', '); } 
+                                if (col === 'zemin') { return formatZemin(row[col]); }
+                                return row[col];
                             }); sheetData.push(rowData);
                         });
                         const ws = XLSX.utils.aoa_to_sheet(sheetData); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Rapor'); XLSX.writeFile(wb, `${sortField}.xlsx`);
                     } else {
                         const headers = ALLOWED_COLS.map(col => col.toLocaleUpperCase('tr-TR')); const sheetData = [headers]; const redFontStyle = { font: { color: { rgb: "FFFF0000" } } };
                         rows.forEach(row => {
-                            const rowData = ALLOWED_COLS.map(col => { if (col === 'görevli personel') { let personnel = splitPersonel(row[col]); if (personnelFilterType === 'engineer') personnel = personnel.filter(p => isEngineer(p)); else if (personnelFilterType === 'other') personnel = personnel.filter(p => !isEngineer(p)); return personnel.map(p => isEngineer(p) ? `${p} (Müh.)` : p).join(', '); } return row[col]; }); sheetData.push(rowData);
+                            const rowData = ALLOWED_COLS.map(col => { 
+                                if (col === 'görevli personel') { let personnel = splitPersonel(row[col]); if (personnelFilterType === 'engineer') personnel = personnel.filter(p => isEngineer(p)); else if (personnelFilterType === 'other') personnel = personnel.filter(p => !isEngineer(p)); return personnel.map(p => isEngineer(p) ? `${p} (Müh.)` : p).join(', '); } 
+                                if (col === 'zemin') { return formatZemin(row[col]); }
+                                return row[col]; 
+                            }); sheetData.push(rowData);
                         });
                         const ws = XLSX.utils.aoa_to_sheet(sheetData);
                         rows.forEach((row, rowIndex) => {
@@ -1042,6 +1129,9 @@
                                         ))}
                                     </td>
                                 );
+                            }
+                            if (col === 'zemin') {
+                                return <td key={col} className={`col-zemin`} style={{whiteSpace: 'pre-line'}}>{formatZemin(row[col])}</td>;
                             }
                              if (col === 'başvuru açıklama') {
                                  const text = row[col]; if (typeof text !== 'string' || !text) return <td key={col} className={`col-${col.replace(/\s+/g, '-')}`}>{text}</td>;
@@ -1199,12 +1289,24 @@
             const [personnelOptions, setPersonnelOptions] = useState([]);
             const [selectedPersonnel, setSelectedPersonnel] = useState([]);
             const [showPersonnelModal, setShowPersonnelModal] = useState(false);
+            
+            const [districtOptions, setDistrictOptions] = useState([]);
+            const [selectedDistricts, setSelectedDistricts] = useState([]);
+            const [showDistrictModal, setShowDistrictModal] = useState(false);
+
+            const [exportFormat, setExportFormat] = useState('excel');
 
             useEffect(() => {
                 if (data && data.length > 0) {
                     const allPersonnel = [...new Set(data.flatMap(row => parsePersonnelWithStatus(row['görevli personel'] || row.personnelRaw).map(p => p.name)))].sort((a, b) => a.localeCompare(b, 'tr'));
                     setPersonnelOptions(allPersonnel);
-                } else { setPersonnelOptions([]); setSelectedPersonnel([]); }
+                    
+                    const allDistricts = [...new Set(data.map(d => d._district || d.ilce).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'tr'));
+                    setDistrictOptions(allDistricts);
+                } else { 
+                    setPersonnelOptions([]); setSelectedPersonnel([]); 
+                    setDistrictOptions([]); setSelectedDistricts([]);
+                }
             }, [data]);
         
             const generateReport = async (type) => {
@@ -1212,9 +1314,6 @@
                 setIsLoading(true);
         
                 try {
-                    const uniqueProvinces = [...new Set(data.map(d => d._province || d.il).filter(Boolean))];
-                    const showProvinceCol = uniqueProvinces.length > 1;
-
                     let reportItems = [];
 
                     if (type === 'district') {
@@ -1237,14 +1336,19 @@
                     } else if (type === 'selected_personnel') {
                         if (selectedPersonnel.length === 0) { alert("Lütfen en az bir personel seçin."); setIsLoading(false); return; }
                         reportItems = selectedPersonnel.map(pName => ({ name: pName, filterFn: (row) => parsePersonnelWithStatus(row['görevli personel'] || row.personnelRaw).some(p => p.name === pName) }));
+                    } else if (type === 'selected_district') {
+                        if (selectedDistricts.length === 0) { alert("Lütfen en az bir ilçe seçin."); setIsLoading(false); return; }
+                        reportItems = selectedDistricts.map(distName => ({
+                            name: distName,
+                            filterFn: (row) => (row._district || row.ilce) === distName
+                        }));
                     } else {
                         const allPersonnelInData = [...new Set(data.flatMap(row => parsePersonnelWithStatus(row['görevli personel'] || row.personnelRaw).filter(p => type === 'engineer' ? isEngineer(p.name) : !isEngineer(p.name)).map(p => p.name)))].sort((a, b) => a.localeCompare(b, 'tr'));
                         if (allPersonnelInData.length === 0) { let entityName = type === 'engineer' ? 'mühendis' : 'personel'; alert(`Yüklenen dosyada raporlanacak ${entityName} bulunamadı.`); setIsLoading(false); return; }
                         reportItems = allPersonnelInData.map(pName => ({ name: pName, filterFn: (row) => parsePersonnelWithStatus(row['görevli personel'] || row.personnelRaw).some(p => p.name === pName && (type === 'engineer' ? isEngineer(p.name) : !isEngineer(p.name))) }));
                     }
         
-                    const mainWb = XLSX.utils.book_new();
-                    const summaryHeader = type === 'district' ? "Bölge/İlçe" : "Personel";
+                    const summaryHeader = (type === 'district' || type === 'selected_district') ? "Bölge/İlçe" : "Personel";
                     const summaryData = [[summaryHeader, "Toplam Bekleyen İşlem", "Bekleme Süreleri Kırılımı (Gün: Adet)"]];
                     const sheetsToAdd = [];
 
@@ -1274,9 +1378,16 @@
                                         }
                                     }
                                 }
-                                const obj = { 'Personel': parsePersonnelWithStatus(row['görevli personel'] || row.personnelRaw).map(p => isEngineer(p.name) ? `${p.name} (Müh.)` : p.name).join("\n"), 'Fen Kayıt Tarihi': row['fen kayıt tarihi'] || row.fenKayitTarihi, 'Fen Kayıt No': row['fen kayıt no'] || row.fenKayitNo };
-                                if (showProvinceCol) obj['İl'] = row._province || row.il;
-                                obj['İlçe'] = row._district || row.ilce; obj['İşlem'] = row['işlem'] || row.islem; obj['Zemin'] = row['zemin'] || row.zemin; obj['Başvuru Durumu'] = row['başvuru durumu'] || row.basvuruDurumu; obj['Bekleme Süresi (Gün)'] = beklemeSuresi;
+                                const obj = { 
+                                    'Personel': parsePersonnelWithStatus(row['görevli personel'] || row.personnelRaw).map(p => isEngineer(p.name) ? `${p.name} (Müh.)` : p.name).join("\n"), 
+                                    'Fen Kayıt Tarihi': row['fen kayıt tarihi'] || row.fenKayitTarihi, 
+                                    'Fen Kayıt No': row['fen kayıt no'] || row.fenKayitNo,
+                                    'İlçe': row._district || row.ilce,
+                                    'İşlem': row['işlem'] || row.islem,
+                                    'Zemin': formatZemin(row['zemin'] || row.zemin),
+                                    'Başvuru Durumu': row['başvuru durumu'] || row.basvuruDurumu,
+                                    'Bekleme Süresi (Gün)': beklemeSuresi
+                                };
                                 return obj;
                             });
         
@@ -1289,7 +1400,7 @@
                             summaryData.push([item.name, pendingCount, breakdownStr]);
 
                             const ws = XLSX.utils.json_to_sheet(dataToExport);
-                            const colWidths = [30, 15, 15]; if (showProvinceCol) colWidths.push(15); colWidths.push(15, 20, 40, 25, 20); 
+                            const colWidths = [30, 15, 15, 15, 20, 40, 25, 20]; 
                             ws['!cols'] = colWidths.map(w => ({ wch: w }));
         
                             const range = XLSX.utils.decode_range(ws['!ref']);
@@ -1299,25 +1410,95 @@
                             }
                             
                             const sheetName = item.name.replace(/[\\/*?:]/g, "").substring(0, 31);
-                            sheetsToAdd.push({ name: sheetName, ws: ws });
+                            sheetsToAdd.push({ name: sheetName, ws: ws, rawData: dataToExport });
                         }
                     }
                     
-                    const summaryWs = XLSX.utils.aoa_to_sheet(summaryData);
-                    summaryWs['!cols'] = [{ wch: 30 }, { wch: 25 }, { wch: 100 }];
-                    XLSX.utils.book_append_sheet(mainWb, summaryWs, "Özet");
+                    let fileName = 'MEGSIS_Raporu';
+                    if (type === 'engineer') fileName = 'MEGSIS_Muhendis_Raporu';
+                    else if (type === 'other') fileName = 'MEGSIS_Diger_Personel_Raporu';
+                    else if (type === 'district') fileName = 'MEGSIS_Ilce_Raporu';
+                    else if (type === 'selected_personnel') fileName = 'MEGSIS_Secili_Personel_Raporu';
+                    else if (type === 'selected_district') fileName = 'MEGSIS_Secili_Ilce_Raporu';
 
-                    sheetsToAdd.forEach(sheetData => {
-                        XLSX.utils.book_append_sheet(mainWb, sheetData.ws, sheetData.name);
-                    });
-                    
-                    let fileName = 'MEGSIS_Raporu.xlsx';
-                    if (type === 'engineer') fileName = 'MEGSIS_Muhendis_Raporu.xlsx';
-                    else if (type === 'other') fileName = 'MEGSIS_Diger_Personel_Raporu.xlsx';
-                    else if (type === 'district') fileName = 'MEGSIS_Ilce_Raporu.xlsx';
-                    else if (type === 'selected_personnel') fileName = 'MEGSIS_Secili_Personel_Raporu.xlsx';
+                    if (exportFormat === 'pdf') {
+                        const doc = new window.jspdf.jsPDF('l'); 
+                        const tr = (str) => {
+                            if (str == null) return '';
+                            return String(str)
+                                .replace(/Ğ/g, 'G').replace(/ğ/g, 'g')
+                                .replace(/Ü/g, 'U').replace(/ü/g, 'u')
+                                .replace(/Ş/g, 'S').replace(/ş/g, 's')
+                                .replace(/İ/g, 'I').replace(/ı/g, 'i')
+                                .replace(/Ö/g, 'O').replace(/ö/g, 'o')
+                                .replace(/Ç/g, 'C').replace(/ç/g, 'c');
+                        };
 
-                    XLSX.writeFile(mainWb, fileName);
+                        doc.setFontSize(16);
+                        doc.text(tr("MEGSIS Raporu - Ozet"), 14, 15);
+                        
+                        const summaryHead = [[tr(summaryHeader), tr("Toplam Bekleyen Islem"), tr("Bekleme Sureleri Kirilimi (Gun: Adet)")]];
+                        const summaryBody = summaryData.slice(1).map(row => [tr(row[0]), row[1], tr(row[2])]);
+
+                        doc.autoTable({
+                            startY: 20,
+                            head: summaryHead,
+                            body: summaryBody,
+                            theme: 'grid',
+                            styles: { fontSize: 9, cellPadding: 3 },
+                            headStyles: { fillColor: [7, 89, 133] }
+                        });
+
+                        sheetsToAdd.forEach(sheetData => {
+                            doc.addPage();
+                            doc.setFontSize(14);
+                            doc.text(tr(sheetData.name), 14, 15);
+
+                            const head = [[tr("Personel"), tr("Fen Kayit Tarihi"), tr("Fen Kayit No"), tr("Ilce"), tr("Islem"), tr("Zemin"), tr("Basvuru Durumu"), tr("Bekleme (Gun)")]];
+                            const body = sheetData.rawData.map(r => [
+                                tr(r['Personel'].replace(/\n/g, ', ')),
+                                r['Fen Kayıt Tarihi'] || '',
+                                r['Fen Kayıt No'] || '',
+                                tr(r['İlçe']),
+                                tr(r['İşlem']),
+                                tr(r['Zemin']),
+                                tr(r['Başvuru Durumu']),
+                                r['Bekleme Süresi (Gün)'] !== '' ? r['Bekleme Süresi (Gün)'] : ''
+                            ]);
+
+                            doc.autoTable({
+                                startY: 20,
+                                head: head,
+                                body: body,
+                                theme: 'striped',
+                                styles: { fontSize: 8, cellPadding: 2, overflow: 'linebreak' },
+                                headStyles: { fillColor: [7, 89, 133] },
+                                columnStyles: {
+                                    0: { cellWidth: 35 },
+                                    1: { cellWidth: 20 },
+                                    2: { cellWidth: 20 },
+                                    3: { cellWidth: 25 },
+                                    4: { cellWidth: 35 },
+                                    5: { cellWidth: 'auto' },
+                                    6: { cellWidth: 30 },
+                                    7: { cellWidth: 20 }
+                                }
+                            });
+                        });
+
+                        doc.save(`${fileName}.pdf`);
+                    } else {
+                        const mainWb = XLSX.utils.book_new();
+                        const summaryWs = XLSX.utils.aoa_to_sheet(summaryData);
+                        summaryWs['!cols'] = [{ wch: 30 }, { wch: 25 }, { wch: 100 }];
+                        XLSX.utils.book_append_sheet(mainWb, summaryWs, "Özet");
+
+                        sheetsToAdd.forEach(sheetData => {
+                            XLSX.utils.book_append_sheet(mainWb, sheetData.ws, sheetData.name);
+                        });
+                        
+                        XLSX.writeFile(mainWb, `${fileName}.xlsx`);
+                    }
 
                 } catch (err) { alert("Rapor oluşturulurken bir hata oluştu."); } finally { setIsLoading(false); }
             };
@@ -1327,22 +1508,65 @@
                     <div className="ebys-reporter-header"><h3 style={{color: '#075985'}}>MEGSİS Raporlama</h3></div>
                     <div className="ebys-controls">
                         <p style={{textAlign: 'center', fontSize: '0.9rem', color: '#0369a1', width: '100%', marginBottom: '15px'}}>Yukarıdaki <b>Uyarı Tablosunda</b> listelenen verileri baz alarak rapor oluşturur. Süre ve Filtreleri yukarıdan ayarlayabilirsiniz.</p>
-                        <button onClick={() => generateReport('engineer')} disabled={isLoading || data.length === 0}>{isLoading ? 'İşleniyor...' : 'Mühendis Bazlı Rapor Al'}</button>
-                        <button onClick={() => generateReport('other')} disabled={isLoading || data.length === 0} style={{backgroundColor: '#0ea5e9'}}>{isLoading ? 'İşleniyor...' : 'Diğer Personel Bazlı Rapor Al'}</button>
-                         <button onClick={() => generateReport('district')} disabled={isLoading || data.length === 0} style={{backgroundColor: '#8b5cf6'}}>{isLoading ? 'İşleniyor...' : 'İlçe Bazlı Rapor Al'}</button>
-                        {personnelOptions.length > 0 && (
-                            <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginTop: '10px', width: '100%', justifyContent: 'center', borderTop: '1px dashed #bae6fd', paddingTop: '15px' }}>
+                        
+                        <div style={{ width: '100%', display: 'flex', gap: '20px', justifyContent: 'center', marginBottom: '15px', background: '#e0f2fe', padding: '10px', borderRadius: '8px' }}>
+                            <label style={{fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', color: '#0369a1'}}>
+                                <input type="radio" name="format" value="excel" checked={exportFormat === 'excel'} onChange={() => setExportFormat('excel')} /> Excel Olarak İndir (.xlsx)
+                            </label>
+                            <label style={{fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', color: '#0369a1'}}>
+                                <input type="radio" name="format" value="pdf" checked={exportFormat === 'pdf'} onChange={() => setExportFormat('pdf')} /> PDF Olarak İndir (.pdf)
+                            </label>
+                        </div>
+
+                        <div style={{ width: '100%', display: 'flex', gap: '15px', justifyContent: 'center', flexWrap: 'wrap' }}>
+                            <button onClick={() => generateReport('engineer')} disabled={isLoading || data.length === 0}>{isLoading ? 'İşleniyor...' : 'Mühendis Bazlı Rapor Al'}</button>
+                            <button onClick={() => generateReport('other')} disabled={isLoading || data.length === 0} style={{backgroundColor: '#0ea5e9'}}>{isLoading ? 'İşleniyor...' : 'Diğer Personel Bazlı Rapor Al'}</button>
+                            <button onClick={() => generateReport('district')} disabled={isLoading || data.length === 0} style={{backgroundColor: '#8b5cf6'}}>{isLoading ? 'İşleniyor...' : 'İlçe Bazlı Rapor Al'}</button>
+                        </div>
+                        
+                        {(personnelOptions.length > 0 || districtOptions.length > 0) && (
+                            <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginTop: '10px', width: '100%', justifyContent: 'center', borderTop: '1px dashed #bae6fd', paddingTop: '15px', flexWrap: 'wrap' }}>
                                 <button onClick={() => setShowPersonnelModal(true)} style={{backgroundColor: '#f59e0b', color: 'white'}}>{selectedPersonnel.length ? `${selectedPersonnel.length} Personel Seçili` : 'Özel Personel Seç'}</button>
-                                <button onClick={() => generateReport('selected_personnel')} disabled={isLoading || data.length === 0 || selectedPersonnel.length === 0} style={{backgroundColor: '#10b981'}}>{isLoading ? 'İşleniyor...' : 'Seçili Personel Raporunu Al'}</button>
+                                <button onClick={() => generateReport('selected_personnel')} disabled={isLoading || data.length === 0 || selectedPersonnel.length === 0} style={{backgroundColor: '#10b981'}}>{isLoading ? 'İşleniyor...' : 'Seçili Personel Raporu'}</button>
+                                
+                                <button onClick={() => setShowDistrictModal(true)} style={{backgroundColor: '#8b5cf6', color: 'white'}}>{selectedDistricts.length ? `${selectedDistricts.length} İlçe Seçili` : 'Özel İlçe Seç'}</button>
+                                <button onClick={() => generateReport('selected_district')} disabled={isLoading || data.length === 0 || selectedDistricts.length === 0} style={{backgroundColor: '#6366f1'}}>{isLoading ? 'İşleniyor...' : 'Seçili İlçe Raporu'}</button>
                             </div>
                         )}
                     </div>
+
+                    {/* Personel Seçim Modalı */}
                     {showPersonnelModal && (
                         <div className="modal-overlay" onClick={() => setShowPersonnelModal(false)}>
                             <div className="modal" onClick={e => e.stopPropagation()}>
                                 <div className="modal-header"><h3>MEGSİS Personel Seç</h3><button className="close-btn" onClick={()=>setShowPersonnelModal(false)}>×</button></div>
                                 <div className="modal-content"><div className="filter-list"><div className="filter-item" key="select-all-megsis"><label><input type="checkbox" checked={selectedPersonnel.length === personnelOptions.length && personnelOptions.length > 0} onChange={e => { if (e.target.checked) setSelectedPersonnel(personnelOptions); else setSelectedPersonnel([]); }} /><b>Tümünü Seç/Bırak</b></label></div>{personnelOptions.map(p => (<div className="filter-item" key={p}><label style={{color: isEngineer(p) ? 'red' : 'inherit'}}><input type="checkbox" checked={selectedPersonnel.includes(p)} onChange={e=>{ if(e.target.checked) setSelectedPersonnel([...selectedPersonnel, p]); else setSelectedPersonnel(selectedPersonnel.filter(item => item !== p)); }}/> {p} {isEngineer(p) ? '(Müh.)' : ''}</label></div>))}</div></div>
                                 <div className="modal-footer"><button className="download-btn" onClick={()=>{setSelectedPersonnel([]); setShowPersonnelModal(false);}}>Temizle & Kapat</button><button className="download-btn" style={{backgroundColor: '#16a34a'}} onClick={()=> setShowPersonnelModal(false)}>Uygula</button></div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* İlçe Seçim Modalı */}
+                    {showDistrictModal && (
+                        <div className="modal-overlay" onClick={() => setShowDistrictModal(false)}>
+                            <div className="modal" onClick={e => e.stopPropagation()}>
+                                <div className="modal-header"><h3>MEGSİS İlçe Seç</h3><button className="close-btn" onClick={()=>setShowDistrictModal(false)}>×</button></div>
+                                <div className="modal-content">
+                                    <div className="filter-list">
+                                        <div className="filter-item" key="select-all-districts">
+                                            <label><input type="checkbox" checked={selectedDistricts.length === districtOptions.length && districtOptions.length > 0} onChange={e => { if (e.target.checked) setSelectedDistricts(districtOptions); else setSelectedDistricts([]); }} /><b>Tümünü Seç/Bırak</b></label>
+                                        </div>
+                                        {districtOptions.map(d => (
+                                            <div className="filter-item" key={d}>
+                                                <label><input type="checkbox" checked={selectedDistricts.includes(d)} onChange={e=>{ if(e.target.checked) setSelectedDistricts([...selectedDistricts, d]); else setSelectedDistricts(selectedDistricts.filter(item => item !== d)); }}/> {d}</label>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                                <div className="modal-footer">
+                                    <button className="download-btn" onClick={()=>{setSelectedDistricts([]); setShowDistrictModal(false);}}>Temizle & Kapat</button>
+                                    <button className="download-btn" style={{backgroundColor: '#16a34a'}} onClick={()=> setShowDistrictModal(false)}>Uygula</button>
+                                </div>
                             </div>
                         </div>
                     )}
