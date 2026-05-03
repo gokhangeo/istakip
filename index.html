@@ -1244,6 +1244,9 @@
                     }
         
                     const mainWb = XLSX.utils.book_new();
+                    const summaryHeader = type === 'district' ? "Bölge/İlçe" : "Personel";
+                    const summaryData = [[summaryHeader, "Toplam Bekleyen İşlem", "Bekleme Süreleri Kırılımı (Gün: Adet)"]];
+                    const sheetsToAdd = [];
 
                     for (let i = 0; i < reportItems.length; i++) {
                         const item = reportItems[i]; let filteredRows = data.filter(item.filterFn);
@@ -1251,16 +1254,40 @@
         
                         if (filteredRows.length > 0) {
                             const today = new Date();
+                            let pendingCount = 0;
+                            let daysCount = {};
+
                             const dataToExport = filteredRows.map(row => {
-                                const status = String(row['başvuru durumu'] || row.basvuruDurumu || '').toLocaleLowerCase('tr'); const isClosed = status.includes('eksiklikten iade edildi') || status.includes('tescile gönderildi');
-                                const fStr = row['fen kayıt tarihi'] || row.fenKayitTarihi; let beklemeSuresi = '';
-                                if (fStr && !isClosed) { const fenKayitDate = new Date(fStr); if (!isNaN(fenKayitDate) && fenKayitDate.getFullYear() > 1900) { const diffDays = (today - fenKayitDate) / (1000 * 60 * 60 * 24); if (diffDays >= 0) beklemeSuresi = Math.floor(diffDays); } }
+                                const status = String(row['başvuru durumu'] || row.basvuruDurumu || '').toLocaleLowerCase('tr');
+                                const isClosed = status.includes('eksiklikten iade edildi') || status.includes('tescile gönderildi');
+                                const fStr = row['fen kayıt tarihi'] || row.fenKayitTarihi;
+                                let beklemeSuresi = '';
+                                
+                                if (fStr && !isClosed) {
+                                    const fenKayitDate = new Date(fStr);
+                                    if (!isNaN(fenKayitDate) && fenKayitDate.getFullYear() > 1900) {
+                                        const diffDays = Math.floor((today - fenKayitDate) / (1000 * 60 * 60 * 24));
+                                        if (diffDays >= 0) {
+                                            beklemeSuresi = diffDays;
+                                            pendingCount++;
+                                            daysCount[diffDays] = (daysCount[diffDays] || 0) + 1;
+                                        }
+                                    }
+                                }
                                 const obj = { 'Personel': parsePersonnelWithStatus(row['görevli personel'] || row.personnelRaw).map(p => isEngineer(p.name) ? `${p.name} (Müh.)` : p.name).join("\n"), 'Fen Kayıt Tarihi': row['fen kayıt tarihi'] || row.fenKayitTarihi, 'Fen Kayıt No': row['fen kayıt no'] || row.fenKayitNo };
                                 if (showProvinceCol) obj['İl'] = row._province || row.il;
                                 obj['İlçe'] = row._district || row.ilce; obj['İşlem'] = row['işlem'] || row.islem; obj['Zemin'] = row['zemin'] || row.zemin; obj['Başvuru Durumu'] = row['başvuru durumu'] || row.basvuruDurumu; obj['Bekleme Süresi (Gün)'] = beklemeSuresi;
                                 return obj;
                             });
         
+                            const breakdownStr = Object.keys(daysCount)
+                                .map(Number)
+                                .sort((a, b) => b - a)
+                                .map(day => `${day} Gün (${daysCount[day]} adet)`)
+                                .join(" | ");
+
+                            summaryData.push([item.name, pendingCount, breakdownStr]);
+
                             const ws = XLSX.utils.json_to_sheet(dataToExport);
                             const colWidths = [30, 15, 15]; if (showProvinceCol) colWidths.push(15); colWidths.push(15, 20, 40, 25, 20); 
                             ws['!cols'] = colWidths.map(w => ({ wch: w }));
@@ -1271,19 +1298,27 @@
                                 if (ws[cell_ref] && ws[cell_ref].v) { if (!ws[cell_ref].s) ws[cell_ref].s = {}; ws[cell_ref].s.alignment = { wrapText: true, vertical: 'top' }; }
                             }
                             
-                            if (type === 'selected_personnel') {
-                                const individualWb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(individualWb, ws, "Rapor"); const safeName = item.name.replace(/[\\/*?:"<>|]/g, ''); XLSX.writeFile(individualWb, `${safeName} (MEGSİS).xlsx`); await new Promise(resolve => setTimeout(resolve, 200));
-                            } else {
-                                const sheetName = item.name.replace(/[\\/*?:]/g, "").substring(0, 31); XLSX.utils.book_append_sheet(mainWb, ws, sheetName);
-                            }
+                            const sheetName = item.name.replace(/[\\/*?:]/g, "").substring(0, 31);
+                            sheetsToAdd.push({ name: sheetName, ws: ws });
                         }
                     }
                     
-                    if (type !== 'selected_personnel') {
-                        let fileName = 'MEGSIS_Raporu.xlsx';
-                        if (type === 'engineer') fileName = 'MEGSIS_Muhendis_Raporu.xlsx'; else if (type === 'other') fileName = 'MEGSIS_Diger_Personel_Raporu.xlsx'; else if (type === 'district') fileName = 'MEGSIS_Ilce_Raporu.xlsx';
-                        XLSX.writeFile(mainWb, fileName);
-                    }
+                    const summaryWs = XLSX.utils.aoa_to_sheet(summaryData);
+                    summaryWs['!cols'] = [{ wch: 30 }, { wch: 25 }, { wch: 100 }];
+                    XLSX.utils.book_append_sheet(mainWb, summaryWs, "Özet");
+
+                    sheetsToAdd.forEach(sheetData => {
+                        XLSX.utils.book_append_sheet(mainWb, sheetData.ws, sheetData.name);
+                    });
+                    
+                    let fileName = 'MEGSIS_Raporu.xlsx';
+                    if (type === 'engineer') fileName = 'MEGSIS_Muhendis_Raporu.xlsx';
+                    else if (type === 'other') fileName = 'MEGSIS_Diger_Personel_Raporu.xlsx';
+                    else if (type === 'district') fileName = 'MEGSIS_Ilce_Raporu.xlsx';
+                    else if (type === 'selected_personnel') fileName = 'MEGSIS_Secili_Personel_Raporu.xlsx';
+
+                    XLSX.writeFile(mainWb, fileName);
+
                 } catch (err) { alert("Rapor oluşturulurken bir hata oluştu."); } finally { setIsLoading(false); }
             };
         
