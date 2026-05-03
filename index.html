@@ -899,7 +899,7 @@
                     if (ws[cell_ref] && ws[cell_ref].v) { if (!ws[cell_ref].s) ws[cell_ref].s = {}; ws[cell_ref].s.alignment = { wrapText: true, vertical: 'top' }; } 
                 } 
                 ws['!cols'] = cols; 
-                const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Uyari Raporu'); XLSX.writeFile(wb, 'uyari_raporu.xlsx'); 
+                const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Rapor'); XLSX.writeFile(wb, 'rapor.xlsx'); 
             }; 
 
             const handleExportWarningPdf = () => {
@@ -918,8 +918,8 @@
                 doc.setFontSize(16);
                 
                 const isUygunOlmayanIadeMode = sortField === 'uygun_olmayan_iade'; const isOnemliIslerMode = sortField === 'onemli_isler'; const isGorevlendirmeYapilmayan = sortField === 'gorevlendirme_yapilmayan'; const isFenKayitAlinmayan = sortField === 'fen_kayit_alinmayan'; const isHarciYatirilmayan = sortField === 'harci_yatirilmayan'; const isIadeEdilen = sortField === 'iade edilen';
-                const generalWarningTitle = warningThreshold === 0 ? `Tum Bekleyen Islemler (Uyari) (Toplam: ${displayedRows.length})` : `${warningThreshold} Gunden Fazla Bekleyen Islemler (Uyari) (Toplam: ${displayedRows.length})`;
-                const warningTitleForPdf = isOnemliIslerMode ? `Son 150 Gundeki Onemli Isler (Toplam: ${displayedRows.length})` : (isUygunOlmayanIadeMode ? `Son 100 Gun Icindeki Iadeler (Toplam: ${displayedRows.length})` : (isFenKayitAlinmayan ? `Fen Kayit Alinmayan Basvurular (Toplam: ${displayedRows.length})` : (isHarciYatirilmayan ? `Harci Yatirilmayan Basvurular (Toplam: ${displayedRows.length})` : (isIadeEdilen ? `Iade Edilen Basvurular (Toplam: ${displayedRows.length})` : (sortField === 'plan_ornegi' ? `1 Gunden Fazla Bekleyen Islemler (Uyari) (Toplam: ${displayedRows.length})` : (isGorevlendirmeYapilmayan ? `1+ Gundur Personel Atanmayan Isler (Uyari) (Toplam: ${displayedRows.length})` : generalWarningTitle))))));
+                const generalWarningTitle = warningThreshold === 0 ? `Tum Bekleyen Islemler (Toplam: ${displayedRows.length})` : `${warningThreshold} Gunden Fazla Bekleyen Islemler (Toplam: ${displayedRows.length})`;
+                const warningTitleForPdf = isOnemliIslerMode ? `Son 150 Gundeki Onemli Isler (Toplam: ${displayedRows.length})` : (isUygunOlmayanIadeMode ? `Son 100 Gun Icindeki Iadeler (Toplam: ${displayedRows.length})` : (isFenKayitAlinmayan ? `Fen Kayit Alinmayan Basvurular (Toplam: ${displayedRows.length})` : (isHarciYatirilmayan ? `Harci Yatirilmayan Basvurular (Toplam: ${displayedRows.length})` : (isIadeEdilen ? `Iade Edilen Basvurular (Toplam: ${displayedRows.length})` : (sortField === 'plan_ornegi' ? `1 Gunden Fazla Bekleyen Islemler (Toplam: ${displayedRows.length})` : (isGorevlendirmeYapilmayan ? `1+ Gundur Personel Atanmayan Isler (Toplam: ${displayedRows.length})` : generalWarningTitle))))));
                 
                 doc.text(tr(warningTitleForPdf), 14, 15);
 
@@ -954,22 +954,37 @@
                     head: head,
                     body: body,
                     theme: 'striped',
-                    styles: { fontSize: 8, cellPadding: 2, overflow: 'linebreak' },
+                    rowPageBreak: 'avoid',
+                    margin: { bottom: 10 },
+                    styles: { fontSize: 7.5, cellPadding: 1.5, overflow: 'linebreak' },
                     headStyles: { fillColor: [220, 38, 38] }, // Kırmızı tema
                     columnStyles: {
                         0: { cellWidth: 35 }, 
-                        5: { cellWidth: 40 }, // Zemin biraz daha geniş olsun
+                        5: { cellWidth: 40 }, // Zemin biraz daha geniş
+                    },
+                    didParseCell: function(data) {
+                        if (data.section === 'body') {
+                            const headerText = data.table.head[0].cells[data.column.index].text[0];
+                            if (headerText === 'Durumu') {
+                                const cellText = data.cell.text.join(' ').toLowerCase();
+                                if (cellText.includes('eksiklik tamamlandi') || cellText.includes('idare')) {
+                                    data.cell.styles.fillColor = [253, 224, 71]; // Sarı arka plan
+                                    data.cell.styles.textColor = [0, 0, 0]; // Siyah yazı
+                                    data.cell.styles.fontStyle = 'bold';
+                                }
+                            }
+                        }
                     }
                 });
 
-                doc.save('Uyari_Raporu.pdf');
+                doc.save('Rapor.pdf');
             };
 
             if (warningRows.length === 0) { return null; } 
             
             const isUygunOlmayanIadeMode = sortField === 'uygun_olmayan_iade'; const isOnemliIslerMode = sortField === 'onemli_isler'; const isGorevlendirmeYapilmayan = sortField === 'gorevlendirme_yapilmayan'; const isFenKayitAlinmayan = sortField === 'fen_kayit_alinmayan'; const isHarciYatirilmayan = sortField === 'harci_yatirilmayan'; const isIadeEdilen = sortField === 'iade edilen';
-            const generalWarningTitle = warningThreshold === 0 ? `Tüm Bekleyen İşlemler (Uyarı) (Toplam: ${displayedRows.length})` : `${warningThreshold} Günden Fazla Bekleyen İşlemler (Uyarı) (Toplam: ${displayedRows.length})`;
-            const warningTitle = isOnemliIslerMode ? `Son 150 Gündeki Önemli İşler (Toplam: ${displayedRows.length})` : (isUygunOlmayanIadeMode ? `Son 100 Gün İçindeki İadeler (Toplam: ${displayedRows.length})` : (isFenKayitAlinmayan ? `Fen Kayıt Alınmayan Başvurular (Toplam: ${displayedRows.length})` : (isHarciYatirilmayan ? `Harcı Yatırılmayan Başvurular (Toplam: ${displayedRows.length})` : (isIadeEdilen ? `İade Edilen Başvurular (Toplam: ${displayedRows.length})` : (sortField === 'plan_ornegi' ? `1 Günden Fazla Bekleyen İşlemler (Uyarı) (Toplam: ${displayedRows.length})` : (isGorevlendirmeYapilmayan ? `1+ Gündür Personel Atanmayan İşler (Uyarı) (Toplam: ${displayedRows.length})` : generalWarningTitle))))));
+            const generalWarningTitle = warningThreshold === 0 ? `Tüm Bekleyen İşlemler (Toplam: ${displayedRows.length})` : `${warningThreshold} Günden Fazla Bekleyen İşlemler (Toplam: ${displayedRows.length})`;
+            const warningTitle = isOnemliIslerMode ? `Son 150 Gündeki Önemli İşler (Toplam: ${displayedRows.length})` : (isUygunOlmayanIadeMode ? `Son 100 Gün İçindeki İadeler (Toplam: ${displayedRows.length})` : (isFenKayitAlinmayan ? `Fen Kayıt Alınmayan Başvurular (Toplam: ${displayedRows.length})` : (isHarciYatirilmayan ? `Harcı Yatırılmayan Başvurular (Toplam: ${displayedRows.length})` : (isIadeEdilen ? `İade Edilen Başvurular (Toplam: ${displayedRows.length})` : (sortField === 'plan_ornegi' ? `1 Günden Fazla Bekleyen İşlemler (Toplam: ${displayedRows.length})` : (isGorevlendirmeYapilmayan ? `1+ Gündür Personel Atanmayan İşler (Toplam: ${displayedRows.length})` : generalWarningTitle))))));
             
             return ( 
                 <div className="warning-table-container"> 
@@ -1471,7 +1486,9 @@
                                 head: head,
                                 body: body,
                                 theme: 'striped',
-                                styles: { fontSize: 8, cellPadding: 2, overflow: 'linebreak' },
+                                rowPageBreak: 'avoid',
+                                margin: { bottom: 10 },
+                                styles: { fontSize: 7.5, cellPadding: 1.5, overflow: 'linebreak' },
                                 headStyles: { fillColor: [7, 89, 133] },
                                 columnStyles: {
                                     0: { cellWidth: 35 },
@@ -1482,6 +1499,19 @@
                                     5: { cellWidth: 'auto' },
                                     6: { cellWidth: 30 },
                                     7: { cellWidth: 20 }
+                                },
+                                didParseCell: function(data) {
+                                    if (data.section === 'body') {
+                                        const headerText = data.table.head[0].cells[data.column.index].text[0];
+                                        if (headerText === 'Basvuru Durumu') {
+                                            const cellText = data.cell.text.join(' ').toLowerCase();
+                                            if (cellText.includes('eksiklik tamamlandi') || cellText.includes('idare')) {
+                                                data.cell.styles.fillColor = [253, 224, 71];
+                                                data.cell.styles.textColor = [0, 0, 0];
+                                                data.cell.styles.fontStyle = 'bold';
+                                            }
+                                        }
+                                    }
                                 }
                             });
                         });
@@ -2066,7 +2096,7 @@
                     <div className="modal-overlay" onClick={() => setShowPersonelModal(false)}>
                         <div className="modal" onClick={e => e.stopPropagation()}>
                              <div className="modal-header"><h3>Personel Seç</h3><button className="close-btn" onClick={()=>setShowPersonelModal(false)}>×</button></div>
-                             <div className="modal-content"><div className="filter-list">{personnelOptions.map(p => <div className="filter-item" key={p}><label style={{color: isEngineer(p) ? 'red' : 'inherit'}}><input type="checkbox" checked={selectedPersonel.includes(p)} onChange={e=>{ if(e.target.checked) setSelectedPersonel([...selectedPersonel,p]); else setSelectedPersonel(selectedPersonel.filter(sp=>sp!==p)); }}/> {p} {isEngineer(p) ? '(Müh.)' : ''}</label></div>)}</div></div>
+                             <div className="modal-content"><div className="filter-list">{personnelOptions.map(p => <div className="filter-item" key={p}><label style={{color: isEngineer(p) ? 'red' : 'inherit'}}><input type="checkbox" checked={selectedPersonel.includes(p)} onChange={e=>{ if(e.target.checked) setSelectedPersonel([...selectedPersonel,p]); else setSelectedPersonel(selectedPersonnel.filter(sp=>sp!==p)); }}/> {p} {isEngineer(p) ? '(Müh.)' : ''}</label></div>)}</div></div>
                             <div className="modal-footer"><button className="download-btn" onClick={()=>{setSelectedPersonel([]); setShowPersonelModal(false);}}>Temizle & Kapat</button></div>
                         </div>
                     </div>
