@@ -918,8 +918,8 @@
                 doc.setFontSize(16);
                 
                 const isUygunOlmayanIadeMode = sortField === 'uygun_olmayan_iade'; const isOnemliIslerMode = sortField === 'onemli_isler'; const isGorevlendirmeYapilmayan = sortField === 'gorevlendirme_yapilmayan'; const isFenKayitAlinmayan = sortField === 'fen_kayit_alinmayan'; const isHarciYatirilmayan = sortField === 'harci_yatirilmayan'; const isIadeEdilen = sortField === 'iade edilen';
-                const generalWarningTitle = warningThreshold === 0 ? `Tum Bekleyen Islemler (Toplam: ${displayedRows.length})` : `${warningThreshold} Gunden Fazla Bekleyen Islemler (Toplam: ${displayedRows.length})`;
-                const warningTitleForPdf = isOnemliIslerMode ? `Son 150 Gundeki Onemli Isler (Toplam: ${displayedRows.length})` : (isUygunOlmayanIadeMode ? `Son 100 Gun Icindeki Iadeler (Toplam: ${displayedRows.length})` : (isFenKayitAlinmayan ? `Fen Kayit Alinmayan Basvurular (Toplam: ${displayedRows.length})` : (isHarciYatirilmayan ? `Harci Yatirilmayan Basvurular (Toplam: ${displayedRows.length})` : (isIadeEdilen ? `Iade Edilen Basvurular (Toplam: ${displayedRows.length})` : (sortField === 'plan_ornegi' ? `1 Gunden Fazla Bekleyen Islemler (Toplam: ${displayedRows.length})` : (isGorevlendirmeYapilmayan ? `1+ Gundur Personel Atanmayan Isler (Toplam: ${displayedRows.length})` : generalWarningTitle))))));
+                const generalWarningTitle = warningThreshold === 0 ? `Tum Bekleyen Islemler (Toplam: ${displayedRows.length})` : `${warningThreshold === 1 ? '1+' : warningThreshold + '+'} Gunden Fazla Bekleyen Islemler (Toplam: ${displayedRows.length})`;
+                const warningTitleForPdf = isOnemliIslerMode ? `Son 150 Gundeki Onemli Isler (Toplam: ${displayedRows.length})` : (isUygunOlmayanIadeMode ? `Son 100 Gun Icindeki Iadeler (Toplam: ${displayedRows.length})` : (isFenKayitAlinmayan ? `Fen Kayit Alinmayan Basvurular (Toplam: ${displayedRows.length})` : (isHarciYatirilmayan ? `Harci Yatirilmayan Basvurular (Toplam: ${displayedRows.length})` : (isIadeEdilen ? `Iade Edilen Basvurular (Toplam: ${displayedRows.length})` : (sortField === 'plan_ornegi' ? `1+ Gunden Fazla Bekleyen Islemler (Toplam: ${displayedRows.length})` : (isGorevlendirmeYapilmayan ? `1+ Gundur Personel Atanmayan Isler (Toplam: ${displayedRows.length})` : generalWarningTitle))))));
                 
                 doc.text(tr(warningTitleForPdf), 14, 15);
 
@@ -983,8 +983,8 @@
             if (warningRows.length === 0) { return null; } 
             
             const isUygunOlmayanIadeMode = sortField === 'uygun_olmayan_iade'; const isOnemliIslerMode = sortField === 'onemli_isler'; const isGorevlendirmeYapilmayan = sortField === 'gorevlendirme_yapilmayan'; const isFenKayitAlinmayan = sortField === 'fen_kayit_alinmayan'; const isHarciYatirilmayan = sortField === 'harci_yatirilmayan'; const isIadeEdilen = sortField === 'iade edilen';
-            const generalWarningTitle = warningThreshold === 0 ? `Tüm Bekleyen İşlemler (Toplam: ${displayedRows.length})` : `${warningThreshold} Günden Fazla Bekleyen İşlemler (Toplam: ${displayedRows.length})`;
-            const warningTitle = isOnemliIslerMode ? `Son 150 Gündeki Önemli İşler (Toplam: ${displayedRows.length})` : (isUygunOlmayanIadeMode ? `Son 100 Gün İçindeki İadeler (Toplam: ${displayedRows.length})` : (isFenKayitAlinmayan ? `Fen Kayıt Alınmayan Başvurular (Toplam: ${displayedRows.length})` : (isHarciYatirilmayan ? `Harcı Yatırılmayan Başvurular (Toplam: ${displayedRows.length})` : (isIadeEdilen ? `İade Edilen Başvurular (Toplam: ${displayedRows.length})` : (sortField === 'plan_ornegi' ? `1 Günden Fazla Bekleyen İşlemler (Toplam: ${displayedRows.length})` : (isGorevlendirmeYapilmayan ? `1+ Gündür Personel Atanmayan İşler (Toplam: ${displayedRows.length})` : generalWarningTitle))))));
+            const generalWarningTitle = warningThreshold === 0 ? `Tüm Bekleyen İşlemler (Toplam: ${displayedRows.length})` : `${warningThreshold === 1 ? '1+' : warningThreshold + '+'} Gunden Fazla Bekleyen İşlemler (Toplam: ${displayedRows.length})`;
+            const warningTitle = isOnemliIslerMode ? `Son 150 Gündeki Önemli İşler (Toplam: ${displayedRows.length})` : (isUygunOlmayanIadeMode ? `Son 100 Gün İçindeki İadeler (Toplam: ${displayedRows.length})` : (isFenKayitAlinmayan ? `Fen Kayıt Alınmayan Başvurular (Toplam: ${displayedRows.length})` : (isHarciYatirilmayan ? `Harcı Yatırılmayan Başvurular (Toplam: ${displayedRows.length})` : (isIadeEdilen ? `İade Edilen Başvurular (Toplam: ${displayedRows.length})` : (sortField === 'plan_ornegi' ? `1+ Günden Fazla Bekleyen İşlemler (Toplam: ${displayedRows.length})` : (isGorevlendirmeYapilmayan ? `1+ Gündür Personel Atanmayan İşler (Toplam: ${displayedRows.length})` : generalWarningTitle))))));
             
             return ( 
                 <div className="warning-table-container"> 
@@ -995,7 +995,11 @@
                                  <div style={{display: 'flex', alignItems: 'center', marginRight: '10px'}}>
                                      <label style={{fontSize: '0.9rem', fontWeight: 'bold', color: '#991b1b', marginRight: '5px'}}>Süre:</label>
                                      <select value={warningThreshold} onChange={(e) => setWarningThreshold(Number(e.target.value))} style={{padding: '6px', borderRadius: '4px', border: '1px solid #fecaca', fontSize: '0.9rem', color: '#991b1b'}}>
-                                         <option value={0}>Tüm Süre</option><option value={7}>7+ Gün</option><option value={15}>15+ Gün</option><option value={30}>30+ Gün</option>
+                                         <option value={0}>Tüm Süre</option>
+                                         <option value={1}>1+ Gün</option>
+                                         <option value={7}>7+ Gün</option>
+                                         <option value={15}>15+ Gün</option>
+                                         <option value={30}>30+ Gün</option>
                                      </select>
                                  </div>
                              )}
