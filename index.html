@@ -401,6 +401,7 @@
             else if (sortField === 'plan_ornegi') { dynamicCardTitle = "Toplam Plan Örneği"; showFenKayitli = false; }
             else if (sortField === 'onemli_isler') { dynamicCardTitle = "Toplam Önemli İşler"; showFenKayitli = true; }
             else if (sortField === 'gorevlendirme_yapilmayan') { dynamicCardTitle = "Toplam Atanmayan"; showFenKayitli = false; }
+            else if (sortField === 'fen_kayitli_islemler') { dynamicCardTitle = "Toplam Fen Kayıtlı İşlem"; showFenKayitli = true; }
             else {
                 dynamicCardTitle = "Toplam Devam Eden";
                 dynamicDataToProcess = filtered.filter(d => {
@@ -493,6 +494,7 @@
                 case 'plan_ornegi': dynamicTitle = 'Plan Örneği-Teknik Bilgi Belge Bekleyen'; districtTitle = 'İlçe Bazlı Plan Örneği Bekleyenler'; islemTitle = 'İşlem Sayıları (Plan Örneği)'; break;
                 case 'gorevlendirme_yapilmayan': dynamicTitle = 'Görevlendirme Yapılmayan (1+ Gün)'; districtTitle = 'İlçe Bazlı Görevlendirme Yapılmayanlar'; islemTitle = 'İşlem Sayıları (Atanmamış)'; break;
                 case 'harci_yatirilmayan': dynamicTitle = 'Harcı Yatırılmayan İşlem Sayıları'; districtTitle = 'İlçe Bazlı Harcı Yatırılmayanlar'; islemTitle = 'İşlem Sayıları (Harcı Yatırılmayan)'; break;
+                case 'fen_kayitli_islemler': dynamicTitle = 'Fen Kayıtlı İşlem Sayıları'; districtTitle = 'İlçe Bazlı Fen Kayıtlı İşlemler'; islemTitle = 'İşlem Sayıları (Fen Kayıtlı)'; break;
             }
 
             useEffect(() => {
@@ -534,6 +536,9 @@
                             if (isWaiting && (isPlanOrnegi || isMahkemePlanOrnegi || isTeknikBilgi) && fenKayitNo != null && fenKayitNo != 0) conditionMet = true;
                             break;
                         case 'gorevlendirme_yapilmayan': break;
+                        case 'fen_kayitli_islemler':
+                            if (fenKayitNo != null && fenKayitNo !== 0 && fenKayitNo !== '0' && fenKayitNo !== '') conditionMet = true;
+                            break;
                         default: if(!status.includes('eksiklikten iade edildi') && !status.includes('tescile gönderildi') && fenKayitNo != null && fenKayitNo != 0) conditionMet = true; break;
                     }
 
@@ -1968,11 +1973,22 @@
             const islemOptions = Array.from(new Set(data.map(d => d['işlem']).filter(i => i && typeof i === 'string' && i.trim() !== ''))).sort((a,b)=>a.localeCompare(b,'tr'));
             
             const sortOptions=[
-                {label:'Sıralama Yok',value:''}, {label:'Başvuru Tarihine Göre',value:'başvuru tarihi'}, {label:'Fen Kayıt Tarihine Göre',value:'fen kayıt tarihi'},
-                {label:'İade Edilen',value:'iade edilen'}, {label:'Tescil Edilen', value:'tescile_giden'}, {label:'Tescilden Geldi', value:'tescilden_geldi'},
-                {label:'İptal Edilen', value:'iptal_edilen'}, {label:'Fen Kayıt Alınmayan', value:'fen_kayit_alinmayan'}, {label:'Harcı Yatırılmayan', value:'harci_yatirilmayan'},
-                {label:'Plan Örneği', value:'plan_ornegi'}, {label:'Bekleyen (Eskiden Yeniye)', value:'bekleyen_eski_yeni'}, {label:'Bekleyen (Yeniden Eskiye)', value:'bekleyen_yeni_eski'},
-                {label:'Uygun Olmayan İade Gerekçeleri', value:'uygun_olmayan_iade'}, {label:'Önemli İşler', value:'onemli_isler'}, {label:'Görevlendirme Yapılmayan', value:'gorevlendirme_yapilmayan'}
+                {label:'Sıralama Yok',value:''}, 
+                {label:'Başvuru Tarihine Göre',value:'başvuru tarihi'}, 
+                {label:'Fen Kayıt Tarihine Göre',value:'fen kayıt tarihi'},
+                {label:'Fen Kayıtlı İşlemler', value:'fen_kayitli_islemler'},
+                {label:'İade Edilen',value:'iade edilen'}, 
+                {label:'Tescil Edilen', value:'tescile_giden'}, 
+                {label:'Tescilden Geldi', value:'tescilden_geldi'},
+                {label:'İptal Edilen', value:'iptal_edilen'}, 
+                {label:'Fen Kayıt Alınmayan', value:'fen_kayit_alinmayan'}, 
+                {label:'Harcı Yatırılmayan', value:'harci_yatirilmayan'},
+                {label:'Plan Örneği', value:'plan_ornegi'}, 
+                {label:'Bekleyen (Eskiden Yeniye)', value:'bekleyen_eski_yeni'}, 
+                {label:'Bekleyen (Yeniden Eskiye)', value:'bekleyen_yeni_eski'},
+                {label:'Uygun Olmayan İade Gerekçeleri', value:'uygun_olmayan_iade'}, 
+                {label:'Önemli İşler', value:'onemli_isler'}, 
+                {label:'Görevlendirme Yapılmayan', value:'gorevlendirme_yapilmayan'}
             ];
             
             const filteredData = React.useMemo(() => {
@@ -1995,6 +2011,18 @@
                 else if (sortField === 'uygun_olmayan_iade') { arr = arr.filter(d => String(d['başvuru durumu'] || '').toLocaleLowerCase('tr').includes('eksiklikten iade edildi')); arr.sort((a,b) => { const pa = a['görevli personel'] || ''; const pb = b['görevli personel'] || ''; return pa.localeCompare(pb, 'tr'); }); }
                 else if (sortField === 'onemli_isler') { const onemliIslemler = [ "3194 Sayılı Kanunun 18. Madde Uygulaması", "Kat İrtifakı Tesisi", "Kat Mülkiyeti Tesisi", "Mülkiyet Raporu" ]; arr = arr.filter(d => onemliIslemler.includes(String(d['işlem'] || '').trim())); }
                 else if (sortField === 'gorevlendirme_yapilmayan') { const today = new Date(); arr = arr.filter(d => { const personnel = splitPersonel(d['görevli personel']); const status = String(d['başvuru durumu'] || '').toLocaleLowerCase('tr'); const isClosed = status.includes('eksiklikten iade edildi') || status.includes('tescile gönderildi'); if (personnel.length === 0 && !isClosed) { const bStr = d['başvuru tarihi']; if (bStr) { const basvuruDate = new Date(bStr); if (!isNaN(basvuruDate) && basvuruDate.getFullYear() > 1900) { const diffDays = (today - basvuruDate) / (1000 * 60 * 60 * 24); if (diffDays >= 1) return true; } } } return false; }); }
+                else if (sortField === 'fen_kayitli_islemler') {
+                    arr = arr.filter(d => {
+                        const fn = d['fen kayıt no'];
+                        return fn != null && fn !== 0 && fn !== '0' && fn !== '';
+                    });
+                    arr.sort((a, b) => {
+                        const da = a['fen kayıt tarihi'] ? new Date(a['fen kayıt tarihi']) : null;
+                        const db = b['fen kayıt tarihi'] ? new Date(b['fen kayıt tarihi']) : null;
+                        if (!da) return 1; if (!db) return -1;
+                        return db - da;
+                    });
+                }
                 else if (sortField) { arr.sort((a, b) => { if (sortField.includes('tarih')) { const dateA = a[sortField] ? new Date(a[sortField]) : null; const dateB = b[sortField] ? new Date(b[sortField]) : null; if (!dateA || isNaN(dateA)) return 1; if (!dateB || isNaN(dateB)) return -1; return dateA - dateB; } const valA = a[sortField] || ''; const valB = b[sortField] || ''; if (typeof valA === 'string' && typeof valB === 'string') { return valA.localeCompare(valB, 'tr'); } return valA < valB ? -1 : valA > valB ? 1 : 0; }); }
                 return arr;
             }, [data, startDate, endDate, selectedIl, selectedIlce, selectedPersonel, selectedIslem, sortField]);
