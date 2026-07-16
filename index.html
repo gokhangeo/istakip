@@ -478,11 +478,13 @@
             ); 
         }
 
-        function ChartsBelow({ data, onZoom, personnelChartCardRef, waitingChartCardRef, islemChartCardRef, districtChartCardRef, selectedIl, isEngineer, personnelFilterType, onFilterChange, sortField }) {
+        function ChartsBelow({ data, onZoom, personnelChartCardRef, waitingChartCardRef, islemChartCardRef, districtChartCardRef, selectedIl, isEngineer, personnelFilterType, onFilterChange, sortField, activeFilterSummary }) {
             const totalRef = useRef(); const dynamicRef = useRef(); const islemRef = useRef(); const districtRef = useRef();
             const totalChartRef = useRef(null); const dynamicChartRef = useRef(null); const islemChartRef = useRef(null); const districtChartRef = useRef(null);
             const [personnelStats, setPersonnelStats] = useState({ totals: {}, dynamic: {} });
             const [islemStats, setIslemStats] = useState({}); const [districtStats, setDistrictStats] = useState({});
+            const [chartLimit, setChartLimit] = useState('10');
+            const [islemGroupMode, setIslemGroupMode] = useState('grouped');
             
             let dynamicTitle = "Bekleyen İşlem Sayıları"; let districtTitle = "İlçe Bazlı Bekleyen İşlemler"; let islemTitle = "İşlem Sayıları";
 
@@ -496,6 +498,21 @@
                 case 'harci_yatirilmayan': dynamicTitle = 'Harcı Yatırılmayan İşlem Sayıları'; districtTitle = 'İlçe Bazlı Harcı Yatırılmayanlar'; islemTitle = 'İşlem Sayıları (Harcı Yatırılmayan)'; break;
                 case 'fen_kayitli_islemler': dynamicTitle = 'Fen Kayıtlı İşlem Sayıları'; districtTitle = 'İlçe Bazlı Fen Kayıtlı İşlemler'; islemTitle = 'İşlem Sayıları (Fen Kayıtlı)'; break;
             }
+
+            const getOperationGroup = (islem) => {
+                const text = String(islem || '').trim();
+                const lower = text.toLocaleLowerCase('tr');
+                if (!text) return '';
+                if (lower.includes('plan örneği') || lower.includes('teknik bilgi ve belge')) return 'Plan Örneği / Teknik Bilgi';
+                if (lower.includes('tescil') || lower.includes('kat irtifakı') || lower.includes('kat mülkiyeti')) return 'Tescil İşlemleri';
+                if (lower.includes('ayırma') || lower.includes('birleştirme') || lower.includes('ifraz') || lower.includes('tevhid')) return 'Ayırma / Birleştirme';
+                if (lower.includes('yola terk') || lower.includes('yeşil alana terk') || lower.includes('ihdas')) return 'Terk / İhdas';
+                if (lower.includes('aplikasyon') || lower.includes('yer gösterme')) return 'Aplikasyon / Yer Gösterme';
+                if (lower.includes('cins') || lower.includes('değişikliği')) return 'Cins Değişikliği';
+                if (lower.includes('18') || lower.includes('madde') || lower.includes('imar')) return 'İmar Uygulamaları';
+                if (lower.includes('mahkeme') || lower.includes('bilirkişi')) return 'Mahkeme / Bilirkişi';
+                return 'Diğer İşlemler';
+            };
 
             useEffect(() => {
                 if (!data || data.length === 0) { setPersonnelStats({ totals: {}, dynamic: {} }); setIslemStats({}); setDistrictStats({}); return; }
@@ -517,9 +534,11 @@
 
                     if (district && includeInDistrict) districtMap[district] = (districtMap[district] || 0) + 1;
                     
-                    let groupedIslem = islem;
-                    if ((islemLower.includes('mahke') && islemLower.includes('plan örneği')) || islemLower.includes('teknik bilgi ve belge örnekleri')) { groupedIslem = 'Plan Örneği'; } 
-                    else if (islemLower.startsWith('ayırma ve yola / yeşil alana terk')) { groupedIslem = 'Ayırma Ve Yola / Yeşil Alana Terk'; }
+                    let groupedIslem = islemGroupMode === 'grouped' ? getOperationGroup(islem) : islem;
+                    if (islemGroupMode === 'detail') {
+                        if ((islemLower.includes('mahke') && islemLower.includes('plan örneği')) || islemLower.includes('teknik bilgi ve belge örnekleri')) { groupedIslem = 'Plan Örneği'; } 
+                        else if (islemLower.startsWith('ayırma ve yola / yeşil alana terk')) { groupedIslem = 'Ayırma Ve Yola / Yeşil Alana Terk'; }
+                    }
                     
                     if (groupedIslem) islemMap[groupedIslem] = (islemMap[groupedIslem] || 0) + 1;
 
@@ -546,7 +565,30 @@
                 });
                 
                 setPersonnelStats({ totals: totalsMap, dynamic: dynamicMap }); setIslemStats(islemMap); setDistrictStats(districtMap);
-            }, [data, sortField]);
+            }, [data, sortField, islemGroupMode]);
+
+            const filterPersonnelChartData = (chartData) => {
+                if (personnelFilterType === 'engineer') return Object.fromEntries(Object.entries(chartData).filter(([name]) => isEngineer(name)));
+                if (personnelFilterType === 'other') return Object.fromEntries(Object.entries(chartData).filter(([name]) => !isEngineer(name)));
+                return chartData;
+            };
+
+            const limitChartData = (chartData) => {
+                const sortedData = Object.entries(chartData).sort(([, a], [, b]) => b - a);
+                const limit = chartLimit === 'all' ? sortedData.length : Number(chartLimit);
+                if (!limit || sortedData.length <= limit) return Object.fromEntries(sortedData);
+                const visible = sortedData.slice(0, limit);
+                const otherTotal = sortedData.slice(limit).reduce((sum, [, value]) => sum + value, 0);
+                if (otherTotal > 0) visible.push(['Diğer', otherTotal]);
+                return Object.fromEntries(visible);
+            };
+
+            const personnelTotalsData = filterPersonnelChartData(personnelStats.totals);
+            const dynamicTotalsData = filterPersonnelChartData(personnelStats.dynamic);
+            const personnelTotalsChartData = limitChartData(personnelTotalsData);
+            const dynamicTotalsChartData = limitChartData(dynamicTotalsData);
+            const islemChartData = limitChartData(islemStats);
+            const districtChartData = limitChartData(districtStats);
 
             const createSortedChart = (canvasRef, chartRef, chartData, label, isNonPersonnelChart = false) => {
                 if (canvasRef.current) {
@@ -556,15 +598,13 @@
                     if (isNonPersonnelChart) {
                         labels = sortedData.map(d => d[0]); dataValues = sortedData.map(d => d[1]);
                     } else {
-                        let filteredSortedData = sortedData;
-                        if (personnelFilterType === 'engineer') filteredSortedData = sortedData.filter(([name]) => isEngineer(name));
-                        else if (personnelFilterType === 'other') filteredSortedData = sortedData.filter(([name]) => !isEngineer(name));
-                        labels = filteredSortedData.map(d => isEngineer(d[0]) ? `${d[0]} (Müh.)` : d[0]);
-                        dataValues = filteredSortedData.map(d => d[1]);
+                        labels = sortedData.map(d => isEngineer(d[0]) ? `${d[0]} (Müh.)` : d[0]);
+                        dataValues = sortedData.map(d => d[1]);
                     }
                     
                     const totalCount = dataValues.reduce((sum, val) => sum + val, 0);
                     const chartLabel = `${label} (Toplam: ${totalCount})`;
+                    const titleText = activeFilterSummary ? [chartLabel, activeFilterSummary] : chartLabel;
 
                     if (chartRef.current) chartRef.current.destroy();
                     chartRef.current = new Chart(canvasRef.current, {
@@ -572,7 +612,7 @@
                         data: { labels, datasets: [{ label: chartLabel, data: dataValues, backgroundColor: labels.map((_, i) => `hsl(${(i * 360 / labels.length)}, 70%, 60%)`) }] },
                         options: {
                             indexAxis: 'y', responsive: true,
-                            plugins: { title: { display: true, text: chartLabel, font: { size: 14 } }, legend: { display: false }, datalabels: { anchor: 'end', align: 'right', color: '#444', font: { weight: 'bold' } } },
+                            plugins: { title: { display: true, text: titleText, font: { size: 14 } }, legend: { display: false }, datalabels: { anchor: 'end', align: 'right', color: '#444', font: { weight: 'bold' } } },
                             scales: { 
                                 y: { ticks: { color: (context) => { if (isNonPersonnelChart) return '#666'; const originalName = context.tick.label.replace(' (Müh.)', ''); return isEngineer(originalName) ? 'red' : '#666'; } } },
                                 x: { beginAtZero: true } 
@@ -582,21 +622,15 @@
                 }
             };
 
-            useEffect(() => { createSortedChart(totalRef, totalChartRef, personnelStats.totals, 'Personel İşlem Dağılımı'); }, [personnelStats.totals, isEngineer, personnelFilterType]);
-            useEffect(() => { createSortedChart(dynamicRef, dynamicChartRef, personnelStats.dynamic, dynamicTitle); }, [personnelStats.dynamic, isEngineer, personnelFilterType, dynamicTitle]);
-            useEffect(() => { createSortedChart(islemRef, islemChartRef, islemStats, islemTitle, true); }, [islemStats, islemTitle]);
-            useEffect(() => { createSortedChart(districtRef, districtChartRef, districtStats, districtTitle, true); }, [districtStats, districtTitle]);
+            useEffect(() => { createSortedChart(totalRef, totalChartRef, personnelTotalsChartData, 'Personel İşlem Dağılımı'); }, [personnelStats.totals, isEngineer, personnelFilterType, chartLimit, activeFilterSummary]);
+            useEffect(() => { createSortedChart(dynamicRef, dynamicChartRef, dynamicTotalsChartData, dynamicTitle); }, [personnelStats.dynamic, isEngineer, personnelFilterType, dynamicTitle, chartLimit, activeFilterSummary]);
+            useEffect(() => { createSortedChart(islemRef, islemChartRef, islemChartData, islemTitle, true); }, [islemStats, islemTitle, chartLimit, activeFilterSummary]);
+            useEffect(() => { createSortedChart(districtRef, districtChartRef, districtChartData, districtTitle, true); }, [districtStats, districtTitle, chartLimit, activeFilterSummary]);
 
             if (!data || data.length === 0) return null;
 
-            let personnelTotalsData = personnelStats.totals;
-            if (personnelFilterType === 'engineer') personnelTotalsData = Object.fromEntries(Object.entries(personnelStats.totals).filter(([name]) => isEngineer(name)));
-            else if (personnelFilterType === 'other') personnelTotalsData = Object.fromEntries(Object.entries(personnelStats.totals).filter(([name]) => !isEngineer(name)));
             const personnelTotalCount = Object.values(personnelTotalsData).reduce((s, v) => s + v, 0);
 
-            let dynamicTotalsData = personnelStats.dynamic;
-            if (personnelFilterType === 'engineer') dynamicTotalsData = Object.fromEntries(Object.entries(personnelStats.dynamic).filter(([name]) => isEngineer(name)));
-            else if (personnelFilterType === 'other') dynamicTotalsData = Object.fromEntries(Object.entries(personnelStats.dynamic).filter(([name]) => !isEngineer(name)));
             const dynamicTotalCount = Object.values(dynamicTotalsData).reduce((s, v) => s + v, 0);
 
             const islemTotalCount = Object.values(islemStats).reduce((s, v) => s + v, 0);
@@ -604,27 +638,36 @@
 
             return (
                  <div style={{flex: 3, display: 'flex', flexDirection: 'column', gap: '10px', minWidth: '1050px'}}>
-                     <div style={{alignSelf: 'center', display: 'flex', alignItems: 'center', gap: '10px'}}>
+                     <div style={{alignSelf: 'center', display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', justifyContent: 'center'}}>
                          <label style={{fontSize: '0.9rem', fontWeight: 'bold', color: '#334155'}}>Personel Filtrele:</label>
                          <select value={personnelFilterType} onChange={(e) => onFilterChange(e.target.value)} style={{padding: '6px', borderRadius: '4px', border: '1px solid #cbd5e1', fontSize: '0.9rem'}}>
                              <option value="all">Tümü</option><option value="engineer">Sadece Mühendisler</option><option value="other">Diğer Personel</option>
                          </select>
+                         <label style={{fontSize: '0.9rem', fontWeight: 'bold', color: '#334155'}}>Grafik Gösterimi:</label>
+                         <select value={chartLimit} onChange={(e) => setChartLimit(e.target.value)} style={{padding: '6px', borderRadius: '4px', border: '1px solid #cbd5e1', fontSize: '0.9rem'}}>
+                             <option value="10">İlk 10 + Diğer</option><option value="20">İlk 20 + Diğer</option><option value="all">Tümü</option>
+                         </select>
+                         <label style={{fontSize: '0.9rem', fontWeight: 'bold', color: '#334155'}}>İşlem Grafiği:</label>
+                         <select value={islemGroupMode} onChange={(e) => setIslemGroupMode(e.target.value)} style={{padding: '6px', borderRadius: '4px', border: '1px solid #cbd5e1', fontSize: '0.9rem'}}>
+                             <option value="grouped">Gruplu</option><option value="detail">Detaylı</option>
+                         </select>
                      </div>
+                     {activeFilterSummary && <div style={{textAlign: 'center', fontSize: '0.85rem', color: '#475569', marginTop: '-2px'}}>Aktif filtre: {activeFilterSummary}</div>}
                      <div className="charts-below">
                          <div className="chart-card" ref={personnelChartCardRef}>
-                             <button className="zoom-btn" title="Büyüt" onClick={() => onZoom({ type: 'chart', data: personnelTotalsData, title: `Personel İşlem Dağılımı (Toplam: ${personnelTotalCount})` })}>🔍</button>
+                             <button className="zoom-btn" title="Büyüt" onClick={() => onZoom({ type: 'chart', data: personnelTotalsChartData, title: `Personel İşlem Dağılımı (Toplam: ${personnelTotalCount})${activeFilterSummary ? ' - ' + activeFilterSummary : ''}` })}>🔍</button>
                              <div className="chart-wrapper" style={{height: '250px'}}><canvas ref={totalRef}></canvas></div>
                          </div>
                          <div className="chart-card" ref={waitingChartCardRef}>
-                              <button className="zoom-btn" title="Büyüt" onClick={() => onZoom({ type: 'chart', data: dynamicTotalsData, title: `${dynamicTitle} (Toplam: ${dynamicTotalCount})` })}>🔍</button>
+                              <button className="zoom-btn" title="Büyüt" onClick={() => onZoom({ type: 'chart', data: dynamicTotalsChartData, title: `${dynamicTitle} (Toplam: ${dynamicTotalCount})${activeFilterSummary ? ' - ' + activeFilterSummary : ''}` })}>🔍</button>
                              <div className="chart-wrapper" style={{height: '250px'}}><canvas ref={dynamicRef}></canvas></div>
                          </div>
                           <div className="chart-card" ref={islemChartCardRef}>
-                               <button className="zoom-btn" title="Büyüt" onClick={() => onZoom({ type: 'chart', data: islemStats, title: `${islemTitle} (Toplam: ${islemTotalCount})` })}>🔍</button>
+                               <button className="zoom-btn" title="Büyüt" onClick={() => onZoom({ type: 'chart', data: islemChartData, title: `${islemTitle} (Toplam: ${islemTotalCount})${activeFilterSummary ? ' - ' + activeFilterSummary : ''}` })}>🔍</button>
                              <div className="chart-wrapper" style={{height: '250px'}}><canvas ref={islemRef}></canvas></div>
                          </div>
                          <div className="chart-card" ref={districtChartCardRef}>
-                               <button className="zoom-btn" title="Büyüt" onClick={() => onZoom({ type: 'chart', data: districtStats, title: `${districtTitle} (Toplam: ${districtTotalCount})` })}>🔍</button>
+                               <button className="zoom-btn" title="Büyüt" onClick={() => onZoom({ type: 'chart', data: districtChartData, title: `${districtTitle} (Toplam: ${districtTotalCount})${activeFilterSummary ? ' - ' + activeFilterSummary : ''}` })}>🔍</button>
                              <div className="chart-wrapper" style={{height: '250px'}}><canvas ref={districtRef}></canvas></div>
                          </div>
                      </div>
@@ -2018,6 +2061,19 @@
                     return next.length === prev.length ? prev : next;
                 });
             }, [data, startDate, endDate, selectedIl, selectedIlce, selectedPersonel, selectedIslem]);
+
+            const summarizeSelection = (items, label) => {
+                if (!items || items.length === 0) return null;
+                if (items.length <= 2) return `${label}: ${items.join(', ')}`;
+                return `${label}: ${items.length} seçili`;
+            };
+            const activeFilterSummary = [
+                (startDate || endDate) ? `Tarih: ${formatToTR(startDate) || '...'} - ${formatToTR(endDate) || '...'}` : null,
+                summarizeSelection(selectedIl, 'İl'),
+                summarizeSelection(selectedIlce, 'İlçe'),
+                summarizeSelection(selectedPersonel, 'Personel'),
+                summarizeSelection(selectedIslem, 'İşlem')
+            ].filter(Boolean).join(' / ') || 'Tüm kayıtlar';
             
             const sortOptions=[
                 {label:'Sıralama Yok',value:''}, 
@@ -2111,7 +2167,7 @@
                     <Dashboard data={data} filtered={filteredData} sortField={sortField} selectedPersonel={selectedPersonel} selectedIl={selectedIl} selectedIlce={selectedIlce} />
                     
                     <div className="charts-below">
-                        <ChartsBelow data={filteredData} onZoom={setZoomContent} personnelChartCardRef={personnelChartCardRef} waitingChartCardRef={waitingChartCardRef} islemChartCardRef={islemChartCardRef} districtChartCardRef={districtChartCardRef} selectedIl={selectedIl} isEngineer={isEngineer} personnelFilterType={personnelFilterType} onFilterChange={setPersonnelFilterType} sortField={sortField} />
+                        <ChartsBelow data={filteredData} onZoom={setZoomContent} personnelChartCardRef={personnelChartCardRef} waitingChartCardRef={waitingChartCardRef} islemChartCardRef={islemChartCardRef} districtChartCardRef={districtChartCardRef} selectedIl={selectedIl} isEngineer={isEngineer} personnelFilterType={personnelFilterType} onFilterChange={setPersonnelFilterType} sortField={sortField} activeFilterSummary={activeFilterSummary} />
                     </div>
 
                     <WarningTable data={filteredData} isEngineer={isEngineer} personnelFilterType={personnelFilterType} onFilterChange={setPersonnelFilterType} sortField={sortField} onWarningRowsChange={setMegsisData} warningThreshold={warningThreshold} setWarningThreshold={setWarningThreshold} />
