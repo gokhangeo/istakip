@@ -1967,27 +1967,57 @@
                 }
             };
 
-            const ilOptions = Array.from(new Set(data.map(d=>d._province).filter(p=>p))).sort((a,b)=>a.localeCompare(b,'tr'));
-            const ilceOptions = Array.from(new Set(data.filter(d => selectedIl.length === 0 || selectedIl.includes(d._province)).map(d => d._district).filter(p => p))).sort((a,b)=>a.localeCompare(b,'tr'));
-            const personnelOptions = Array.from(new Set(data.flatMap(d=>splitPersonel(d['görevli personel'])))).sort((a,b)=>a.localeCompare(b,'tr'));
-            const rowsForIslemOptions = data.filter(d => {
-                if (selectedIl.length > 0 && !selectedIl.includes(d._province)) return false;
-                if (selectedIlce.length > 0 && !selectedIlce.includes(d._district)) return false;
-                if (selectedPersonel.length > 0) {
+            const isRowInDateRange = (d) => {
+                const dateVal = d['fen kayıt tarihi'] || d['başvuru tarihi'];
+                if ((startDate || endDate) && !dateVal) return false;
+                const rowDate = dateVal ? new Date(dateVal) : null;
+                if (startDate) {
+                    const sObj = new Date(startDate);
+                    if (!rowDate || isNaN(rowDate) || rowDate < sObj) return false;
+                }
+                if (endDate) {
+                    const eObj = new Date(endDate);
+                    eObj.setHours(23, 59, 59, 999);
+                    if (!rowDate || isNaN(rowDate) || rowDate > eObj) return false;
+                }
+                return true;
+            };
+
+            const rowMatchesActiveFilters = (d, ignoreFilter = '') => {
+                if (!isRowInDateRange(d)) return false;
+                if (ignoreFilter !== 'il' && selectedIl.length > 0 && !selectedIl.includes(d._province)) return false;
+                if (ignoreFilter !== 'ilce' && selectedIlce.length > 0 && !selectedIlce.includes(d._district)) return false;
+                if (ignoreFilter !== 'personel' && selectedPersonel.length > 0) {
                     const ppl = splitPersonel(d['görevli personel']);
                     if (!selectedPersonel.some(sp => ppl.includes(sp))) return false;
                 }
+                if (ignoreFilter !== 'islem' && selectedIslem.length > 0 && !selectedIslem.includes(d['işlem'])) return false;
                 return true;
-            });
-            const islemOptions = Array.from(new Set(rowsForIslemOptions.map(d => d['işlem']).filter(i => i && typeof i === 'string' && i.trim() !== ''))).sort((a,b)=>a.localeCompare(b,'tr'));
+            };
+
+            const ilOptions = Array.from(new Set(data.filter(d => rowMatchesActiveFilters(d, 'il')).map(d=>d._province).filter(p=>p))).sort((a,b)=>a.localeCompare(b,'tr'));
+            const ilceOptions = Array.from(new Set(data.filter(d => rowMatchesActiveFilters(d, 'ilce')).map(d => d._district).filter(p => p))).sort((a,b)=>a.localeCompare(b,'tr'));
+            const personnelOptions = Array.from(new Set(data.filter(d => rowMatchesActiveFilters(d, 'personel')).flatMap(d=>splitPersonel(d['görevli personel'])))).sort((a,b)=>a.localeCompare(b,'tr'));
+            const islemOptions = Array.from(new Set(data.filter(d => rowMatchesActiveFilters(d, 'islem')).map(d => d['işlem']).filter(i => i && typeof i === 'string' && i.trim() !== ''))).sort((a,b)=>a.localeCompare(b,'tr'));
             
             useEffect(() => {
-                setSelectedIlce(prev => prev.filter(ilce => ilceOptions.includes(ilce)));
-            }, [selectedIl, data]);
-            
-            useEffect(() => {
-                setSelectedIslem(prev => prev.filter(islem => islemOptions.includes(islem)));
-            }, [selectedIl, selectedIlce, selectedPersonel, data]);
+                setSelectedIl(prev => {
+                    const next = prev.filter(il => ilOptions.includes(il));
+                    return next.length === prev.length ? prev : next;
+                });
+                setSelectedIlce(prev => {
+                    const next = prev.filter(ilce => ilceOptions.includes(ilce));
+                    return next.length === prev.length ? prev : next;
+                });
+                setSelectedPersonel(prev => {
+                    const next = prev.filter(personel => personnelOptions.includes(personel));
+                    return next.length === prev.length ? prev : next;
+                });
+                setSelectedIslem(prev => {
+                    const next = prev.filter(islem => islemOptions.includes(islem));
+                    return next.length === prev.length ? prev : next;
+                });
+            }, [data, startDate, endDate, selectedIl, selectedIlce, selectedPersonel, selectedIslem]);
             
             const sortOptions=[
                 {label:'Sıralama Yok',value:''}, 
@@ -2070,10 +2100,10 @@
                          <div className="control-group"><label>Dosya İşlemleri</label><input type="file" multiple onChange={handleFile} accept=".xlsx, .xls" /></div>
                         <div className="control-group"><label>Sıralama</label><select value={sortField} onChange={e=>setSortField(e.target.value)}>{sortOptions.map(o=><option key={o.value} value={o.value}>{o.label}</option>)}</select></div>
                         <div className="control-group"><label>Tarih Filtresi</label><button onClick={() => setShowDateModal(true)}>{startDate || endDate ? `${formatToTR(startDate) || '...'} - ${formatToTR(endDate) || '...'}` : 'Tarih Aralığı Seç'}</button></div>
-                        <div className="control-group"><label>İl Filtresi</label><button onClick={()=>setShowIlModal(true)}>{selectedIl.length ? `${selectedIl.length} il seçili` : 'İl Seç'}</button></div>
+                        <div className="control-group"><label>İl Filtresi</label><button onClick={()=>setShowIlModal(true)} disabled={ilOptions.length === 0}>{selectedIl.length ? `${selectedIl.length} il seçili` : 'İl Seç'}</button></div>
                         <div className="control-group"><label>İlçe Filtresi</label><button onClick={()=>setShowIlceModal(true)} disabled={ilceOptions.length === 0}>{selectedIlce.length ? `${selectedIlce.length} ilçe seçili` : 'İlçe Seç'}</button></div>
-                        <div className="control-group"><label>Personel Filtresi</label><button onClick={()=>setShowPersonelModal(true)}>{selectedPersonel.length ? `${selectedPersonel.length} personel seçili` : 'Personel Seç'}</button></div>
-                        <div className="control-group"><label>İşlem Filtresi</label><button onClick={()=>setShowIslemModal(true)}>{selectedIslem.length ? `${selectedIslem.length} işlem seçili` : 'İşlem Seç'}</button></div>
+                        <div className="control-group"><label>Personel Filtresi</label><button onClick={()=>setShowPersonelModal(true)} disabled={personnelOptions.length === 0}>{selectedPersonel.length ? `${selectedPersonel.length} personel seçili` : 'Personel Seç'}</button></div>
+                        <div className="control-group"><label>İşlem Filtresi</label><button onClick={()=>setShowIslemModal(true)} disabled={islemOptions.length === 0}>{selectedIslem.length ? `${selectedIslem.length} işlem seçili` : 'İşlem Seç'}</button></div>
                          <div className="control-group"><label>Veri Yönetimi</label><button onClick={() => { setData([]); setSelectedIl([]); setSelectedPersonel([]); setSelectedIlce([]); setSelectedIslem([]); setStartDate(''); setEndDate(''); setErrorMsg(""); }} style={{backgroundColor: '#ef4444', color: 'white'}}>Verileri Temizle</button></div>
                     </div>
                     {errorMsg && <p className="error-message" style={{padding: '10px', background: '#fee2e2', borderRadius: '8px', border: '1px solid #ef4444', textAlign: 'center'}}>{errorMsg}</p>}
