@@ -688,19 +688,19 @@
                      {activeFilterSummary && <div style={{textAlign: 'center', fontSize: '0.85rem', color: '#475569', marginTop: '-2px'}}>Aktif filtre: {activeFilterSummary}</div>}
                      <div className="charts-below">
                          <div className="chart-card" ref={personnelChartCardRef}>
-                             <button className="zoom-btn" title="Büyüt" onClick={() => onZoom({ type: 'chart', data: personnelTotalsChartData, title: `Personel İşlem Dağılımı (Toplam: ${personnelTotalCount})${activeFilterSummary ? ' - ' + activeFilterSummary : ''}`, filterKind: 'personel', filterMembers: personnelTotalsLimited.members })}>🔍</button>
+                             <button className="zoom-btn" title="Büyüt" onClick={() => onZoom({ type: 'chart', data: personnelTotalsChartData, title: `Personel İşlem Dağılımı (Toplam: ${personnelTotalCount})${activeFilterSummary ? ' - ' + activeFilterSummary : ''}`, filterKind: 'personel', filterMembers: personnelTotalsLimited.members })}>&#128269;</button>
                              <div className="chart-wrapper" style={{height: '250px'}}><canvas ref={totalRef}></canvas></div>
                          </div>
                          <div className="chart-card" ref={waitingChartCardRef}>
-                              <button className="zoom-btn" title="Büyüt" onClick={() => onZoom({ type: 'chart', data: dynamicTotalsChartData, title: `${dynamicTitle} (Toplam: ${dynamicTotalCount})${activeFilterSummary ? ' - ' + activeFilterSummary : ''}`, filterKind: 'personel', filterMembers: dynamicTotalsLimited.members })}>🔍</button>
+                              <button className="zoom-btn" title="Büyüt" onClick={() => onZoom({ type: 'chart', data: dynamicTotalsChartData, title: `${dynamicTitle} (Toplam: ${dynamicTotalCount})${activeFilterSummary ? ' - ' + activeFilterSummary : ''}`, filterKind: 'personel', filterMembers: dynamicTotalsLimited.members })}>&#128269;</button>
                              <div className="chart-wrapper" style={{height: '250px'}}><canvas ref={dynamicRef}></canvas></div>
                          </div>
                           <div className="chart-card" ref={islemChartCardRef}>
-                               <button className="zoom-btn" title="Büyüt" onClick={() => onZoom({ type: 'chart', data: islemChartData, title: `${islemTitle} (Toplam: ${islemTotalCount})${activeFilterSummary ? ' - ' + activeFilterSummary : ''}`, filterKind: islemGroupMode === 'grouped' ? 'islemGroup' : 'islem', filterMembers: islemLimited.members })}>🔍</button>
+                               <button className="zoom-btn" title="Büyüt" onClick={() => onZoom({ type: 'chart', data: islemChartData, title: `${islemTitle} (Toplam: ${islemTotalCount})${activeFilterSummary ? ' - ' + activeFilterSummary : ''}`, filterKind: islemGroupMode === 'grouped' ? 'islemGroup' : 'islem', filterMembers: islemLimited.members })}>&#128269;</button>
                              <div className="chart-wrapper" style={{height: '250px'}}><canvas ref={islemRef}></canvas></div>
                          </div>
                          <div className="chart-card" ref={districtChartCardRef}>
-                               <button className="zoom-btn" title="Büyüt" onClick={() => onZoom({ type: 'chart', data: districtChartData, title: `${districtTitle} (Toplam: ${districtTotalCount})${activeFilterSummary ? ' - ' + activeFilterSummary : ''}`, filterKind: 'ilce', filterMembers: districtLimited.members })}>🔍</button>
+                               <button className="zoom-btn" title="Büyüt" onClick={() => onZoom({ type: 'chart', data: districtChartData, title: `${districtTitle} (Toplam: ${districtTotalCount})${activeFilterSummary ? ' - ' + activeFilterSummary : ''}`, filterKind: 'ilce', filterMembers: districtLimited.members })}>&#128269;</button>
                              <div className="chart-wrapper" style={{height: '250px'}}><canvas ref={districtRef}></canvas></div>
                          </div>
                      </div>
@@ -767,6 +767,7 @@
             const [warningPersonnelFilter, setWarningPersonnelFilter] = useState([]);
             const [showWarningPersonnelModal, setShowWarningPersonnelModal] = useState(false);
             const tableData = React.useMemo(() => Array.isArray(data) ? data : [], [data]);
+            const warningEligibleData = React.useMemo(() => tableData.filter(row => !String(row['başvuru durumu'] || '').toLocaleLowerCase('tr').includes('ek ödeme gönderildi')), [tableData]);
 
             const toggleDateSort = () => setDateSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
             useEffect(() => { setWarningPersonnelFilter([]); }, [sortField]);
@@ -778,7 +779,7 @@
                 if (sortField === 'onemli_isler') {
                     const oneHundredFiftyDaysAgo = new Date(); oneHundredFiftyDaysAgo.setDate(today.getDate() - 150);
                     const groupedTasks = {};
-                    tableData.forEach((d, index) => {
+                    warningEligibleData.forEach((d, index) => {
                         const islem = String(d['işlem'] || '').trim();
                         const onemliIslemler = ["3194 Sayılı Kanunun 18. Madde Uygulaması", "Kat İrtifakı Tesisi", "Kat Mülkiyeti Tesisi", "Mülkiyet Raporu"];
                         if (!onemliIslemler.includes(islem)) return;
@@ -796,7 +797,7 @@
                 else if (sortField === 'uygun_olmayan_iade') {
                     const oneHundredDaysAgo = new Date(); oneHundredDaysAgo.setDate(today.getDate() - 100);
                     const groupedTasks = {};
-                    tableData.forEach((d, index) => {
+                    warningEligibleData.forEach((d, index) => {
                         const status = String(d['başvuru durumu'] || '').toLocaleLowerCase('tr');
                         if (!status.includes('eksiklikten iade edildi')) return;
                         const fenKayitTarihiStr = d['fen kayıt tarihi']; if (!fenKayitTarihiStr) return; 
@@ -811,7 +812,7 @@
                     finalRows = Object.values(groupedTasks);
                 } else if (sortField === 'iade edilen') {
                     const groupedTasks = {};
-                    tableData.forEach((task, index) => {
+                    warningEligibleData.forEach((task, index) => {
                         const status = String(task['başvuru durumu'] || '').toLocaleLowerCase('tr');
                         if (status.includes('eksiklikten iade edildi')) {
                             const bStr = task['başvuru tarihi']; let diffDays = 0;
@@ -823,7 +824,7 @@
                     finalRows = Object.values(groupedTasks).sort((a, b) => b.beklemeSuresi - a.beklemeSuresi);
                 } else if (sortField === 'gorevlendirme_yapilmayan') {
                     const groupedTasks = {};
-                    tableData.forEach((task, index) => {
+                    warningEligibleData.forEach((task, index) => {
                         const personnel = splitPersonel(task['görevli personel']);
                         const status = String(task['başvuru durumu'] || '').toLocaleLowerCase('tr');
                         const isClosed = status.includes('eksiklikten iade edildi') || status.includes('tescile gönderildi');
@@ -846,7 +847,7 @@
                     finalRows = Object.values(groupedTasks).sort((a, b) => b.beklemeSuresi - a.beklemeSuresi);
                 } else if (sortField === 'fen_kayit_alinmayan') {
                     const groupedTasks = {};
-                    tableData.forEach((task, index) => {
+                    warningEligibleData.forEach((task, index) => {
                         const odeme = String(task['ödeme'] || '').toLocaleLowerCase('tr');
                         const fenKayitNo = task['fen kayıt no'];
                         const isFenKayitMissing = (fenKayitNo === 0 || fenKayitNo == null || fenKayitNo === '');
@@ -860,7 +861,7 @@
                     finalRows = Object.values(groupedTasks).sort((a, b) => b.beklemeSuresi - a.beklemeSuresi);
                 } else if (sortField === 'harci_yatirilmayan') {
                     const groupedTasks = {};
-                    tableData.forEach((task, index) => {
+                    warningEligibleData.forEach((task, index) => {
                         const odeme = String(task['ödeme'] || '').toLocaleLowerCase('tr');
                         const status = String(task['başvuru durumu'] || '').toLocaleLowerCase('tr');
                         const isClosed = status.includes('eksiklikten iade edildi') || status.includes('tescile gönderildi');
@@ -873,7 +874,7 @@
                     });
                     finalRows = Object.values(groupedTasks).sort((a, b) => b.beklemeSuresi - a.beklemeSuresi);
                 } else {
-                    let relevantData = tableData;
+                    let relevantData = warningEligibleData;
                     if (sortField === 'plan_ornegi') { relevantData = relevantData.filter(d => { const islem = String(d['işlem'] || '').toLocaleLowerCase('tr'); return ['plan örneği', 'mahkeme plan örneği', 'teknik bilgi ve belge örnekleri'].includes(islem); }); }
                     const groupedTasks = {};
                     const daysThreshold = sortField === 'plan_ornegi' ? 1 : warningThreshold;
@@ -911,7 +912,7 @@
                 else if (personnelFilterType === 'other') finalRows = finalRows.filter(row => parsePersonnelWithStatus(row.personnelRaw).some(p => !isEngineer(p.name)));
 
                 setWarningRows(finalRows);
-            }, [tableData, isEngineer, personnelFilterType, sortField, dateSortOrder, warningThreshold]); 
+            }, [warningEligibleData, isEngineer, personnelFilterType, sortField, dateSortOrder, warningThreshold]); 
 
             const warningPersonnelOptions = React.useMemo(() => {
                 const names = new Set();
@@ -1192,7 +1193,7 @@
                                 <tr> 
                                     <th className="col-personel">Personel</th>
                                     {(isFenKayitAlinmayan || isHarciYatirilmayan || isIadeEdilen) && <th>Başvuru Tarihi</th>}
-                                    <th>Fen Kayıt Tarihi {(isOnemliIslerMode || isUygunOlmayanIadeMode || isIadeEdilen) && ( <span onClick={toggleDateSort} style={{ cursor: 'pointer', userSelect: 'none', padding: '0 5px' }}>{dateSortOrder === 'asc' ? '🔼' : '🔽'}</span> )}</th>
+                                    <th>Fen Kayıt Tarihi {(isOnemliIslerMode || isUygunOlmayanIadeMode || isIadeEdilen) && ( <span onClick={toggleDateSort} style={{ cursor: 'pointer', userSelect: 'none', padding: '0 5px' }}>{dateSortOrder === 'asc' ? '\u{1F53C}' : '\u{1F53D}'}</span> )}</th>
                                     <th className="col-fen-kayit-no">Fen Kayıt No</th><th className="col-ilce">İlçe</th><th className="col-islem">İşlem</th><th className="col-zemin">Zemin</th><th>Başvuru Durumu</th>
                                     {(isUygunOlmayanIadeMode || isOnemliIslerMode || isFenKayitAlinmayan || isHarciYatirilmayan || isIadeEdilen) ? <th>Başvuru Açıklama</th> : <th className="col-bekleme-süresi-gün">Bekleme Süresi (Gün)</th> }
                                 </tr> 
@@ -1953,7 +1954,7 @@
 
                     {stackedChartData && 
                         <div className="chart-card" style={{marginTop: '20px', minHeight: '400px'}}>
-                            <button className="zoom-btn" title="Büyüt" onClick={() => onZoom({ type: 'chart', data: stackedChartData, title: `EBYS Bekleyen Evrak Dağılımı (Toplam: ${totalEbysDocs})` })}>🔍</button>
+                            <button className="zoom-btn" title="Büyüt" onClick={() => onZoom({ type: 'chart', data: stackedChartData, title: `EBYS Bekleyen Evrak Dağılımı (Toplam: ${totalEbysDocs})` })}>&#128269;</button>
                             <div className="ebys-chart-container"><canvas ref={ebysChartRef}></canvas></div>
                         </div>
                     }
@@ -2300,7 +2301,7 @@
              
             const LandingPage = ({onFileChange}) => (
                 <div className="landing-container">
-                    <label htmlFor="file-upload-landing" className="upload-box"><div className="upload-icon">📤</div><div className="upload-text">Analiz için Excel Dosyası Seçin</div><div className="upload-subtext">veya dosyayı buraya sürükleyip bırakın</div></label>
+                    <label htmlFor="file-upload-landing" className="upload-box"><div className="upload-icon">&#128228;</div><div className="upload-text">Analiz için Excel Dosyası Seçin</div><div className="upload-subtext">veya dosyayı buraya sürükleyip bırakın</div></label>
                     <input id="file-upload-landing" type="file" multiple onChange={onFileChange} accept=".xlsx, .xls" style={{display: 'none'}} />
                 </div>
             );
@@ -2452,3 +2453,4 @@
     </script>
 </body>
 </html>
+
