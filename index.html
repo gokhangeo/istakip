@@ -761,7 +761,7 @@
             );
         };
 
-        function WarningTable({ data, isEngineer, personnelFilterType, onFilterChange, sortField, onWarningRowsChange, warningThreshold, setWarningThreshold }) { 
+        function WarningTable({ data, isEngineer, personnelFilterType, onFilterChange, sortField, onWarningRowsChange, warningThreshold, setWarningThreshold, reportSummary }) { 
             const [warningRows, setWarningRows] = useState([]); 
             const [dateSortOrder, setDateSortOrder] = useState('asc');
             const [warningPersonnelFilter, setWarningPersonnelFilter] = useState([]);
@@ -958,6 +958,50 @@
                 }).join("\n");
             };
 
+            const getPersonnelModeLabel = () => personnelFilterType === 'engineer' ? 'Sadece Mühendisler' : (personnelFilterType === 'other' ? 'Diğer Personel' : 'Tümü');
+            const getSafeFilePart = (text) => String(text || 'Rapor').replace(/[\\/:*?"<>|]/g, '').replace(/\s+/g, '_').substring(0, 60);
+            const getTodayForFile = () => {
+                const d = new Date();
+                return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+            };
+            const getReportBaseName = () => `MEGSIS_${getSafeFilePart(sortField || 'Bekleyen_Islemler')}_${getTodayForFile()}`;
+            const countBy = (rows, getter) => {
+                const map = {};
+                rows.forEach(row => {
+                    const key = getter(row) || 'Boş';
+                    map[key] = (map[key] || 0) + 1;
+                });
+                return Object.entries(map).sort(([, a], [, b]) => b - a);
+            };
+            const getWaitingBucket = (days) => {
+                const n = Number(days);
+                if (isNaN(n)) return 'Süre Yok';
+                if (n <= 7) return '0-7 Gün';
+                if (n <= 15) return '8-15 Gün';
+                if (n <= 30) return '16-30 Gün';
+                return '30+ Gün';
+            };
+            const buildSummarySheetRows = (rows, title) => {
+                const summaryRows = [
+                    ['MEGSİS İş Takip Raporu'],
+                    [],
+                    ['Rapor Başlığı', title],
+                    ['Rapor Tarihi', new Date().toLocaleString('tr-TR')],
+                    ['Filtre Özeti', reportSummary || 'Tüm kayıtlar'],
+                    ['Personel Görünümü', getPersonnelModeLabel()],
+                    ['Toplam Kayıt', rows.length],
+                    ['Not', 'Bu rapor ekrandaki aktif filtreler ve uyarı tablosu görünümü esas alınarak oluşturulmuştur.'],
+                    [],
+                    ['İlçe Özeti', 'Adet']
+                ];
+                countBy(rows, row => row.ilce).slice(0, 15).forEach(([name, count]) => summaryRows.push([name, count]));
+                summaryRows.push([], ['İşlem Özeti', 'Adet']);
+                countBy(rows, row => row.islem).slice(0, 15).forEach(([name, count]) => summaryRows.push([name, count]));
+                summaryRows.push([], ['Bekleme Süresi Dağılımı', 'Adet']);
+                countBy(rows, row => getWaitingBucket(row.beklemeSuresi)).forEach(([name, count]) => summaryRows.push([name, count]));
+                return summaryRows;
+            };
+
             const handleExportWarningExcel = () => { 
                 let dataToExport, cols = [];
                 const rowsToExport = displayedRows;
@@ -973,15 +1017,35 @@
                     cols = [ { wch: 30 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 20 }, { wch: 40 }, { wch: 25 }, { wch: 20 } ];
                 }
                 
-                const ws = XLSX.utils.json_to_sheet(dataToExport); 
-                const range = XLSX.utils.decode_range(ws['!ref']); 
-                for (let R = range.s.r + 1; R <= range.e.r; ++R) { 
-                    const cell_address = { c: 0, r: R }; 
-                    const cell_ref = XLSX.utils.encode_cell(cell_address); 
-                    if (ws[cell_ref] && ws[cell_ref].v) { if (!ws[cell_ref].s) ws[cell_ref].s = {}; ws[cell_ref].s.alignment = { wrapText: true, vertical: 'top' }; } 
-                } 
+                const wb = XLSX.utils.book_new();
+                const summaryWs = XLSX.utils.aoa_to_sheet(buildSummarySheetRows(rowsToExport, warningTitle));
+                summaryWs['!cols'] = [{ wch: 28 }, { wch: 90 }];
+                XLSX.utils.book_append_sheet(wb, summaryWs, 'Özet');
+
+                const ws = XLSX.utils.json_to_sheet(dataToExport);
+                if (ws['!ref']) {
+                    const range = XLSX.utils.decode_range(ws['!ref']);
+                    ws['!autofilter'] = { ref: XLSX.utils.encode_range(range) };
+                    ws['!freeze'] = { xSplit: 0, ySplit: 1 };
+                    for (let C = range.s.c; C <= range.e.c; ++C) {
+                        const headerRef = XLSX.utils.encode_cell({ c: C, r: 0 });
+                        if (ws[headerRef]) {
+                            ws[headerRef].s = { font: { bold: true, color: { rgb: 'FFFFFF' } }, fill: { fgColor: { rgb: '1D4ED8' } }, alignment: { vertical: 'center', wrapText: true } };
+                        }
+                    }
+                    for (let R = range.s.r + 1; R <= range.e.r; ++R) { 
+                        for (let C = range.s.c; C <= range.e.c; ++C) {
+                            const cell_ref = XLSX.utils.encode_cell({ c: C, r: R });
+                            if (ws[cell_ref] && ws[cell_ref].v) {
+                                if (!ws[cell_ref].s) ws[cell_ref].s = {};
+                                ws[cell_ref].s.alignment = { wrapText: true, vertical: 'top' };
+                            }
+                        }
+                    }
+                }
                 ws['!cols'] = cols; 
-                const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Rapor'); XLSX.writeFile(wb, 'rapor.xlsx'); 
+                XLSX.utils.book_append_sheet(wb, ws, 'Rapor');
+                XLSX.writeFile(wb, `${getReportBaseName()}.xlsx`); 
             }; 
 
             const handleExportWarningPdf = () => {
@@ -1003,7 +1067,24 @@
                 const generalWarningTitle = warningThreshold === 0 ? `Tum Bekleyen Islemler (Toplam: ${displayedRows.length})` : `${warningThreshold === 1 ? '1+' : warningThreshold + '+'} Gunden Fazla Bekleyen Islemler (Toplam: ${displayedRows.length})`;
                 const warningTitleForPdf = isOnemliIslerMode ? `Son 150 Gundeki Onemli Isler (Toplam: ${displayedRows.length})` : (isUygunOlmayanIadeMode ? `Son 100 Gun Icindeki Iadeler (Toplam: ${displayedRows.length})` : (isFenKayitAlinmayan ? `Fen Kayit Alinmayan Basvurular (Toplam: ${displayedRows.length})` : (isHarciYatirilmayan ? `Harci Yatirilmayan Basvurular (Toplam: ${displayedRows.length})` : (isIadeEdilen ? `Iade Edilen Basvurular (Toplam: ${displayedRows.length})` : (sortField === 'plan_ornegi' ? `1+ Gunden Fazla Bekleyen Islemler (Toplam: ${displayedRows.length})` : (isGorevlendirmeYapilmayan ? `1+ Gundur Personel Atanmayan Isler (Toplam: ${displayedRows.length})` : generalWarningTitle))))));
                 
-                doc.text(tr(warningTitleForPdf), 14, 15);
+                doc.setTextColor(30, 58, 138);
+                doc.text(tr("MEGSIS Is Takip Raporu"), 14, 14);
+                doc.setFontSize(10);
+                doc.setTextColor(71, 85, 105);
+                doc.text(tr(warningTitleForPdf), 14, 21);
+                doc.autoTable({
+                    startY: 26,
+                    body: [
+                        [tr('Rapor Tarihi'), tr(new Date().toLocaleString('tr-TR'))],
+                        [tr('Filtre Ozeti'), tr(reportSummary || 'Tum kayitlar')],
+                        [tr('Personel Gorunumu'), tr(getPersonnelModeLabel())],
+                        [tr('Toplam Kayit'), String(displayedRows.length)]
+                    ],
+                    theme: 'grid',
+                    styles: { fontSize: 8, cellPadding: 2 },
+                    columnStyles: { 0: { cellWidth: 35, fontStyle: 'bold' }, 1: { cellWidth: 230 } },
+                    margin: { left: 14, right: 14 }
+                });
 
                 let head = [];
                 let body = [];
@@ -1032,7 +1113,7 @@
                 }
 
                 doc.autoTable({
-                    startY: 20,
+                    startY: doc.lastAutoTable ? doc.lastAutoTable.finalY + 7 : 45,
                     head: head,
                     body: body,
                     theme: 'striped',
@@ -1056,10 +1137,19 @@
                                 }
                             }
                         }
+                    },
+                    didDrawPage: function(data) {
+                        const pageSize = doc.internal.pageSize;
+                        const pageWidth = pageSize.width || pageSize.getWidth();
+                        const pageHeight = pageSize.height || pageSize.getHeight();
+                        doc.setFontSize(8);
+                        doc.setTextColor(100);
+                        doc.text(tr('MEGSIS Is Takip'), data.settings.margin.left, pageHeight - 8);
+                        doc.text(`${doc.internal.getNumberOfPages()}`, pageWidth - data.settings.margin.right, pageHeight - 8, { align: 'right' });
                     }
                 });
 
-                doc.save('Rapor.pdf');
+                doc.save(`${getReportBaseName()}.pdf`);
             };
 
             if (warningRows.length === 0) { return null; } 
@@ -2205,7 +2295,9 @@
                     return true;
                 });
             }, [filteredData, chartWarningFilter]);
-            
+
+            const warningReportSummary = `${activeFilterSummary}${chartWarningFilter ? ` / Grafik filtresi: ${chartWarningFilter.label}` : ''}`;
+             
             const LandingPage = ({onFileChange}) => (
                 <div className="landing-container">
                     <label htmlFor="file-upload-landing" className="upload-box"><div className="upload-icon">📤</div><div className="upload-text">Analiz için Excel Dosyası Seçin</div><div className="upload-subtext">veya dosyayı buraya sürükleyip bırakın</div></label>
@@ -2252,7 +2344,7 @@
                             <button className="download-btn" style={{backgroundColor: '#2563eb'}} onClick={() => setChartWarningFilter(null)}>Grafik Filtresini Temizle</button>
                         </div>
                     )}
-                    <WarningTable data={chartFilteredWarningData} isEngineer={isEngineer} personnelFilterType={personnelFilterType} onFilterChange={setPersonnelFilterType} sortField={sortField} onWarningRowsChange={setMegsisData} warningThreshold={warningThreshold} setWarningThreshold={setWarningThreshold} />
+                    <WarningTable data={chartFilteredWarningData} isEngineer={isEngineer} personnelFilterType={personnelFilterType} onFilterChange={setPersonnelFilterType} sortField={sortField} onWarningRowsChange={setMegsisData} warningThreshold={warningThreshold} setWarningThreshold={setWarningThreshold} reportSummary={warningReportSummary} />
                     <DataTable data={filteredData} sortField={sortField} isEngineer={isEngineer} personnelFilterType={personnelFilterType} onFilterChange={setPersonnelFilterType} />
                     
                     <ReportComparison engineers={engineers} isEngineer={isEngineer} />
