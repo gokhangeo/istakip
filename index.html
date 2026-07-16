@@ -1970,7 +1970,24 @@
             const ilOptions = Array.from(new Set(data.map(d=>d._province).filter(p=>p))).sort((a,b)=>a.localeCompare(b,'tr'));
             const ilceOptions = Array.from(new Set(data.filter(d => selectedIl.length === 0 || selectedIl.includes(d._province)).map(d => d._district).filter(p => p))).sort((a,b)=>a.localeCompare(b,'tr'));
             const personnelOptions = Array.from(new Set(data.flatMap(d=>splitPersonel(d['görevli personel'])))).sort((a,b)=>a.localeCompare(b,'tr'));
-            const islemOptions = Array.from(new Set(data.map(d => d['işlem']).filter(i => i && typeof i === 'string' && i.trim() !== ''))).sort((a,b)=>a.localeCompare(b,'tr'));
+            const rowsForIslemOptions = data.filter(d => {
+                if (selectedIl.length > 0 && !selectedIl.includes(d._province)) return false;
+                if (selectedIlce.length > 0 && !selectedIlce.includes(d._district)) return false;
+                if (selectedPersonel.length > 0) {
+                    const ppl = splitPersonel(d['görevli personel']);
+                    if (!selectedPersonel.some(sp => ppl.includes(sp))) return false;
+                }
+                return true;
+            });
+            const islemOptions = Array.from(new Set(rowsForIslemOptions.map(d => d['işlem']).filter(i => i && typeof i === 'string' && i.trim() !== ''))).sort((a,b)=>a.localeCompare(b,'tr'));
+            
+            useEffect(() => {
+                setSelectedIlce(prev => prev.filter(ilce => ilceOptions.includes(ilce)));
+            }, [selectedIl, data]);
+            
+            useEffect(() => {
+                setSelectedIslem(prev => prev.filter(islem => islemOptions.includes(islem)));
+            }, [selectedIl, selectedIlce, selectedPersonel, data]);
             
             const sortOptions=[
                 {label:'Sıralama Yok',value:''}, 
@@ -2128,7 +2145,7 @@
                     <div className="modal-overlay" onClick={() => setShowPersonelModal(false)}>
                         <div className="modal" onClick={e => e.stopPropagation()}>
                              <div className="modal-header"><h3>Personel Seç</h3><button className="close-btn" onClick={()=>setShowPersonelModal(false)}>×</button></div>
-                             <div className="modal-content"><div className="filter-list">{personnelOptions.map(p => <div className="filter-item" key={p}><label style={{color: isEngineer(p) ? 'red' : 'inherit'}}><input type="checkbox" checked={selectedPersonel.includes(p)} onChange={e=>{ if(e.target.checked) setSelectedPersonel([...selectedPersonel,p]); else setSelectedPersonel(selectedPersonnel.filter(sp=>sp!==p)); }}/> {p} {isEngineer(p) ? '(Müh.)' : ''}</label></div>)}</div></div>
+                             <div className="modal-content"><div className="filter-list">{personnelOptions.map(p => <div className="filter-item" key={p}><label style={{color: isEngineer(p) ? 'red' : 'inherit'}}><input type="checkbox" checked={selectedPersonel.includes(p)} onChange={e=>{ if(e.target.checked) setSelectedPersonel([...selectedPersonel,p]); else setSelectedPersonel(selectedPersonel.filter(sp=>sp!==p)); }}/> {p} {isEngineer(p) ? '(Müh.)' : ''}</label></div>)}</div></div>
                             <div className="modal-footer"><button className="download-btn" onClick={()=>{setSelectedPersonel([]); setShowPersonelModal(false);}}>Temizle & Kapat</button></div>
                         </div>
                     </div>
