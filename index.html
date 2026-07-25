@@ -479,7 +479,6 @@
                         <div style={{marginTop: '2px'}}><span style={{fontSize: '0.9rem', color: '#334155'}}>İade Edilen: </span><span style={{fontSize: '1.1rem', color: '#1d4ed8', fontWeight: 'bold'}}>{metrics.iade}</span></div>
                         <div style={{marginTop: '2px'}}><span style={{fontSize: '0.9rem', color: '#334155'}}>F.K. Alınmayan: </span><span style={{fontSize: '1.1rem', color: '#1d4ed8', fontWeight: 'bold'}}>{metrics.fenKayitAlinmayan}</span></div>
                         <div style={{marginTop: '2px'}}><span style={{fontSize: '0.9rem', color: '#334155'}}>Harcı Yatırılmayan: </span><span style={{fontSize: '1.1rem', color: '#dc2626', fontWeight: 'bold'}}>{metrics.harciYatirilmayan}</span></div>
-                        <div style={{marginTop: '2px'}}><span style={{fontSize: '0.9rem', color: '#334155'}}>Ort. İşlem Süresi: </span><span style={{fontSize: '1.1rem', color: '#1d4ed8', fontWeight: 'bold'}}>{metrics.avgTescilSuresi > 0 ? `${metrics.avgTescilSuresi} gün` : 'N/A'}</span></div>
                     </div>
                 </div>
             ); 
@@ -490,8 +489,8 @@
             const totalChartRef = useRef(null); const dynamicChartRef = useRef(null); const islemChartRef = useRef(null); const districtChartRef = useRef(null);
             const [personnelStats, setPersonnelStats] = useState({ totals: {}, dynamic: {} });
             const [islemStats, setIslemStats] = useState({}); const [districtStats, setDistrictStats] = useState({});
-            const [chartLimit, setChartLimit] = useState('10');
-            const [islemGroupMode, setIslemGroupMode] = useState('grouped');
+            const [chartLimit, setChartLimit] = useState('all');
+            const [islemGroupMode, setIslemGroupMode] = useState('detail');
             
             let dynamicTitle = "Bekleyen İşlem Sayıları"; let districtTitle = "İlçe Bazlı Bekleyen İşlemler"; let islemTitle = "İşlem Sayıları";
 
@@ -2453,4 +2452,3 @@
     </script>
 </body>
 </html>
-
