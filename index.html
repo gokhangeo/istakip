@@ -766,7 +766,7 @@
             const [warningPersonnelFilter, setWarningPersonnelFilter] = useState([]);
             const [showWarningPersonnelModal, setShowWarningPersonnelModal] = useState(false);
             const tableData = React.useMemo(() => Array.isArray(data) ? data : [], [data]);
-            const warningEligibleData = React.useMemo(() => tableData.filter(row => !String(row['başvuru durumu'] || '').toLocaleLowerCase('tr').includes('ek ödeme gönderildi')), [tableData]);
+            const warningEligibleData = tableData;
 
             const toggleDateSort = () => setDateSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
             useEffect(() => { setWarningPersonnelFilter([]); }, [sortField]);
@@ -1172,6 +1172,7 @@
                                          <option value={7}>7+ Gün</option>
                                          <option value={15}>15+ Gün</option>
                                          <option value={30}>30+ Gün</option>
+                                         <option value={60}>60+ Gün</option>
                                      </select>
                                  </div>
                              )}
