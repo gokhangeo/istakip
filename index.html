@@ -503,6 +503,7 @@
             const totalChartRef = useRef(null); const dynamicChartRef = useRef(null); const islemChartRef = useRef(null); const districtChartRef = useRef(null);
             const [personnelStats, setPersonnelStats] = useState({ totals: {}, dynamic: {} });
             const [islemStats, setIslemStats] = useState({}); const [districtStats, setDistrictStats] = useState({});
+            const [islemFilterMembers, setIslemFilterMembers] = useState({});
             const [chartLimit, setChartLimit] = useState('all');
             const [islemGroupMode, setIslemGroupMode] = useState('detail');
             
@@ -536,8 +537,8 @@
             };
 
             useEffect(() => {
-                if (!data || data.length === 0) { setPersonnelStats({ totals: {}, dynamic: {} }); setIslemStats({}); setDistrictStats({}); return; }
-                const totalsMap = {}; const dynamicMap = {}; const islemMap = {}; const districtMap = {};
+                if (!data || data.length === 0) { setPersonnelStats({ totals: {}, dynamic: {} }); setIslemStats({}); setIslemFilterMembers({}); setDistrictStats({}); return; }
+                const totalsMap = {}; const dynamicMap = {}; const islemMap = {}; const islemMembersMap = {}; const districtMap = {};
 
                 data.forEach(r => {
                     const personnel = splitPersonel(r['görevli personel']);
@@ -561,7 +562,11 @@
                         else if (islemLower.startsWith('ayırma ve yola / yeşil alana terk')) { groupedIslem = 'Ayırma Ve Yola / Yeşil Alana Terk'; }
                     }
                     
-                    if (groupedIslem) islemMap[groupedIslem] = (islemMap[groupedIslem] || 0) + 1;
+                    if (groupedIslem) {
+                        islemMap[groupedIslem] = (islemMap[groupedIslem] || 0) + 1;
+                        if (!islemMembersMap[groupedIslem]) islemMembersMap[groupedIslem] = [];
+                        if (islem && !islemMembersMap[groupedIslem].includes(islem)) islemMembersMap[groupedIslem].push(islem);
+                    }
 
                     let conditionMet = false;
                     switch(sortField) {
@@ -585,7 +590,7 @@
                     if (conditionMet && personnel.length > 0) { personnel.forEach(p => { if (p) dynamicMap[p] = (dynamicMap[p] || 0) + 1; }); }
                 });
                 
-                setPersonnelStats({ totals: totalsMap, dynamic: dynamicMap }); setIslemStats(islemMap); setDistrictStats(districtMap);
+                setPersonnelStats({ totals: totalsMap, dynamic: dynamicMap }); setIslemStats(islemMap); setIslemFilterMembers(islemMembersMap); setDistrictStats(districtMap);
             }, [data, sortField, islemGroupMode]);
 
             const filterPersonnelChartData = (chartData) => {
@@ -594,22 +599,23 @@
                 return chartData;
             };
 
-            const limitChartData = (chartData) => {
+            const limitChartData = (chartData, sourceMembers = null) => {
                 const sortedData = Object.entries(chartData).sort(([, a], [, b]) => b - a);
+                const getMembers = (key) => sourceMembers && sourceMembers[key] && sourceMembers[key].length ? sourceMembers[key] : [key];
                 const limit = chartLimit === 'all' ? sortedData.length : Number(chartLimit);
                 if (!limit || sortedData.length <= limit) {
                     return {
                         data: Object.fromEntries(sortedData),
-                        members: Object.fromEntries(sortedData.map(([key]) => [key, [key]]))
+                        members: Object.fromEntries(sortedData.map(([key]) => [key, getMembers(key)]))
                     };
                 }
                 const visible = sortedData.slice(0, limit);
                 const rest = sortedData.slice(limit);
                 const otherTotal = rest.reduce((sum, [, value]) => sum + value, 0);
-                const members = Object.fromEntries(visible.map(([key]) => [key, [key]]));
+                const members = Object.fromEntries(visible.map(([key]) => [key, getMembers(key)]));
                 if (otherTotal > 0) {
                     visible.push(['Diğer', otherTotal]);
-                    members['Diğer'] = rest.map(([key]) => key);
+                    members['Diğer'] = [...new Set(rest.flatMap(([key]) => getMembers(key)))];
                 }
                 return { data: Object.fromEntries(visible), members };
             };
@@ -618,7 +624,7 @@
             const dynamicTotalsData = filterPersonnelChartData(personnelStats.dynamic);
             const personnelTotalsLimited = limitChartData(personnelTotalsData);
             const dynamicTotalsLimited = limitChartData(dynamicTotalsData);
-            const islemLimited = limitChartData(islemStats);
+            const islemLimited = limitChartData(islemStats, islemGroupMode === 'detail' ? islemFilterMembers : null);
             const districtLimited = limitChartData(districtStats);
             const personnelTotalsChartData = personnelTotalsLimited.data;
             const dynamicTotalsChartData = dynamicTotalsLimited.data;
@@ -775,12 +781,11 @@
             );
         };
 
-        function WarningTable({ data, isEngineer, personnelFilterType, onFilterChange, sortField, onWarningRowsChange, warningThreshold, setWarningThreshold, reportSummary }) { 
+        function WarningTable({ data, isEngineer, personnelFilterType, onFilterChange, sortField, onWarningRowsChange, warningThreshold, setWarningThreshold, reportSummary, hideEkOdemeGonderildi, setHideEkOdemeGonderildi }) {
             const [warningRows, setWarningRows] = useState([]); 
             const [dateSortOrder, setDateSortOrder] = useState('asc');
             const [warningPersonnelFilter, setWarningPersonnelFilter] = useState([]);
             const [showWarningPersonnelModal, setShowWarningPersonnelModal] = useState(false);
-            const [hideEkOdemeGonderildi, setHideEkOdemeGonderildi] = useState(false);
             const tableData = React.useMemo(() => Array.isArray(data) ? data : [], [data]);
             const warningEligibleData = React.useMemo(() => {
                 if (!hideEkOdemeGonderildi) return tableData;
@@ -978,12 +983,21 @@
             };
 
             const getPersonnelModeLabel = () => personnelFilterType === 'engineer' ? 'Sadece Mühendisler' : (personnelFilterType === 'other' ? 'Diğer Personel' : 'Tümü');
-            const getSafeFilePart = (text) => String(text || 'Rapor').replace(/[\\/:*?"<>|]/g, '').replace(/\s+/g, '_').substring(0, 60);
+            const getSafeFilePart = (text) => String(text || 'Rapor').replace(/[\\/:*?"<>|]/g, '').replace(/\s+/g, '_').replace(/_+/g, '_').substring(0, 60);
             const getTodayForFile = () => {
                 const d = new Date();
                 return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
             };
-            const getReportBaseName = () => `MEGSIS_${getSafeFilePart(sortField || 'Bekleyen_Islemler')}_${getTodayForFile()}`;
+            const getReportBaseName = () => {
+                const filterParts = [
+                    getWarningFilterLabel(sortField, warningThreshold),
+                    reportSummary && reportSummary !== 'Tüm kayıtlar' ? reportSummary : null,
+                    personnelFilterType !== 'all' ? getPersonnelModeLabel() : null,
+                    hideEkOdemeGonderildi ? 'Ek Ödeme Hariç' : null
+                ].filter(Boolean).map(getSafeFilePart);
+                const filterName = (filterParts.join('_') || 'Tüm_Kayıtlar').substring(0, 150).replace(/_+$/g, '');
+                return `MEGSİS_${filterName}_${getTodayForFile()}`;
+            };
             const countBy = (rows, getter) => {
                 const map = {};
                 rows.forEach(row => {
@@ -1503,7 +1517,7 @@
             );
         }
 
-        function MegsisReporter({ data, isEngineer, warningFilterLabel }) {
+        function MegsisReporter({ data, isEngineer, warningFilterLabel, reportSummary, hideEkOdemeGonderildi }) {
             const [isLoading, setIsLoading] = useState(false);
             const [personnelOptions, setPersonnelOptions] = useState([]);
             const [selectedPersonnel, setSelectedPersonnel] = useState([]);
@@ -1638,12 +1652,25 @@
                         }
                     }
                     
-                    let fileName = 'MEGSIS_Raporu';
-                    if (type === 'engineer') fileName = 'MEGSIS_Muhendis_Raporu';
-                    else if (type === 'other') fileName = 'MEGSIS_Diger_Personel_Raporu';
-                    else if (type === 'district') fileName = 'MEGSIS_Ilce_Raporu';
-                    else if (type === 'selected_personnel') fileName = 'MEGSIS_Secili_Personel_Raporu';
-                    else if (type === 'selected_district') fileName = 'MEGSIS_Secili_Ilce_Raporu';
+                    let fileName = 'MEGSİS_Raporu';
+                    let reportTypeName = 'Raporu';
+                    if (type === 'engineer') { fileName = 'MEGSİS_Muhendis_Raporu'; reportTypeName = 'Mühendis Raporu'; }
+                    else if (type === 'other') { fileName = 'MEGSİS_Diger_Personel_Raporu'; reportTypeName = 'Diğer Personel Raporu'; }
+                    else if (type === 'district') { fileName = 'MEGSİS_Ilce_Raporu'; reportTypeName = 'İlçe Raporu'; }
+                    else if (type === 'selected_personnel') { fileName = 'MEGSİS_Secili_Personel_Raporu'; reportTypeName = 'Seçili Personel Raporu'; }
+                    else if (type === 'selected_district') { fileName = 'MEGSİS_Secili_Ilce_Raporu'; reportTypeName = 'Seçili İlçe Raporu'; }
+
+                    const getSafePdfNamePart = (text) => String(text || '').replace(/[\\/:*?"<>|]/g, '').replace(/\s+/g, '_').replace(/_+/g, '_').substring(0, 60);
+                    const today = new Date();
+                    const reportDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+                    const pdfFilterParts = [
+                        reportTypeName,
+                        warningFilterLabel,
+                        reportSummary && reportSummary !== 'Tüm kayıtlar' ? reportSummary : null,
+                        hideEkOdemeGonderildi ? 'Ek Ödeme Hariç' : null
+                    ].filter(Boolean).map(getSafePdfNamePart);
+                    const pdfFilterName = pdfFilterParts.join('_').substring(0, 150).replace(/_+$/g, '');
+                    const pdfFileName = `MEGSİS_${pdfFilterName || 'Tüm_Kayıtlar'}_${reportDate}`;
 
                     if (exportFormat === 'pdf') {
                         const doc = new window.jspdf.jsPDF('l'); 
@@ -1728,7 +1755,7 @@
                             });
                         });
 
-                        doc.save(`${fileName}.pdf`);
+                        doc.save(`${pdfFileName}.pdf`);
                     } else {
                         const mainWb = XLSX.utils.book_new();
                         const summaryWs = XLSX.utils.aoa_to_sheet(summaryData);
@@ -2052,6 +2079,7 @@
             const [isLoggedIn, setIsLoggedIn] = useState(false);
 
             const [warningThreshold, setWarningThreshold] = useState(0);
+            const [hideEkOdemeGonderildi, setHideEkOdemeGonderildi] = useState(false);
             const [megsisData, setMegsisData] = useState([]);
 
             const modalContentRef = useRef(null);
@@ -2313,10 +2341,15 @@
                 return arr;
             }, [data, startDate, endDate, selectedIl, selectedIlce, selectedPersonel, selectedIslem, sortField]);
 
+            const chartData = React.useMemo(() => {
+                if (!hideEkOdemeGonderildi) return filteredData;
+                return filteredData.filter(row => !String(row['başvuru durumu'] || '').toLocaleLowerCase('tr').includes('ek ödeme gönderildi'));
+            }, [filteredData, hideEkOdemeGonderildi]);
+
             const chartFilteredWarningData = React.useMemo(() => {
-                if (!chartWarningFilter) return filteredData;
+                if (!chartWarningFilter) return chartData;
                 const values = chartWarningFilter.values || [];
-                return filteredData.filter(row => {
+                return chartData.filter(row => {
                     if (chartWarningFilter.kind === 'personel') {
                         const ppl = splitPersonel(row['görevli personel']);
                         return values.some(v => ppl.includes(v));
@@ -2325,14 +2358,14 @@
                         return values.includes(row._district || row['ilçe']);
                     }
                     if (chartWarningFilter.kind === 'islem') {
-                        return values.includes(row['işlem']);
+                        return values.includes(String(row['işlem'] || '').trim());
                     }
                     if (chartWarningFilter.kind === 'islemGroup') {
                         return values.includes(getOperationGroupForChartFilter(row['işlem']));
                     }
                     return true;
                 });
-            }, [filteredData, chartWarningFilter]);
+            }, [chartData, chartWarningFilter]);
 
             const warningReportSummary = `${activeFilterSummary}${chartWarningFilter ? ` / Grafik filtresi: ${chartWarningFilter.label}` : ''}`;
              
@@ -2373,7 +2406,7 @@
                     <Dashboard data={data} filtered={filteredData} sortField={sortField} selectedPersonel={selectedPersonel} selectedIl={selectedIl} selectedIlce={selectedIlce} />
                     
                     <div className="charts-below">
-                        <ChartsBelow data={filteredData} onZoom={setZoomContent} onChartFilter={applyChartWarningFilter} personnelChartCardRef={personnelChartCardRef} waitingChartCardRef={waitingChartCardRef} islemChartCardRef={islemChartCardRef} districtChartCardRef={districtChartCardRef} selectedIl={selectedIl} isEngineer={isEngineer} personnelFilterType={personnelFilterType} onFilterChange={setPersonnelFilterType} sortField={sortField} activeFilterSummary={activeFilterSummary} />
+                        <ChartsBelow data={chartData} onZoom={setZoomContent} onChartFilter={applyChartWarningFilter} personnelChartCardRef={personnelChartCardRef} waitingChartCardRef={waitingChartCardRef} islemChartCardRef={islemChartCardRef} districtChartCardRef={districtChartCardRef} selectedIl={selectedIl} isEngineer={isEngineer} personnelFilterType={personnelFilterType} onFilterChange={setPersonnelFilterType} sortField={sortField} activeFilterSummary={activeFilterSummary} />
                     </div>
 
                     {chartWarningFilter && (
@@ -2382,11 +2415,11 @@
                             <button className="download-btn" style={{backgroundColor: '#2563eb'}} onClick={() => setChartWarningFilter(null)}>Grafik Filtresini Temizle</button>
                         </div>
                     )}
-                    <WarningTable data={chartFilteredWarningData} isEngineer={isEngineer} personnelFilterType={personnelFilterType} onFilterChange={setPersonnelFilterType} sortField={sortField} onWarningRowsChange={setMegsisData} warningThreshold={warningThreshold} setWarningThreshold={setWarningThreshold} reportSummary={warningReportSummary} />
+                    <WarningTable data={chartFilteredWarningData} isEngineer={isEngineer} personnelFilterType={personnelFilterType} onFilterChange={setPersonnelFilterType} sortField={sortField} onWarningRowsChange={setMegsisData} warningThreshold={warningThreshold} setWarningThreshold={setWarningThreshold} reportSummary={warningReportSummary} hideEkOdemeGonderildi={hideEkOdemeGonderildi} setHideEkOdemeGonderildi={setHideEkOdemeGonderildi} />
                     <DataTable data={filteredData} sortField={sortField} isEngineer={isEngineer} personnelFilterType={personnelFilterType} onFilterChange={setPersonnelFilterType} />
                     
                     <ReportComparison engineers={engineers} isEngineer={isEngineer} />
-                    <MegsisReporter data={megsisData} isEngineer={isEngineer} warningFilterLabel={getWarningFilterLabel(sortField, warningThreshold)} />
+                    <MegsisReporter data={megsisData} isEngineer={isEngineer} warningFilterLabel={getWarningFilterLabel(sortField, warningThreshold)} reportSummary={warningReportSummary} hideEkOdemeGonderildi={hideEkOdemeGonderildi} />
                     <EbysReporter onZoom={setZoomContent} />
                 </React.Fragment>}
                 
