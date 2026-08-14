@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { parse } from '@babel/parser';
 
 const html = await readFile(new URL('../index.html', import.meta.url), 'utf8');
-const scriptMatch = html.match(/<script[^>]*type=["']text\\/babel["'][^>]*>([\\s\\S]*?)<\\/script>/i);
+const scriptMatch = html.match(/<script[^>]*type=["']text\/babel["'][^>]*>([\s\S]*?)<\/script>/i);
 
 if (!scriptMatch) {
   throw new Error('index.html içinde text/babel uygulama kodu bulunamadı.');
