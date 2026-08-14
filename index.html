@@ -2406,7 +2406,7 @@
                     <Dashboard data={data} filtered={filteredData} sortField={sortField} selectedPersonel={selectedPersonel} selectedIl={selectedIl} selectedIlce={selectedIlce} />
                     
                     <div className="charts-below">
-                        <ChartsBelow data={chartData} onZoom={setZoomContent} onChartFilter={applyChartWarningFilter} personnelChartCardRef={personnelChartCardRef} waitingChartCardRef={waitingChartCardRef} islemChartCardRef={islemChartCardRef} districtChartCardRef={districtChartCardRef} selectedIl={selectedIl} isEngineer={isEngineer} personnelFilterType={personnelFilterType} onFilterChange={setPersonnelFilterType} sortField={sortField} activeFilterSummary={activeFilterSummary} />
+                        <ChartsBelow data={chartFilteredWarningData} onZoom={setZoomContent} onChartFilter={applyChartWarningFilter} personnelChartCardRef={personnelChartCardRef} waitingChartCardRef={waitingChartCardRef} islemChartCardRef={islemChartCardRef} districtChartCardRef={districtChartCardRef} selectedIl={selectedIl} isEngineer={isEngineer} personnelFilterType={personnelFilterType} onFilterChange={setPersonnelFilterType} sortField={sortField} activeFilterSummary={activeFilterSummary} />
                     </div>
 
                     {chartWarningFilter && (
