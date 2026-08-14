@@ -1,0 +1,11 @@
+{
+  "name": "istakip-dashboard-checks",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node tests/validate-index.mjs"
+  },
+  "devDependencies": {
+    "@babel/parser": "^7.26.9"
+  }
+}
