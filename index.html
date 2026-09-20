@@ -1903,9 +1903,11 @@
                                         const headerText = data.table.head[0].cells[data.column.index].text[0];
                                         if (headerText === 'Basvuru Durumu') {
                                             const cellText = data.cell.text.join(' ').toLowerCase();
-                                            if (cellText.includes('eksiklik tamamlandi') || cellText.includes('idare')) {
-                                                data.cell.styles.fillColor = [253, 224, 71];
-                                                data.cell.styles.textColor = [0, 0, 0];
+                                            const isIlgilisineVerildi = cellText.includes('ilgili') && cellText.includes('verildi');
+                                            const isEksiklikTamamlandi = cellText.includes('eksiklik tamamlandi');
+                                            if (isIlgilisineVerildi || isEksiklikTamamlandi) {
+                                                data.cell.styles.fillColor = [254, 202, 202];
+                                                data.cell.styles.textColor = [153, 27, 27];
                                                 data.cell.styles.fontStyle = 'bold';
                                             }
                                         }
