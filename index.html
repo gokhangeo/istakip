@@ -1686,22 +1686,74 @@
                                 .replace(/Ç/g, 'C').replace(/ç/g, 'c');
                         };
 
-                        doc.setFontSize(16);
-                        doc.text(tr("MEGSIS Raporu - Ozet"), 14, 15);
-                        doc.setFontSize(10);
-                        doc.setTextColor(71, 85, 105);
-                        doc.text(tr(`Uyari Tablosu Filtresi: ${warningFilterLabel || 'Tum kayitlar'}`), 14, 22);
-                        
-                        const summaryHead = [[tr(summaryHeader), tr(summaryCountHeader), tr("Bekleme Sureleri Kirilimi (Gun: Adet)")]];
-                        const summaryBody = summaryData.slice(1).map(row => [tr(row[0]), row[1], tr(row[2])]);
+                        // Yönetici özeti
+                        const allReportRows = sheetsToAdd.flatMap(sheet => sheet.rawData || []);
+                        const waitingBuckets = { green: 0, yellow: 0, orange: 0, red: 0 };
+                        allReportRows.forEach(row => {
+                            const day = Number(row['Bekleme Süresi (Gün)']) || 0;
+                            if (day <= 7) waitingBuckets.green++;
+                            else if (day <= 15) waitingBuckets.yellow++;
+                            else if (day <= 30) waitingBuckets.orange++;
+                            else waitingBuckets.red++;
+                        });
+                        const totalPending = allReportRows.length;
+                        const uniquePersonnelCount = sheetsToAdd.length;
 
+                        doc.setFillColor(11, 37, 69);
+                        doc.rect(0, 0, 297, 30, 'F');
+                        doc.setFontSize(18);
+                        doc.setTextColor(255, 255, 255);
+                        doc.text(tr("MEGSIS PERSONELDE BEKLEYEN ISLER"), 14, 13);
+                        doc.setFontSize(8);
+                        doc.setTextColor(205, 220, 235);
+                        doc.text(tr(`Rapor tarihi: ${new Date().toLocaleString('tr-TR')}  |  ${warningFilterLabel || 'Tum kayitlar'}`), 14, 21);
+
+                        const summaryCards = [
+                            { label: 'Toplam Bekleyen', value: totalPending, color: [20, 108, 148] },
+                            { label: '0-7 Gun', value: waitingBuckets.green, color: [22, 163, 74] },
+                            { label: '8-15 Gun', value: waitingBuckets.yellow, color: [234, 179, 8] },
+                            { label: '16-30 Gun', value: waitingBuckets.orange, color: [249, 115, 22] },
+                            { label: '30+ Gun', value: waitingBuckets.red, color: [220, 38, 38] }
+                        ];
+                        summaryCards.forEach((card, index) => {
+                            const x = 14 + (index * 55);
+                            doc.setFillColor(255, 255, 255);
+                            doc.setDrawColor(217, 226, 236);
+                            doc.roundedRect(x, 36, 49, 24, 2, 2, 'FD');
+                            doc.setFillColor(...card.color);
+                            doc.rect(x, 57.5, 49, 2.5, 'F');
+                            doc.setFontSize(7);
+                            doc.setTextColor(101, 117, 139);
+                            doc.text(tr(card.label.toUpperCase()), x + 4, 43);
+                            doc.setFontSize(17);
+                            doc.setTextColor(...card.color);
+                            doc.text(String(card.value), x + 4, 54);
+                        });
+
+                        doc.setFontSize(12);
+                        doc.setTextColor(11, 37, 69);
+                        doc.text(tr("PERSONEL BAZLI IS YUKU"), 14, 72);
+                        doc.setFontSize(8);
+                        doc.setTextColor(101, 117, 139);
+                        doc.text(tr(`${uniquePersonnelCount} personel icin bekleyen is dagilimi`), 14, 78);
+
+                        const summaryHead = [[tr(summaryHeader), tr(summaryCountHeader), tr("Bekleme Sureleri Dagilimi (Gun: Adet)")]];
+                        const summaryBody = summaryData.slice(1).map(row => [tr(row[0]), row[1], tr(row[2])]);
                         doc.autoTable({
-                            startY: 27,
+                            startY: 83,
                             head: summaryHead,
                             body: summaryBody,
                             theme: 'grid',
-                            styles: { fontSize: 9, cellPadding: 3 },
-                            headStyles: { fillColor: [7, 89, 133] }
+                            styles: { fontSize: 8.5, cellPadding: 2.5, textColor: [36, 52, 71] },
+                            headStyles: { fillColor: [11, 37, 69], textColor: [255, 255, 255] },
+                            alternateRowStyles: { fillColor: [244, 247, 251] },
+                            columnStyles: { 0: { cellWidth: 60 }, 1: { cellWidth: 38, halign: 'center' }, 2: { cellWidth: 'auto' } },
+                            didDrawPage: function() {
+                                const pageHeight = doc.internal.pageSize.getHeight();
+                                doc.setFontSize(7);
+                                doc.setTextColor(101, 117, 139);
+                                doc.text(tr('MEGSIS Is Takip - Yonetim Raporu'), 14, pageHeight - 7);
+                            }
                         });
 
                         sheetsToAdd.forEach(sheetData => {
@@ -1751,7 +1803,32 @@
                                                 data.cell.styles.fontStyle = 'bold';
                                             }
                                         }
+                                        if (headerText === 'Bekleme (Gun)') {
+                                            const day = Number(data.cell.raw) || 0;
+                                            data.cell.styles.fontStyle = 'bold';
+                                            if (day <= 7) {
+                                                data.cell.styles.fillColor = [220, 252, 231];
+                                                data.cell.styles.textColor = [22, 101, 52];
+                                            } else if (day <= 15) {
+                                                data.cell.styles.fillColor = [254, 249, 195];
+                                                data.cell.styles.textColor = [133, 77, 14];
+                                            } else if (day <= 30) {
+                                                data.cell.styles.fillColor = [255, 237, 213];
+                                                data.cell.styles.textColor = [154, 52, 18];
+                                            } else {
+                                                data.cell.styles.fillColor = [254, 226, 226];
+                                                data.cell.styles.textColor = [153, 27, 27];
+                                            }
+                                        }
                                     }
+                                },
+                                didDrawPage: function() {
+                                    const pageHeight = doc.internal.pageSize.getHeight();
+                                    const pageWidth = doc.internal.pageSize.getWidth();
+                                    doc.setFontSize(7);
+                                    doc.setTextColor(101, 117, 139);
+                                    doc.text(tr('MEGSIS Is Takip'), 14, pageHeight - 7);
+                                    doc.text(String(doc.internal.getNumberOfPages()), pageWidth - 14, pageHeight - 7, { align: 'right' });
                                 }
                             });
                         });
