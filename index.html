@@ -1792,22 +1792,35 @@
                             doc.setFillColor(231, 238, 245);
                             doc.roundedRect(barX, y - 1.2, barWidth, personnelBarHeight, 1.4, 1.4, 'F');
 
+                            const activeSegments = ['green', 'yellow', 'orange', 'red']
+                                .map(key => ({ key, value: person.buckets[key] || 0 }))
+                                .filter(segment => segment.value > 0);
+                            const rawWidths = activeSegments.map(segment => barWidth * segment.value / maxWorkload);
+                            let visualWidths = rawWidths.map(width => Math.max(9, width));
+                            const visualTotal = visualWidths.reduce((sum, width) => sum + width, 0);
+                            if (visualTotal > barWidth) {
+                                const scale = barWidth / visualTotal;
+                                visualWidths = visualWidths.map(width => width * scale);
+                            }
+
                             let segmentX = barX;
-                            ['green', 'yellow', 'orange', 'red'].forEach(key => {
-                                const value = person.buckets[key] || 0;
-                                if (!value) return;
-                                const segmentWidth = barWidth * value / maxWorkload;
-                                doc.setFillColor(...segmentColors[key]);
+                            activeSegments.forEach((segment, segmentIndex) => {
+                                const segmentWidth = visualWidths[segmentIndex];
+                                doc.setFillColor(...segmentColors[segment.key]);
                                 doc.rect(segmentX, y - 1.2, segmentWidth, personnelBarHeight, 'F');
-                                if (segmentWidth >= 7) {
-                                    doc.setFontSize(Math.max(4.5, personnelFontSize - 0.5));
+                                doc.setFont('helvetica', 'bold');
+                                doc.setFontSize(Math.max(6, personnelFontSize));
+                                if (segment.key === 'yellow') {
+                                    doc.setTextColor(92, 57, 0);
+                                } else {
                                     doc.setTextColor(255, 255, 255);
-                                    doc.text(String(value), segmentX + segmentWidth / 2, y + 1.8, { align: 'center' });
                                 }
+                                doc.text(String(segment.value), segmentX + segmentWidth / 2, y + 2.2, { align: 'center' });
+                                doc.setFont('helvetica', 'normal');
                                 segmentX += segmentWidth;
                             });
 
-                            doc.setFontSize(personnelFontSize);
+                            doc.setFontSize(Math.max(6, personnelFontSize));
                             doc.setTextColor(20, 108, 148);
                             doc.text(String(person.count), 266, y + 2.3);
                         });
