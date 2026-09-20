@@ -1700,8 +1700,8 @@
                         const personnelWorkload = summaryData.slice(1)
                             .map(row => ({ name: row[0], count: Number(row[1]) || 0, breakdown: row[2] || '' }))
                             .sort((a, b) => b.count - a.count);
-                        const topPersonnel = personnelWorkload.slice(0, 8);
-                        const maxWorkload = Math.max(1, ...topPersonnel.map(item => item.count));
+                        const reportPersonnel = personnelWorkload;
+                        const maxWorkload = Math.max(1, ...reportPersonnel.map(item => item.count));
 
                         doc.setFillColor(11, 37, 69);
                         doc.rect(0, 0, 297, 30, 'F');
@@ -1743,20 +1743,23 @@
                         doc.text(tr("PERSONEL BAZLI IS YUKU"), 22, 78);
                         doc.setFontSize(7.2);
                         doc.setTextColor(101, 117, 139);
-                        doc.text(tr(`En fazla isi bulunan ${topPersonnel.length} personel`), 22, 85);
+                        doc.text(tr(`Tum personel - ${reportPersonnel.length} kisi`), 22, 85);
 
-                        topPersonnel.forEach((person, index) => {
-                            const y = 96 + (index * 10.2);
+                        const personnelRowGap = Math.min(10.2, 81 / Math.max(1, reportPersonnel.length));
+                        const personnelFontSize = reportPersonnel.length > 14 ? 5.2 : (reportPersonnel.length > 10 ? 6 : 7.1);
+                        const personnelBarHeight = reportPersonnel.length > 14 ? 2.8 : 4.5;
+                        reportPersonnel.forEach((person, index) => {
+                            const y = 94 + (index * personnelRowGap);
                             const barX = 72;
                             const barWidth = 88;
-                            doc.setFontSize(7.1);
+                            doc.setFontSize(personnelFontSize);
                             doc.setTextColor(36, 52, 71);
                             doc.text(tr(String(person.name).substring(0, 24)), 22, y + 2.5);
                             doc.setFillColor(231, 238, 245);
-                            doc.roundedRect(barX, y - 1.2, barWidth, 4.5, 2, 2, 'F');
+                            doc.roundedRect(barX, y - 1.2, barWidth, personnelBarHeight, 1.4, 1.4, 'F');
                             doc.setFillColor(20, 108, 148);
-                            doc.roundedRect(barX, y - 1.2, Math.max(3, barWidth * person.count / maxWorkload), 4.5, 2, 2, 'F');
-                            doc.setFontSize(7.4);
+                            doc.roundedRect(barX, y - 1.2, Math.max(3, barWidth * person.count / maxWorkload), personnelBarHeight, 1.4, 1.4, 'F');
+                            doc.setFontSize(personnelFontSize);
                             doc.setTextColor(20, 108, 148);
                             doc.text(String(person.count), 166, y + 2.5);
                         });
