@@ -1697,10 +1697,21 @@
                             else waitingBuckets.red++;
                         });
                         const totalPending = allReportRows.length;
-                        const personnelWorkload = summaryData.slice(1)
-                            .map(row => ({ name: row[0], count: Number(row[1]) || 0, breakdown: row[2] || '' }))
-                            .sort((a, b) => b.count - a.count);
-                        const reportPersonnel = personnelWorkload;
+                        const reportPersonnel = sheetsToAdd.map(sheet => {
+                            const buckets = { green: 0, yellow: 0, orange: 0, red: 0 };
+                            (sheet.rawData || []).forEach(row => {
+                                const day = Number(row['Bekleme Süresi (Gün)']) || 0;
+                                if (day <= 7) buckets.green++;
+                                else if (day <= 15) buckets.yellow++;
+                                else if (day <= 30) buckets.orange++;
+                                else buckets.red++;
+                            });
+                            return {
+                                name: sheet.name,
+                                count: (sheet.rawData || []).length,
+                                buckets
+                            };
+                        }).sort((a, b) => b.count - a.count);
                         const maxWorkload = Math.max(1, ...reportPersonnel.map(item => item.count));
 
                         doc.setFillColor(11, 37, 69);
@@ -1734,10 +1745,10 @@
                             doc.text(String(card.value), x + 4, 54);
                         });
 
-                        // Sol panel: personel bazlı iş yükü
+                        // Tam genişlik personel iş yükü: süre aralıklarına göre yığılmış çubuklar
                         doc.setFillColor(255, 255, 255);
                         doc.setDrawColor(217, 226, 236);
-                        doc.roundedRect(14, 67, 174, 116, 3, 3, 'FD');
+                        doc.roundedRect(14, 67, 269, 116, 3, 3, 'FD');
                         doc.setFontSize(11);
                         doc.setTextColor(11, 37, 69);
                         doc.text(tr("PERSONEL BAZLI IS YUKU"), 22, 78);
@@ -1745,54 +1756,60 @@
                         doc.setTextColor(101, 117, 139);
                         doc.text(tr(`Tum personel - ${reportPersonnel.length} kisi`), 22, 85);
 
-                        const personnelRowGap = Math.min(10.2, 81 / Math.max(1, reportPersonnel.length));
-                        const personnelFontSize = reportPersonnel.length > 14 ? 5.2 : (reportPersonnel.length > 10 ? 6 : 7.1);
-                        const personnelBarHeight = reportPersonnel.length > 14 ? 2.8 : 4.5;
-                        reportPersonnel.forEach((person, index) => {
-                            const y = 94 + (index * personnelRowGap);
-                            const barX = 72;
-                            const barWidth = 88;
-                            doc.setFontSize(personnelFontSize);
-                            doc.setTextColor(36, 52, 71);
-                            doc.text(tr(String(person.name).substring(0, 24)), 22, y + 2.5);
-                            doc.setFillColor(231, 238, 245);
-                            doc.roundedRect(barX, y - 1.2, barWidth, personnelBarHeight, 1.4, 1.4, 'F');
-                            doc.setFillColor(20, 108, 148);
-                            doc.roundedRect(barX, y - 1.2, Math.max(3, barWidth * person.count / maxWorkload), personnelBarHeight, 1.4, 1.4, 'F');
-                            doc.setFontSize(personnelFontSize);
-                            doc.setTextColor(20, 108, 148);
-                            doc.text(String(person.count), 166, y + 2.5);
+                        const workloadLegend = [
+                            { label: '0-7 gun', color: [22, 163, 74] },
+                            { label: '8-15 gun', color: [234, 179, 8] },
+                            { label: '16-30 gun', color: [249, 115, 22] },
+                            { label: '30+ gun', color: [220, 38, 38] }
+                        ];
+                        workloadLegend.forEach((legend, index) => {
+                            const x = 142 + (index * 33);
+                            doc.setFillColor(...legend.color);
+                            doc.roundedRect(x, 80.5, 4, 4, 1, 1, 'F');
+                            doc.setFontSize(6.2);
+                            doc.setTextColor(71, 85, 105);
+                            doc.text(tr(legend.label), x + 6, 84);
                         });
 
-                        // Sağ panel: bekleme süresi dağılımı
-                        doc.setFillColor(255, 255, 255);
-                        doc.setDrawColor(217, 226, 236);
-                        doc.roundedRect(194, 67, 89, 116, 3, 3, 'FD');
-                        doc.setFontSize(10.5);
-                        doc.setTextColor(11, 37, 69);
-                        doc.text(tr("BEKLEME SURESI DAGILIMI"), 201, 78);
-                        doc.setFontSize(7.2);
-                        doc.setTextColor(101, 117, 139);
-                        doc.text(tr(`Toplam ${totalPending} is`), 201, 85);
+                        const personnelRowGap = Math.min(10.2, 86 / Math.max(1, reportPersonnel.length));
+                        const personnelFontSize = reportPersonnel.length > 16 ? 4.8 : (reportPersonnel.length > 13 ? 5.7 : 6.8);
+                        const personnelBarHeight = reportPersonnel.length > 16 ? 2.8 : 4;
+                        const barX = 75;
+                        const barWidth = 180;
+                        const segmentColors = {
+                            green: [22, 163, 74],
+                            yellow: [234, 179, 8],
+                            orange: [249, 115, 22],
+                            red: [220, 38, 38]
+                        };
 
-                        const durationRows = [
-                            { label: '0-7 gun', value: waitingBuckets.green, color: [22, 163, 74] },
-                            { label: '8-15 gun', value: waitingBuckets.yellow, color: [234, 179, 8] },
-                            { label: '16-30 gun', value: waitingBuckets.orange, color: [249, 115, 22] },
-                            { label: '30+ gun', value: waitingBuckets.red, color: [220, 38, 38] }
-                        ];
-                        const maxBucket = Math.max(1, ...durationRows.map(row => row.value));
-                        durationRows.forEach((row, index) => {
-                            const y = 101 + (index * 18);
-                            doc.setFontSize(7.5);
+                        reportPersonnel.forEach((person, index) => {
+                            const y = 94 + (index * personnelRowGap);
+                            doc.setFontSize(personnelFontSize);
                             doc.setTextColor(36, 52, 71);
-                            doc.text(tr(row.label), 201, y + 2.5);
+                            doc.text(tr(String(person.name).substring(0, 30)), 22, y + 2.3);
+
                             doc.setFillColor(231, 238, 245);
-                            doc.roundedRect(225, y - 1.2, 42, 5, 2, 2, 'F');
-                            doc.setFillColor(...row.color);
-                            doc.roundedRect(225, y - 1.2, Math.max(3, 42 * row.value / maxBucket), 5, 2, 2, 'F');
-                            doc.setTextColor(...row.color);
-                            doc.text(String(row.value), 276, y + 2.5, { align: 'right' });
+                            doc.roundedRect(barX, y - 1.2, barWidth, personnelBarHeight, 1.4, 1.4, 'F');
+
+                            let segmentX = barX;
+                            ['green', 'yellow', 'orange', 'red'].forEach(key => {
+                                const value = person.buckets[key] || 0;
+                                if (!value) return;
+                                const segmentWidth = barWidth * value / maxWorkload;
+                                doc.setFillColor(...segmentColors[key]);
+                                doc.rect(segmentX, y - 1.2, segmentWidth, personnelBarHeight, 'F');
+                                if (segmentWidth >= 7) {
+                                    doc.setFontSize(Math.max(4.5, personnelFontSize - 0.5));
+                                    doc.setTextColor(255, 255, 255);
+                                    doc.text(String(value), segmentX + segmentWidth / 2, y + 1.8, { align: 'center' });
+                                }
+                                segmentX += segmentWidth;
+                            });
+
+                            doc.setFontSize(personnelFontSize);
+                            doc.setTextColor(20, 108, 148);
+                            doc.text(String(person.count), 266, y + 2.3);
                         });
 
                         doc.setFontSize(7);
