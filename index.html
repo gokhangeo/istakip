@@ -1686,7 +1686,7 @@
                                 .replace(/Ç/g, 'C').replace(/ç/g, 'c');
                         };
 
-                        // Yönetici özeti
+                        // Görsel yönetici özeti
                         const allReportRows = sheetsToAdd.flatMap(sheet => sheet.rawData || []);
                         const waitingBuckets = { green: 0, yellow: 0, orange: 0, red: 0 };
                         allReportRows.forEach(row => {
@@ -1697,7 +1697,11 @@
                             else waitingBuckets.red++;
                         });
                         const totalPending = allReportRows.length;
-                        const uniquePersonnelCount = sheetsToAdd.length;
+                        const personnelWorkload = summaryData.slice(1)
+                            .map(row => ({ name: row[0], count: Number(row[1]) || 0, breakdown: row[2] || '' }))
+                            .sort((a, b) => b.count - a.count);
+                        const topPersonnel = personnelWorkload.slice(0, 8);
+                        const maxWorkload = Math.max(1, ...topPersonnel.map(item => item.count));
 
                         doc.setFillColor(11, 37, 69);
                         doc.rect(0, 0, 297, 30, 'F');
@@ -1722,7 +1726,7 @@
                             doc.roundedRect(x, 36, 49, 24, 2, 2, 'FD');
                             doc.setFillColor(...card.color);
                             doc.rect(x, 57.5, 49, 2.5, 'F');
-                            doc.setFontSize(7);
+                            doc.setFontSize(6.8);
                             doc.setTextColor(101, 117, 139);
                             doc.text(tr(card.label.toUpperCase()), x + 4, 43);
                             doc.setFontSize(17);
@@ -1730,36 +1734,105 @@
                             doc.text(String(card.value), x + 4, 54);
                         });
 
-                        doc.setFontSize(12);
+                        // Sol panel: personel bazlı iş yükü
+                        doc.setFillColor(255, 255, 255);
+                        doc.setDrawColor(217, 226, 236);
+                        doc.roundedRect(14, 67, 174, 116, 3, 3, 'FD');
+                        doc.setFontSize(11);
                         doc.setTextColor(11, 37, 69);
-                        doc.text(tr("PERSONEL BAZLI IS YUKU"), 14, 72);
-                        doc.setFontSize(8);
+                        doc.text(tr("PERSONEL BAZLI IS YUKU"), 22, 78);
+                        doc.setFontSize(7.2);
                         doc.setTextColor(101, 117, 139);
-                        doc.text(tr(`${uniquePersonnelCount} personel icin bekleyen is dagilimi`), 14, 78);
+                        doc.text(tr(`En fazla isi bulunan ${topPersonnel.length} personel`), 22, 85);
 
-                        const summaryHead = [[tr(summaryHeader), tr(summaryCountHeader), tr("Bekleme Sureleri Dagilimi (Gun: Adet)")]];
-                        const summaryBody = summaryData.slice(1).map(row => [tr(row[0]), row[1], tr(row[2])]);
-                        doc.autoTable({
-                            startY: 83,
-                            head: summaryHead,
-                            body: summaryBody,
-                            theme: 'grid',
-                            styles: { fontSize: 8.5, cellPadding: 2.5, textColor: [36, 52, 71] },
-                            headStyles: { fillColor: [11, 37, 69], textColor: [255, 255, 255] },
-                            alternateRowStyles: { fillColor: [244, 247, 251] },
-                            columnStyles: { 0: { cellWidth: 60 }, 1: { cellWidth: 38, halign: 'center' }, 2: { cellWidth: 'auto' } },
-                            didDrawPage: function() {
-                                const pageHeight = doc.internal.pageSize.getHeight();
-                                doc.setFontSize(7);
-                                doc.setTextColor(101, 117, 139);
-                                doc.text(tr('MEGSIS Is Takip - Yonetim Raporu'), 14, pageHeight - 7);
-                            }
+                        topPersonnel.forEach((person, index) => {
+                            const y = 96 + (index * 10.2);
+                            const barX = 72;
+                            const barWidth = 88;
+                            doc.setFontSize(7.1);
+                            doc.setTextColor(36, 52, 71);
+                            doc.text(tr(String(person.name).substring(0, 24)), 22, y + 2.5);
+                            doc.setFillColor(231, 238, 245);
+                            doc.roundedRect(barX, y - 1.2, barWidth, 4.5, 2, 2, 'F');
+                            doc.setFillColor(20, 108, 148);
+                            doc.roundedRect(barX, y - 1.2, Math.max(3, barWidth * person.count / maxWorkload), 4.5, 2, 2, 'F');
+                            doc.setFontSize(7.4);
+                            doc.setTextColor(20, 108, 148);
+                            doc.text(String(person.count), 166, y + 2.5);
                         });
+
+                        // Sağ panel: bekleme süresi dağılımı
+                        doc.setFillColor(255, 255, 255);
+                        doc.setDrawColor(217, 226, 236);
+                        doc.roundedRect(194, 67, 89, 116, 3, 3, 'FD');
+                        doc.setFontSize(10.5);
+                        doc.setTextColor(11, 37, 69);
+                        doc.text(tr("BEKLEME SURESI DAGILIMI"), 201, 78);
+                        doc.setFontSize(7.2);
+                        doc.setTextColor(101, 117, 139);
+                        doc.text(tr(`Toplam ${totalPending} is`), 201, 85);
+
+                        const durationRows = [
+                            { label: '0-7 gun', value: waitingBuckets.green, color: [22, 163, 74] },
+                            { label: '8-15 gun', value: waitingBuckets.yellow, color: [234, 179, 8] },
+                            { label: '16-30 gun', value: waitingBuckets.orange, color: [249, 115, 22] },
+                            { label: '30+ gun', value: waitingBuckets.red, color: [220, 38, 38] }
+                        ];
+                        const maxBucket = Math.max(1, ...durationRows.map(row => row.value));
+                        durationRows.forEach((row, index) => {
+                            const y = 101 + (index * 18);
+                            doc.setFontSize(7.5);
+                            doc.setTextColor(36, 52, 71);
+                            doc.text(tr(row.label), 201, y + 2.5);
+                            doc.setFillColor(231, 238, 245);
+                            doc.roundedRect(225, y - 1.2, 42, 5, 2, 2, 'F');
+                            doc.setFillColor(...row.color);
+                            doc.roundedRect(225, y - 1.2, Math.max(3, 42 * row.value / maxBucket), 5, 2, 2, 'F');
+                            doc.setTextColor(...row.color);
+                            doc.text(String(row.value), 276, y + 2.5, { align: 'right' });
+                        });
+
+                        doc.setFontSize(7);
+                        doc.setTextColor(101, 117, 139);
+                        doc.text(tr('MEGSIS Is Takip - Yonetim Raporu'), 14, 202);
+                        doc.text('1', 283, 202, { align: 'right' });
 
                         sheetsToAdd.forEach(sheetData => {
                             doc.addPage();
+                            const personDays = sheetData.rawData
+                                .map(row => Number(row['Bekleme Süresi (Gün)']) || 0)
+                                .filter(day => day >= 0);
+                            const personTotal = sheetData.rawData.length;
+                            const personAverage = personDays.length ? Math.round(personDays.reduce((sum, day) => sum + day, 0) / personDays.length) : 0;
+                            const personOldest = personDays.length ? Math.max(...personDays) : 0;
+
+                            doc.setFillColor(11, 37, 69);
+                            doc.rect(0, 0, 297, 30, 'F');
+                            doc.setFontSize(17);
+                            doc.setTextColor(255, 255, 255);
+                            doc.text(tr("PERSONEL DETAYI"), 14, 13);
+                            doc.setFontSize(8);
+                            doc.setTextColor(205, 220, 235);
+                            doc.text(tr(`${sheetData.name} - Bekleyen islerin sure ve durum analizi`), 14, 21);
+
+                            doc.setFillColor(255, 255, 255);
+                            doc.setDrawColor(217, 226, 236);
+                            doc.roundedRect(14, 36, 269, 25, 3, 3, 'FD');
                             doc.setFontSize(14);
-                            doc.text(tr(sheetData.name), 14, 15);
+                            doc.setTextColor(11, 37, 69);
+                            doc.text(tr(sheetData.name), 21, 48);
+                            doc.setFontSize(7);
+                            doc.setTextColor(101, 117, 139);
+                            doc.text(tr("BEKLEYEN"), 142, 43);
+                            doc.text(tr("ORTALAMA"), 188, 43);
+                            doc.text(tr("EN ESKI IS"), 236, 43);
+                            doc.setFontSize(12);
+                            doc.setTextColor(20, 108, 148);
+                            doc.text(String(personTotal), 142, 53);
+                            doc.setTextColor(249, 115, 22);
+                            doc.text(tr(`${personAverage} gun`), 188, 53);
+                            doc.setTextColor(220, 38, 38);
+                            doc.text(tr(`${personOldest} gun`), 236, 53);
 
                             const head = [[tr("Personel"), tr("Fen Kayit Tarihi"), tr("Fen Kayit No"), tr("Ilce"), tr("Islem"), tr("Zemin"), tr("Basvuru Durumu"), tr("Bekleme (Gun)")]];
                             const body = sheetData.rawData.map(r => [
@@ -1774,7 +1847,7 @@
                             ]);
 
                             doc.autoTable({
-                                startY: 20,
+                                startY: 68,
                                 head: head,
                                 body: body,
                                 theme: 'striped',
