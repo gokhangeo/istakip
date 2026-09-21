@@ -2268,8 +2268,10 @@
             const [hideEkOdemeGonderildi, setHideEkOdemeGonderildi] = useState(false);
             const [megsisData, setMegsisData] = useState([]);
             const [jevLoading, setJevLoading] = useState(false);
-            const [jevResults, setJevResults] = useState([]);
             const [showJevModal, setShowJevModal] = useState(false);
+            const [jevQuestion, setJevQuestion] = useState('');
+            const [jevAnswer, setJevAnswer] = useState('');
+            const [managerSummary, setManagerSummary] = useState(null);
 
             const modalContentRef = useRef(null);
             const personnelChartCardRef = useRef(null);
@@ -2298,6 +2300,10 @@
                 };
                 fetchEngineers();
             }, []);
+
+            useEffect(() => {
+                if (data.length) saveDailySnapshot(data);
+            }, [data]);
 
             useEffect(() => {
                 const handleFullscreenChange = () => setIsFullscreen(!!document.fullscreenElement);
@@ -2368,54 +2374,85 @@
                 finally { if (inputElement) inputElement.value = null; setLoading(false); }
             };
             
-            const runJevAnalysis = async () => {
-                if (!data.length || jevLoading) return;
-                setJevLoading(true);
-                setErrorMsg("");
-                try {
-                    const today = new Date();
-                    const closedTerms = ['tescile gönderildi', 'ilgilisine verildi', 'eksiklikten tamamlandı', 'eksiklik tamamlandı'];
-                    const activeRows = data.filter(row => {
-                        const status = String(row['başvuru durumu'] || '').toLocaleLowerCase('tr');
-                        return !closedTerms.some(term => status.includes(term));
+            const buildDailySnapshot = (rows) => {
+                const today = new Date();
+                const closedTerms = ['tescile gönderildi', 'ilgilisine verildi', 'eksiklikten tamamlandı', 'eksiklik tamamlandı'];
+                const activeRows = rows.filter(row => {
+                    const status = String(row['başvuru durumu'] || '').toLocaleLowerCase('tr');
+                    return !closedTerms.some(term => status.includes(term));
+                });
+                const personnel = {};
+                activeRows.forEach(row => {
+                    const raw = row['fen kayıt tarihi'] || row['başvuru tarihi'];
+                    const dt = raw ? new Date(raw) : null;
+                    const days = dt && !isNaN(dt) ? Math.max(0, Math.floor((today - dt) / 86400000)) : 0;
+                    splitPersonel(row['görevli personel']).forEach(name => {
+                        if (!personnel[name]) personnel[name] = { total:0, d0_7:0, d8_15:0, d16_30:0, d30:0 };
+                        const p = personnel[name]; p.total++;
+                        if (days <= 7) p.d0_7++; else if (days <= 15) p.d8_15++; else if (days <= 30) p.d16_30++; else p.d30++;
                     });
-                    const names = Array.from(new Set(activeRows.flatMap(row => splitPersonel(row['görevli personel'])))).sort((a,b)=>a.localeCompare(b,'tr'));
-                    if (!names.length) throw new Error('Analiz edilecek personel bulunamadı.');
+                });
+                return {
+                    date: new Date().toISOString().slice(0,10),
+                    total: activeRows.length,
+                    d30: Object.values(personnel).reduce((s,p)=>s+p.d30,0),
+                    d16_30: Object.values(personnel).reduce((s,p)=>s+p.d16_30,0),
+                    personnel
+                };
+            };
 
-                    const payloads = names.map(personel => {
-                        const rows = activeRows.filter(row => splitPersonel(row['görevli personel']).includes(personel));
-                        const buckets = { gun_0_7: 0, gun_8_15: 0, gun_16_30: 0, gun_30_ustu: 0 };
-                        rows.forEach(row => {
-                            const raw = row['fen kayıt tarihi'] || row['başvuru tarihi'];
-                            const dt = raw ? new Date(raw) : null;
-                            if (!dt || isNaN(dt)) return;
-                            const days = Math.max(0, Math.floor((today - dt) / 86400000));
-                            if (days <= 7) buckets.gun_0_7++;
-                            else if (days <= 15) buckets.gun_8_15++;
-                            else if (days <= 30) buckets.gun_16_30++;
-                            else buckets.gun_30_ustu++;
-                        });
-                        return { personel, toplam_bekleyen_is: rows.length, ...buckets, son_7_gun_degisim: 0 };
+            const saveDailySnapshot = (rows) => {
+                if (!rows.length) return null;
+                const snap = buildDailySnapshot(rows);
+                let history = [];
+                try { history = JSON.parse(localStorage.getItem('megsisDailyHistory') || '[]'); } catch(e) {}
+                history = history.filter(x => x.date !== snap.date);
+                history.push(snap);
+                history.sort((a,b)=>a.date.localeCompare(b.date));
+                history = history.slice(-30);
+                localStorage.setItem('megsisDailyHistory', JSON.stringify(history));
+                return { snap, history };
+            };
+
+            const openManagerSummary = () => {
+                const saved = saveDailySnapshot(data);
+                if (!saved) return;
+                const { snap, history } = saved;
+                const prev = history.length > 1 ? history[history.length - 2] : null;
+                const changes = [];
+                if (prev) {
+                    const names = new Set([...Object.keys(prev.personnel || {}), ...Object.keys(snap.personnel || {})]);
+                    names.forEach(name => {
+                        const a=(prev.personnel||{})[name]||{total:0,d30:0}, b=(snap.personnel||{})[name]||{total:0,d30:0};
+                        const diff=b.total-a.total, d30diff=b.d30-a.d30;
+                        if (diff || d30diff) changes.push({name,diff,d30diff,now:b.total});
                     });
-
-                    const results = [];
-                    for (const payload of payloads) {
-                        const response = await fetch('https://sweet-glitter-bcc8.okitnc1.workers.dev/', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify(payload)
-                        });
-                        const body = await response.json().catch(() => ({}));
-                        if (!response.ok || !body.ok) throw new Error(body.error || ('Jev bağlantı hatası (' + response.status + ')'));
-                        results.push({ ...payload, ...body });
-                    }
-                    setJevResults(results);
-                    setShowJevModal(true);
-                } catch (err) {
-                    setErrorMsg('Jev analizi yapılamadı: ' + (err.message || 'Bilinmeyen hata'));
-                } finally {
-                    setJevLoading(false);
+                    changes.sort((a,b)=>Math.abs(b.diff)+Math.abs(b.d30diff)-Math.abs(a.diff)-Math.abs(a.d30diff));
                 }
+                setManagerSummary({ snap, prev, changes:changes.slice(0,12), historyCount:history.length });
+                setJevAnswer('');
+                setShowJevModal(true);
+            };
+
+            const askJev = async () => {
+                const q = jevQuestion.trim();
+                if (!q || jevLoading) return;
+                setJevLoading(true); setJevAnswer(''); setErrorMsg('');
+                try {
+                    const saved = saveDailySnapshot(data);
+                    const history = saved ? saved.history : [];
+                    const current = saved ? saved.snap : buildDailySnapshot(data);
+                    const compactHistory = history.slice(-30).map(h => ({date:h.date,total:h.total,d30:h.d30,d16_30:h.d16_30,personnel:h.personnel}));
+                    const response = await fetch('https://sweet-glitter-bcc8.okitnc1.workers.dev/', {
+                        method:'POST', headers:{'Content-Type':'application/json'},
+                        body: JSON.stringify({ mode:'ask', question:q, current, history:compactHistory })
+                    });
+                    const body = await response.json().catch(()=>({}));
+                    if (!response.ok || !body.ok) throw new Error(body.error || ('Jev bağlantı hatası ('+response.status+')'));
+                    setJevAnswer(body.answer || 'Yanıt alınamadı.');
+                } catch(err) {
+                    setJevAnswer('Hata: ' + (err.message || 'Jev yanıt veremedi.'));
+                } finally { setJevLoading(false); }
             };
 
             const handleDownloadModalAsJpeg = () => {
@@ -2638,7 +2675,7 @@
                         <div className="control-group"><label>İlçe Filtresi</label><button onClick={()=>setShowIlceModal(true)} disabled={ilceOptions.length === 0}>{selectedIlce.length ? `${selectedIlce.length} ilçe seçili` : 'İlçe Seç'}</button></div>
                         <div className="control-group"><label>Personel Filtresi</label><button onClick={()=>setShowPersonelModal(true)} disabled={personnelOptions.length === 0}>{selectedPersonel.length ? `${selectedPersonel.length} personel seçili` : 'Personel Seç'}</button></div>
                         <div className="control-group"><label>İşlem Filtresi</label><button onClick={()=>setShowIslemModal(true)} disabled={islemOptions.length === 0}>{selectedIslem.length ? `${selectedIslem.length} işlem seçili` : 'İşlem Seç'}</button></div>
-                        <div className="control-group"><label>Yapay Zekâ</label><button onClick={runJevAnalysis} disabled={jevLoading} style={{backgroundColor:'#7c3aed', color:'white', border:'none'}}>{jevLoading ? 'Analiz Ediliyor...' : '🤖 Jev Analizi'}</button></div>
+                        <div className="control-group"><label>Yönetici Asistanı</label><button onClick={openManagerSummary} style={{backgroundColor:'#7c3aed', color:'white', border:'none'}}>🤖 Yönetici Özeti / Jev'e Sor</button></div>
                          <div className="control-group"><label>Veri Yönetimi</label><button onClick={() => { setData([]); setSelectedIl([]); setSelectedPersonel([]); setSelectedIlce([]); setSelectedIslem([]); setChartWarningFilter(null); setStartDate(''); setEndDate(''); setErrorMsg(""); }} style={{backgroundColor: '#ef4444', color: 'white'}}>Verileri Temizle</button></div>
                     </div>
                     {errorMsg && <p className="error-message" style={{padding: '10px', background: '#fee2e2', borderRadius: '8px', border: '1px solid #ef4444', textAlign: 'center'}}>{errorMsg}</p>}
@@ -2682,18 +2719,29 @@
                 {showJevModal && (
                     <div className="modal-overlay" onClick={() => setShowJevModal(false)}>
                         <div className="modal" style={{width:'900px'}} onClick={e => e.stopPropagation()}>
-                            <div className="modal-header"><h3>🤖 Jev Personel Analizi</h3><button className="close-btn" onClick={()=>setShowJevModal(false)}>×</button></div>
+                            <div className="modal-header"><h3>🤖 MEGSİS Yönetici Asistanı</h3><button className="close-btn" onClick={()=>setShowJevModal(false)}>×</button></div>
                             <div className="modal-content">
-                                <p style={{marginTop:0,color:'#64748b'}}>Jev'e yalnızca personel adı ve toplulaştırılmış iş/bekleme sayıları gönderilir; başvuran, zemin, başvuru numarası gibi dosya ayrıntıları gönderilmez.</p>
-                                <div className="table-wrapper" style={{maxHeight:'60vh'}}>
-                                    <table>
-                                        <thead><tr><th>Personel</th><th>Bekleyen</th><th>0-7 Gün</th><th>8-15 Gün</th><th>16-30 Gün</th><th>30+ Gün</th><th>Jev Sonucu</th></tr></thead>
-                                        <tbody>{jevResults.map((r,i) => {
-                                            const status = String(r.takip_durumu || '').toLocaleLowerCase('tr');
-                                            const label = status === 'normal' ? '🟢 Normal' : status === 'takip_edilmeli' ? '🟠 Takip Edilmeli' : status === 'oncelikli' ? '🔴 Öncelikli' : (r.takip_durumu || '—');
-                                            return <tr key={r.personel || i}><td><b>{r.personel}</b></td><td>{r.toplam_bekleyen_is}</td><td>{r.gun_0_7}</td><td>{r.gun_8_15}</td><td>{r.gun_16_30}</td><td>{r.gun_30_ustu}</td><td><b>{label}</b></td></tr>;
-                                        })}</tbody>
-                                    </table>
+                                {managerSummary && <div style={{background:'#f8fafc',border:'1px solid #e2e8f0',borderRadius:'10px',padding:'14px',marginBottom:'16px'}}>
+                                    <h3 style={{margin:'0 0 10px'}}>📋 Günlük Yönetici Özeti</h3>
+                                    <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(160px,1fr))',gap:'8px'}}>
+                                        <div><b>Bugün bekleyen:</b> {managerSummary.snap.total}</div>
+                                        <div><b>16-30 gün:</b> {managerSummary.snap.d16_30}</div>
+                                        <div><b>30+ gün:</b> {managerSummary.snap.d30}</div>
+                                        <div><b>Hafıza:</b> {managerSummary.historyCount}/30 gün</div>
+                                    </div>
+                                    {managerSummary.prev ? <React.Fragment>
+                                        <p style={{marginBottom:'6px'}}><b>Önceki kayıt ({formatToTR(managerSummary.prev.date)}) → Bugün:</b> toplam iş {managerSummary.snap.total-managerSummary.prev.total >= 0 ? '+' : ''}{managerSummary.snap.total-managerSummary.prev.total}, 30+ gün {managerSummary.snap.d30-managerSummary.prev.d30 >= 0 ? '+' : ''}{managerSummary.snap.d30-managerSummary.prev.d30}.</p>
+                                        {managerSummary.changes.length > 0 && <div><b>Dikkat çeken değişimler:</b> {managerSummary.changes.slice(0,6).map(x => x.name + ' (' + (x.diff>=0?'+':'') + x.diff + ' iş' + (x.d30diff ? ', 30+ ' + (x.d30diff>=0?'+':'') + x.d30diff : '') + ')').join(' • ')}</div>}
+                                    </React.Fragment> : <p style={{marginBottom:0}}>İlk günlük kayıt oluşturuldu. Bir sonraki gün yeni Excel yüklendiğinde değişimler otomatik karşılaştırılacak.</p>}
+                                </div>}
+                                <div style={{background:'#faf5ff',border:'1px solid #e9d5ff',borderRadius:'10px',padding:'14px'}}>
+                                    <h3 style={{margin:'0 0 8px'}}>💬 Jev'e Sor</h3>
+                                    <div style={{display:'flex',gap:'8px'}}>
+                                        <input value={jevQuestion} onChange={e=>setJevQuestion(e.target.value)} onKeyDown={e=>{if(e.key==='Enter') askJev();}} placeholder="Örn: Son 7 günde kimlerin iş yükü en çok değişti?" style={{flex:1,padding:'10px',border:'1px solid #cbd5e1',borderRadius:'7px'}} />
+                                        <button className="download-btn" onClick={askJev} disabled={jevLoading} style={{backgroundColor:'#7c3aed'}}>{jevLoading ? 'Soruluyor...' : 'Sor'}</button>
+                                    </div>
+                                    {jevAnswer && <div style={{marginTop:'12px',padding:'12px',background:'white',borderRadius:'8px',border:'1px solid #ddd',whiteSpace:'pre-wrap',lineHeight:'1.5'}}>{jevAnswer}</div>}
+                                    <p style={{fontSize:'0.82rem',color:'#64748b',marginBottom:0}}>Geçmiş özetleri bu tarayıcıda en fazla 30 gün tutulur. Jev'e ham başvuru dosyası değil, toplulaştırılmış yönetim verisi gönderilir.</p>
                                 </div>
                             </div>
                             <div className="modal-footer"><button className="download-btn" onClick={()=>setShowJevModal(false)}>Kapat</button></div>
