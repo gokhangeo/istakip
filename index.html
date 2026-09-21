@@ -2263,6 +2263,9 @@
             const [chartWarningFilter, setChartWarningFilter] = useState(null);
             const [isFullscreen, setIsFullscreen] = useState(false);
             const [isLoggedIn, setIsLoggedIn] = useState(false);
+            const [currentUser, setCurrentUser] = useState('');
+            const [changeReport, setChangeReport] = useState(null);
+            const [showChangeModal, setShowChangeModal] = useState(false);
 
             const [warningThreshold, setWarningThreshold] = useState(0);
             const [hideEkOdemeGonderildi, setHideEkOdemeGonderildi] = useState(false);
@@ -2299,10 +2302,6 @@
                 };
                 fetchEngineers();
             }, []);
-
-            useEffect(() => {
-                if (data.length) saveDailySnapshot(data);
-            }, [data]);
 
             useEffect(() => {
                 const handleFullscreenChange = () => setIsFullscreen(!!document.fullscreenElement);
@@ -2367,12 +2366,66 @@
                         }));
                         const results = await Promise.all(newRowsPromises);
                         const allNewRows = results.flatMap(res => res.rows);
+                        if (currentUser && allNewRows.length) {
+                            const previous = loadLastDataset(currentUser);
+                            if (previous && previous.rows && previous.rows.length) {
+                                setChangeReport(compareDatasets(previous.rows, allNewRows, previous.savedAt));
+                            } else {
+                                setChangeReport({ first:true, currentCount:allNewRows.length });
+                            }
+                            saveLastDataset(currentUser, allNewRows);
+                            saveDailySnapshot(allNewRows);
+                        }
                         setData(prevData => [...prevData, ...allNewRows]); 
                     }
                 } catch (err) { setErrorMsg("Beklenmeyen bir hata oluştu."); } 
                 finally { if (inputElement) inputElement.value = null; setLoading(false); }
             };
             
+            const userStorageKey = (suffix) => 'megsis_' + String(currentUser || 'unknown').toLocaleLowerCase('tr-TR') + '_' + suffix;
+            const rowIdentity = (row) => String(row['başvuru no'] || row['fen kayıt no'] || [row['ilçe'],row['başvuran'],row['işlem'],row['zemin']].join('|')).trim();
+            const compactRow = (row) => ({
+                id: rowIdentity(row),
+                basvuruNo: row['başvuru no'] || '',
+                fenNo: row['fen kayıt no'] || '',
+                personel: row['görevli personel'] || '',
+                durum: row['başvuru durumu'] || '',
+                islem: row['işlem'] || '',
+                ilce: row['ilçe'] || '',
+                tarih: row['fen kayıt tarihi'] || row['başvuru tarihi'] || ''
+            });
+            const loadLastDataset = (user) => {
+                try { return JSON.parse(localStorage.getItem('megsis_' + String(user).toLocaleLowerCase('tr-TR') + '_lastDataset') || 'null'); } catch(e) { return null; }
+            };
+            const saveLastDataset = (user, rows) => {
+                try {
+                    const payload={savedAt:new Date().toISOString(),rows:rows.map(compactRow)};
+                    localStorage.setItem('megsis_' + String(user).toLocaleLowerCase('tr-TR') + '_lastDataset', JSON.stringify(payload));
+                } catch(e) { console.warn('Son veri saklanamadı',e); }
+            };
+            const compareDatasets = (oldRows, newRows, previousSavedAt) => {
+                const oldMap=new Map(oldRows.map(r=>[String(r.id || rowIdentity(r)),r]));
+                const compactNew=newRows.map(compactRow), newMap=new Map(compactNew.map(r=>[r.id,r]));
+                const added=[], removed=[], personnel=[], status=[];
+                newMap.forEach((n,id)=>{
+                    const o=oldMap.get(id);
+                    if(!o) added.push(n);
+                    else {
+                        if(String(o.personel||'')!==String(n.personel||'')) personnel.push({id,old:o,new:n});
+                        if(String(o.durum||'')!==String(n.durum||'')) status.push({id,old:o,new:n});
+                    }
+                });
+                oldMap.forEach((o,id)=>{if(!newMap.has(id)) removed.push(o);});
+                return {first:false,previousSavedAt,currentSavedAt:new Date().toISOString(),added,removed,personnel,status,oldCount:oldRows.length,newCount:newRows.length};
+            };
+            const openChangeReport = () => {
+                if (!changeReport) {
+                    const last=loadLastDataset(currentUser);
+                    setChangeReport(last ? {first:true,currentCount:last.rows.length,message:'Karşılaştırma için yeni bir Excel yükleyin.'} : {first:true,currentCount:0});
+                }
+                setShowChangeModal(true);
+            };
+
             const buildDailySnapshot = (rows) => {
                 const today = new Date();
                 const closedTerms = ['tescile gönderildi', 'ilgilisine verildi', 'eksiklikten tamamlandı', 'eksiklik tamamlandı'];
@@ -2404,12 +2457,12 @@
                 if (!rows.length) return null;
                 const snap = buildDailySnapshot(rows);
                 let history = [];
-                try { history = JSON.parse(localStorage.getItem('megsisDailyHistory') || '[]'); } catch(e) {}
+                try { history = JSON.parse(localStorage.getItem(userStorageKey('dailyHistory')) || '[]'); } catch(e) {}
                 history = history.filter(x => x.date !== snap.date);
                 history.push(snap);
                 history.sort((a,b)=>a.date.localeCompare(b.date));
                 history = history.slice(-30);
-                localStorage.setItem('megsisDailyHistory', JSON.stringify(history));
+                localStorage.setItem(userStorageKey('dailyHistory'), JSON.stringify(history));
                 return { snap, history };
             };
 
@@ -2662,7 +2715,7 @@
                 </div>
             );
             
-            if (!isLoggedIn) { return <LoginScreen onLogin={() => setIsLoggedIn(true)} />; }
+            if (!isLoggedIn) { return <LoginScreen onLogin={(user) => { setCurrentUser(user); setIsLoggedIn(true); }} />; }
 
             return (<div className="container">
                 <div className="header-center"><h1>MEGSİS İŞ TAKİP</h1><h2 style={{fontStyle: 'italic', fontSize: '0.9rem', color: '#64748b'}}>© Gökhan ELGÜL tarafından tasarlanmıştır.</h2></div>
@@ -2686,6 +2739,7 @@
                         <div className="control-group"><label>Personel Filtresi</label><button onClick={()=>setShowPersonelModal(true)} disabled={personnelOptions.length === 0}>{selectedPersonel.length ? `${selectedPersonel.length} personel seçili` : 'Personel Seç'}</button></div>
                         <div className="control-group"><label>İşlem Filtresi</label><button onClick={()=>setShowIslemModal(true)} disabled={islemOptions.length === 0}>{selectedIslem.length ? `${selectedIslem.length} işlem seçili` : 'İşlem Seç'}</button></div>
                         <div className="control-group"><label>Yönetici Asistanı</label><button onClick={openManagerSummary} style={{backgroundColor:'#7c3aed', color:'white', border:'none'}}>🤖 Yönetici Özeti / Jev'e Sor</button></div>
+                        <div className="control-group"><label>Karşılaştırma</label><button onClick={openChangeReport} style={{backgroundColor:'#0f766e', color:'white', border:'none'}}>🔄 Ne Değişti?</button></div>
                          <div className="control-group"><label>Veri Yönetimi</label><button onClick={() => { setData([]); setSelectedIl([]); setSelectedPersonel([]); setSelectedIlce([]); setSelectedIslem([]); setChartWarningFilter(null); setStartDate(''); setEndDate(''); setErrorMsg(""); }} style={{backgroundColor: '#ef4444', color: 'white'}}>Verileri Temizle</button></div>
                     </div>
                     {errorMsg && <p className="error-message" style={{padding: '10px', background: '#fee2e2', borderRadius: '8px', border: '1px solid #ef4444', textAlign: 'center'}}>{errorMsg}</p>}
@@ -2762,7 +2816,38 @@
                     </div>
                 )}
 
-                {/* Modallar */}
+                {showChangeModal && changeReport && (
+                    <div className="modal-overlay" onClick={()=>setShowChangeModal(false)}>
+                        <div className="modal" style={{width:'950px'}} onClick={e=>e.stopPropagation()}>
+                            <div className="modal-header"><h3>🔄 Ne Değişti?</h3><button className="close-btn" onClick={()=>setShowChangeModal(false)}>×</button></div>
+                            <div className="modal-content">
+                                {changeReport.first ? <div style={{padding:'16px',background:'#f8fafc',borderRadius:'10px'}}>
+                                    <b>{changeReport.message || 'İlk veri bu kullanıcı için saklandı.'}</b><br/>
+                                    Kayıt sayısı: {changeReport.currentCount}. Bir sonraki Excel yüklemesinde bu veriyle otomatik karşılaştırılacak.
+                                </div> : <React.Fragment>
+                                    <p style={{color:'#64748b',marginTop:0}}>Bu karşılaştırma yalnızca <b>{currentUser}</b> kullanıcısının tarayıcıda saklanan önceki verisiyle yapılmıştır. Önceki kayıt: {new Date(changeReport.previousSavedAt).toLocaleString('tr-TR')}</p>
+                                    <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:'10px',marginBottom:'16px'}}>
+                                        <div style={{padding:'14px',background:'#ecfdf5',borderRadius:'9px'}}><b>🆕 Yeni</b><div style={{fontSize:'1.6rem'}}>{changeReport.added.length}</div></div>
+                                        <div style={{padding:'14px',background:'#eff6ff',borderRadius:'9px'}}><b>✅ Listeden Çıkan</b><div style={{fontSize:'1.6rem'}}>{changeReport.removed.length}</div></div>
+                                        <div style={{padding:'14px',background:'#fff7ed',borderRadius:'9px'}}><b>👤 Personeli Değişen</b><div style={{fontSize:'1.6rem'}}>{changeReport.personnel.length}</div></div>
+                                        <div style={{padding:'14px',background:'#faf5ff',borderRadius:'9px'}}><b>🔄 Durumu Değişen</b><div style={{fontSize:'1.6rem'}}>{changeReport.status.length}</div></div>
+                                    </div>
+                                    <div style={{maxHeight:'50vh',overflow:'auto'}}>
+                                        {[
+                                            ['🆕 Yeni İşler',changeReport.added.map(x=>({...x,degisim:'Yeni'}))],
+                                            ['✅ Listeden Çıkanlar',changeReport.removed.map(x=>({...x,degisim:'Listeden çıktı'}))],
+                                            ['👤 Personeli Değişenler',changeReport.personnel.map(x=>({...x.new,degisim:(x.old.personel||'—')+' → '+(x.new.personel||'—')}))],
+                                            ['🔄 Durumu Değişenler',changeReport.status.map(x=>({...x.new,degisim:(x.old.durum||'—')+' → '+(x.new.durum||'—')}))]
+                                        ].map(([title,rows])=>rows.length>0 && <div key={title} style={{marginBottom:'18px'}}><h4>{title} ({rows.length})</h4><table><thead><tr><th>Başvuru No</th><th>Fen Kayıt No</th><th>İlçe</th><th>İşlem</th><th>Personel</th><th>Değişim</th></tr></thead><tbody>{rows.map((x,i)=><tr key={(x.id||'')+i}><td>{x.basvuruNo||'—'}</td><td>{x.fenNo||'—'}</td><td>{x.ilce||'—'}</td><td>{x.islem||'—'}</td><td>{x.personel||'—'}</td><td>{x.degisim}</td></tr>)}</tbody></table></div>)}
+                                    </div>
+                                </React.Fragment>}
+                            </div>
+                            <div className="modal-footer"><button className="download-btn" onClick={()=>setShowChangeModal(false)}>Kapat</button></div>
+                        </div>
+                    </div>
+                )}
+
+                                {/* Modallar */}
                 {showDateModal && (
                     <div className="modal-overlay" onClick={() => setShowDateModal(false)}>
                         <div className="modal" onClick={e => e.stopPropagation()}>
@@ -2826,7 +2911,7 @@
             const handleLogin = () => {
                 let userToCheck = username;
                 if (username.toLowerCase() !== 'mersinkm') userToCheck = username.toUpperCase();
-                if (users[userToCheck] && users[userToCheck] === password) onLogin();
+                if (users[userToCheck] && users[userToCheck] === password) onLogin(userToCheck);
                 else setError('Kullanıcı adı veya şifre hatalı.');
             };
 
