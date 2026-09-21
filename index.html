@@ -2267,6 +2267,9 @@
             const [warningThreshold, setWarningThreshold] = useState(0);
             const [hideEkOdemeGonderildi, setHideEkOdemeGonderildi] = useState(false);
             const [megsisData, setMegsisData] = useState([]);
+            const [jevLoading, setJevLoading] = useState(false);
+            const [jevResults, setJevResults] = useState([]);
+            const [showJevModal, setShowJevModal] = useState(false);
 
             const modalContentRef = useRef(null);
             const personnelChartCardRef = useRef(null);
@@ -2365,6 +2368,56 @@
                 finally { if (inputElement) inputElement.value = null; setLoading(false); }
             };
             
+            const runJevAnalysis = async () => {
+                if (!data.length || jevLoading) return;
+                setJevLoading(true);
+                setErrorMsg("");
+                try {
+                    const today = new Date();
+                    const closedTerms = ['tescile gönderildi', 'ilgilisine verildi', 'eksiklikten tamamlandı', 'eksiklik tamamlandı'];
+                    const activeRows = data.filter(row => {
+                        const status = String(row['başvuru durumu'] || '').toLocaleLowerCase('tr');
+                        return !closedTerms.some(term => status.includes(term));
+                    });
+                    const names = Array.from(new Set(activeRows.flatMap(row => splitPersonel(row['görevli personel'])))).sort((a,b)=>a.localeCompare(b,'tr'));
+                    if (!names.length) throw new Error('Analiz edilecek personel bulunamadı.');
+
+                    const payloads = names.map(personel => {
+                        const rows = activeRows.filter(row => splitPersonel(row['görevli personel']).includes(personel));
+                        const buckets = { gun_0_7: 0, gun_8_15: 0, gun_16_30: 0, gun_30_ustu: 0 };
+                        rows.forEach(row => {
+                            const raw = row['fen kayıt tarihi'] || row['başvuru tarihi'];
+                            const dt = raw ? new Date(raw) : null;
+                            if (!dt || isNaN(dt)) return;
+                            const days = Math.max(0, Math.floor((today - dt) / 86400000));
+                            if (days <= 7) buckets.gun_0_7++;
+                            else if (days <= 15) buckets.gun_8_15++;
+                            else if (days <= 30) buckets.gun_16_30++;
+                            else buckets.gun_30_ustu++;
+                        });
+                        return { personel, toplam_bekleyen_is: rows.length, ...buckets, son_7_gun_degisim: 0 };
+                    });
+
+                    const results = [];
+                    for (const payload of payloads) {
+                        const response = await fetch('https://sweet-glitter-bcc8.okitnc1.workers.dev/', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(payload)
+                        });
+                        const body = await response.json().catch(() => ({}));
+                        if (!response.ok || !body.ok) throw new Error(body.error || ('Jev bağlantı hatası (' + response.status + ')'));
+                        results.push({ ...payload, ...body });
+                    }
+                    setJevResults(results);
+                    setShowJevModal(true);
+                } catch (err) {
+                    setErrorMsg('Jev analizi yapılamadı: ' + (err.message || 'Bilinmeyen hata'));
+                } finally {
+                    setJevLoading(false);
+                }
+            };
+
             const handleDownloadModalAsJpeg = () => {
                 const elementToCapture = modalContentRef.current;
                 if (elementToCapture) {
@@ -2585,6 +2638,7 @@
                         <div className="control-group"><label>İlçe Filtresi</label><button onClick={()=>setShowIlceModal(true)} disabled={ilceOptions.length === 0}>{selectedIlce.length ? `${selectedIlce.length} ilçe seçili` : 'İlçe Seç'}</button></div>
                         <div className="control-group"><label>Personel Filtresi</label><button onClick={()=>setShowPersonelModal(true)} disabled={personnelOptions.length === 0}>{selectedPersonel.length ? `${selectedPersonel.length} personel seçili` : 'Personel Seç'}</button></div>
                         <div className="control-group"><label>İşlem Filtresi</label><button onClick={()=>setShowIslemModal(true)} disabled={islemOptions.length === 0}>{selectedIslem.length ? `${selectedIslem.length} işlem seçili` : 'İşlem Seç'}</button></div>
+                        <div className="control-group"><label>Yapay Zekâ</label><button onClick={runJevAnalysis} disabled={jevLoading} style={{backgroundColor:'#7c3aed', color:'white', border:'none'}}>{jevLoading ? 'Analiz Ediliyor...' : '🤖 Jev Analizi'}</button></div>
                          <div className="control-group"><label>Veri Yönetimi</label><button onClick={() => { setData([]); setSelectedIl([]); setSelectedPersonel([]); setSelectedIlce([]); setSelectedIslem([]); setChartWarningFilter(null); setStartDate(''); setEndDate(''); setErrorMsg(""); }} style={{backgroundColor: '#ef4444', color: 'white'}}>Verileri Temizle</button></div>
                     </div>
                     {errorMsg && <p className="error-message" style={{padding: '10px', background: '#fee2e2', borderRadius: '8px', border: '1px solid #ef4444', textAlign: 'center'}}>{errorMsg}</p>}
@@ -2621,6 +2675,28 @@
                                 <button className="download-btn" onClick={toggleFullscreen}>{isFullscreen ? 'Tam Ekrandan Çık' : 'Tam Ekran'}</button>
                                 {zoomContent.type === 'waitingList' ? <button className="download-btn excel-download-btn" onClick={handleExportWaitingListExcel}>Excel İndir</button> : <button className="download-btn" onClick={handleDownloadModalAsJpeg}>JPEG İndir</button>}
                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {showJevModal && (
+                    <div className="modal-overlay" onClick={() => setShowJevModal(false)}>
+                        <div className="modal" style={{width:'900px'}} onClick={e => e.stopPropagation()}>
+                            <div className="modal-header"><h3>🤖 Jev Personel Analizi</h3><button className="close-btn" onClick={()=>setShowJevModal(false)}>×</button></div>
+                            <div className="modal-content">
+                                <p style={{marginTop:0,color:'#64748b'}}>Jev'e yalnızca personel adı ve toplulaştırılmış iş/bekleme sayıları gönderilir; başvuran, zemin, başvuru numarası gibi dosya ayrıntıları gönderilmez.</p>
+                                <div className="table-wrapper" style={{maxHeight:'60vh'}}>
+                                    <table>
+                                        <thead><tr><th>Personel</th><th>Bekleyen</th><th>0-7 Gün</th><th>8-15 Gün</th><th>16-30 Gün</th><th>30+ Gün</th><th>Jev Sonucu</th></tr></thead>
+                                        <tbody>{jevResults.map((r,i) => {
+                                            const status = String(r.takip_durumu || '').toLocaleLowerCase('tr');
+                                            const label = status === 'normal' ? '🟢 Normal' : status === 'takip_edilmeli' ? '🟠 Takip Edilmeli' : status === 'oncelikli' ? '🔴 Öncelikli' : (r.takip_durumu || '—');
+                                            return <tr key={r.personel || i}><td><b>{r.personel}</b></td><td>{r.toplam_bekleyen_is}</td><td>{r.gun_0_7}</td><td>{r.gun_8_15}</td><td>{r.gun_16_30}</td><td>{r.gun_30_ustu}</td><td><b>{label}</b></td></tr>;
+                                        })}</tbody>
+                                    </table>
+                                </div>
+                            </div>
+                            <div className="modal-footer"><button className="download-btn" onClick={()=>setShowJevModal(false)}>Kapat</button></div>
                         </div>
                     </div>
                 )}
