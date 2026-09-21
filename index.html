@@ -2269,7 +2269,6 @@
             const [megsisData, setMegsisData] = useState([]);
             const [jevLoading, setJevLoading] = useState(false);
             const [showJevModal, setShowJevModal] = useState(false);
-            const [jevQuestion, setJevQuestion] = useState('');
             const [jevAnswer, setJevAnswer] = useState('');
             const [managerSummary, setManagerSummary] = useState(null);
 
@@ -2434,25 +2433,36 @@
                 setShowJevModal(true);
             };
 
-            const askJev = async () => {
-                const q = jevQuestion.trim();
-                if (!q || jevLoading) return;
-                setJevLoading(true); setJevAnswer(''); setErrorMsg('');
-                try {
-                    const saved = saveDailySnapshot(data);
-                    const history = saved ? saved.history : [];
-                    const current = saved ? saved.snap : buildDailySnapshot(data);
-                    const compactHistory = history.slice(-30).map(h => ({date:h.date,total:h.total,d30:h.d30,d16_30:h.d16_30,personnel:h.personnel}));
-                    const response = await fetch('https://sweet-glitter-bcc8.okitnc1.workers.dev/', {
-                        method:'POST', headers:{'Content-Type':'application/json'},
-                        body: JSON.stringify({ mode:'ask', question:q, current, history:compactHistory })
-                    });
-                    const body = await response.json().catch(()=>({}));
-                    if (!response.ok || !body.ok) throw new Error(body.error || ('Jev bağlantı hatası ('+response.status+')'));
-                    setJevAnswer(body.answer || 'Yanıt alınamadı.');
-                } catch(err) {
-                    setJevAnswer('Hata: ' + (err.message || 'Jev yanıt veremedi.'));
-                } finally { setJevLoading(false); }
+            const runSmartQuestion = (type) => {
+                const saved = saveDailySnapshot(data);
+                if (!saved) return;
+                const { snap, history } = saved;
+                const prev = history.length > 1 ? history[history.length - 2] : null;
+                const ago7 = history.length ? [...history].reverse().find(h => {
+                    const days = (new Date(snap.date) - new Date(h.date)) / 86400000;
+                    return days >= 7;
+                }) : null;
+                const diffText = (a,b) => (a-b >= 0 ? '+' : '') + (a-b);
+                if (type === 'today') {
+                    setJevAnswer(prev ? `Önceki kayda göre toplam bekleyen iş ${diffText(snap.total,prev.total)}, 16-30 günlük iş ${diffText(snap.d16_30,prev.d16_30)}, 30+ günlük iş ${diffText(snap.d30,prev.d30)} değişti.` : 'Henüz karşılaştırılacak önceki günlük kayıt yok.');
+                } else if (type === 'week') {
+                    setJevAnswer(ago7 ? `Yaklaşık 7 gün önceki kayda göre toplam bekleyen iş ${diffText(snap.total,ago7.total)}, 16-30 günlük iş ${diffText(snap.d16_30,ago7.d16_30)}, 30+ günlük iş ${diffText(snap.d30,ago7.d30)} değişti.` : '7 günlük karşılaştırma için henüz yeterli geçmiş kayıt yok.');
+                } else if (type === 'old') {
+                    setJevAnswer(prev ? `30+ günlük işler: ${prev.d30} → ${snap.d30} (${diffText(snap.d30,prev.d30)}).` : `Bugün 30+ günlük ${snap.d30} iş var. Karşılaştırma için önceki kayıt henüz yok.`);
+                } else if (type === 'personnel') {
+                    if (!prev) { setJevAnswer('Personel değişimini göstermek için önceki günlük kayıt henüz yok.'); return; }
+                    const names=new Set([...Object.keys(prev.personnel||{}),...Object.keys(snap.personnel||{})]);
+                    const changes=[...names].map(name=>{const a=(prev.personnel||{})[name]||{total:0,d30:0},b=(snap.personnel||{})[name]||{total:0,d30:0};return{name,d:b.total-a.total,d30:b.d30-a.d30,now:b.total};}).filter(x=>x.d||x.d30).sort((a,b)=>Math.abs(b.d)+Math.abs(b.d30)-Math.abs(a.d)-Math.abs(a.d30)).slice(0,10);
+                    setJevAnswer(changes.length ? changes.map(x=>`${x.name}: toplam ${x.d>=0?'+':''}${x.d}, 30+ ${x.d30>=0?'+':''}${x.d30} (şimdi ${x.now})`).join('\n') : 'Personel bazında belirgin bir değişiklik yok.');
+                } else if (type === 'unusual') {
+                    if (!prev) { setJevAnswer('Olağandışı değişiklik analizi için önceki kayıt henüz yok.'); return; }
+                    const totalPct=prev.total ? Math.round((snap.total-prev.total)*100/prev.total) : 0;
+                    const oldPct=prev.d30 ? Math.round((snap.d30-prev.d30)*100/prev.d30) : 0;
+                    const flags=[];
+                    if(Math.abs(totalPct)>=15) flags.push(`Toplam bekleyen işte %${Math.abs(totalPct)} ${totalPct>0?'artış':'azalış'} var.`);
+                    if(Math.abs(oldPct)>=15) flags.push(`30+ günlük işlerde %${Math.abs(oldPct)} ${oldPct>0?'artış':'azalış'} var.`);
+                    setJevAnswer(flags.length ? flags.join('\n') : 'Önceki kayda göre %15 ve üzeri olağandışı toplam değişim görünmüyor.');
+                }
             };
 
             const handleDownloadModalAsJpeg = () => {
@@ -2735,13 +2745,16 @@
                                     </React.Fragment> : <p style={{marginBottom:0}}>İlk günlük kayıt oluşturuldu. Bir sonraki gün yeni Excel yüklendiğinde değişimler otomatik karşılaştırılacak.</p>}
                                 </div>}
                                 <div style={{background:'#faf5ff',border:'1px solid #e9d5ff',borderRadius:'10px',padding:'14px'}}>
-                                    <h3 style={{margin:'0 0 8px'}}>💬 Jev'e Sor</h3>
-                                    <div style={{display:'flex',gap:'8px'}}>
-                                        <input value={jevQuestion} onChange={e=>setJevQuestion(e.target.value)} onKeyDown={e=>{if(e.key==='Enter') askJev();}} placeholder="Örn: Son 7 günde kimlerin iş yükü en çok değişti?" style={{flex:1,padding:'10px',border:'1px solid #cbd5e1',borderRadius:'7px'}} />
-                                        <button className="download-btn" onClick={askJev} disabled={jevLoading} style={{backgroundColor:'#7c3aed'}}>{jevLoading ? 'Soruluyor...' : 'Sor'}</button>
+                                    <h3 style={{margin:'0 0 8px'}}>🔎 Akıllı Sorgular</h3>
+                                    <div style={{display:'flex',gap:'8px',flexWrap:'wrap'}}>
+                                        <button className="download-btn" style={{backgroundColor:'#7c3aed'}} onClick={()=>runSmartQuestion('today')}>Bugün Ne Değişti?</button>
+                                        <button className="download-btn" style={{backgroundColor:'#7c3aed'}} onClick={()=>runSmartQuestion('week')}>Son 7 Gün</button>
+                                        <button className="download-btn" style={{backgroundColor:'#7c3aed'}} onClick={()=>runSmartQuestion('old')}>30+ Günlük İşler</button>
+                                        <button className="download-btn" style={{backgroundColor:'#7c3aed'}} onClick={()=>runSmartQuestion('personnel')}>Personel Değişimleri</button>
+                                        <button className="download-btn" style={{backgroundColor:'#7c3aed'}} onClick={()=>runSmartQuestion('unusual')}>Olağandışı Değişim</button>
                                     </div>
                                     {jevAnswer && <div style={{marginTop:'12px',padding:'12px',background:'white',borderRadius:'8px',border:'1px solid #ddd',whiteSpace:'pre-wrap',lineHeight:'1.5'}}>{jevAnswer}</div>}
-                                    <p style={{fontSize:'0.82rem',color:'#64748b',marginBottom:0}}>Geçmiş özetleri bu tarayıcıda en fazla 30 gün tutulur. Jev'e ham başvuru dosyası değil, toplulaştırılmış yönetim verisi gönderilir.</p>
+                                    <p style={{fontSize:'0.82rem',color:'#64748b',marginBottom:0}}>Geçmiş özetleri bu tarayıcıda en fazla 30 gün tutulur. Sonuçlar kayıtlı günlük özetlerden hesaplanır.</p>
                                 </div>
                             </div>
                             <div className="modal-footer"><button className="download-btn" onClick={()=>setShowJevModal(false)}>Kapat</button></div>
