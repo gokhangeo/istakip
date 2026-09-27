@@ -2359,49 +2359,136 @@
 
             const handleExportEbysPdf = () => {
                 if (!validatePeriod()) return;
+                if (!displayRows.length) { alert('Seçilen dönemde raporlanacak evrak bulunamadı.'); return; }
                 const doc = new window.jspdf.jsPDF('l');
                 const tr = value => String(value == null ? '' : value)
                     .replace(/Ğ/g, 'G').replace(/ğ/g, 'g').replace(/Ü/g, 'U').replace(/ü/g, 'u')
                     .replace(/Ş/g, 'S').replace(/ş/g, 's').replace(/İ/g, 'I').replace(/ı/g, 'i')
                     .replace(/Ö/g, 'O').replace(/ö/g, 'o').replace(/Ç/g, 'C').replace(/ç/g, 'c');
-                const personnelSummary = {};
+                const today = new Date();
+                const todayDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+                const groups = {};
+                const buckets = [0, 0, 0, 0];
+                const getBucket = days => days <= 7 ? 0 : days <= 15 ? 1 : days <= 30 ? 2 : 3;
                 displayRows.forEach(row => {
-                    const name = String(row.kullanici || 'Belirtilmemis');
-                    personnelSummary[name] = (personnelSummary[name] || 0) + 1;
+                    const name = String(row.kullanici || 'Personel belirtilmemis').trim();
+                    if (!groups[name]) groups[name] = { name: name, rows: [], buckets: [0, 0, 0, 0] };
+                    const days = row.tarihRaw ? Math.max(0, Math.floor((todayDate - row.tarihRaw) / 86400000)) : null;
+                    const entry = { row: row, days: days };
+                    groups[name].rows.push(entry);
+                    if (days !== null) { const bucket = getBucket(days); buckets[bucket]++; groups[name].buckets[bucket]++; }
                 });
-                const personLabel = selectedPersonnel.length ? `${selectedPersonnel.length} kisi secili` : 'Tum personel';
-                doc.setFontSize(16); doc.setTextColor(12, 65, 98);
-                doc.text('EBYS Bekleyen Evrak Raporu', 14, 15);
-                doc.setFontSize(9); doc.setTextColor(71, 85, 105);
-                doc.text(tr(`Donem: ${periodLabel} | Personel: ${personLabel} | Toplam: ${displayRows.length} | Rapor: ${new Date().toLocaleString('tr-TR')}`), 14, 22, { maxWidth: 268 });
-                doc.autoTable({
-                    startY: 29,
-                    head: [['Personel', 'Bekleyen Evrak']],
-                    body: Object.entries(personnelSummary).sort((a, b) => b[1] - a[1]).map(([name, count]) => [tr(name), String(count)]),
-                    theme: 'grid', headStyles: { fillColor: [12, 65, 98] },
-                    styles: { fontSize: 8, cellPadding: 2 },
-                    margin: { left: 14, right: 14 }
+                const people = Object.keys(groups).map(name => groups[name]).sort((a, b) => b.rows.length - a.rows.length || a.name.localeCompare(b.name, 'tr'));
+                const colors = [[22, 163, 74], [234, 179, 8], [249, 115, 22], [220, 38, 38]];
+                const labels = ['0-7 gun', '8-15 gun', '16-30 gun', '30+ gun'];
+                const maxCount = Math.max(1, ...people.map(p => p.rows.length));
+
+                doc.setFillColor(11, 37, 69);
+                doc.rect(0, 0, 297, 30, 'F');
+                doc.setFontSize(17); doc.setTextColor(255, 255, 255);
+                doc.text('EBYS PERSONELDE BEKLEYEN EVRAKLAR', 14, 13);
+                doc.setFontSize(8); doc.setTextColor(205, 220, 235);
+                doc.text(tr('Donem: ' + periodLabel + '  |  Rapor: ' + today.toLocaleString('tr-TR')), 14, 21);
+
+                const cards = [{ label: 'TOPLAM BEKLEYEN', value: displayRows.length, color: [20, 108, 148] }]
+                    .concat(labels.map((label, i) => ({ label: label.toUpperCase(), value: buckets[i], color: colors[i] })));
+                cards.forEach((card, i) => {
+                    const x = 14 + i * 55;
+                    doc.setFillColor(255, 255, 255); doc.setDrawColor(217, 226, 236);
+                    doc.roundedRect(x, 36, 49, 24, 2, 2, 'FD');
+                    doc.setFillColor(...card.color); doc.rect(x, 57.5, 49, 2.5, 'F');
+                    doc.setFontSize(6.8); doc.setTextColor(101, 117, 139);
+                    doc.text(tr(card.label), x + 4, 43);
+                    doc.setFontSize(17); doc.setTextColor(...card.color);
+                    doc.text(String(card.value), x + 4, 54);
                 });
-                doc.addPage();
-                doc.setFontSize(13); doc.setTextColor(12, 65, 98);
-                doc.text(tr(`EBYS Evrak Listesi - ${periodLabel} (${displayRows.length})`), 14, 15);
-                doc.autoTable({
-                    startY: 21,
-                    head: [['Sayi', 'Tarih', 'Konu', 'Bekleyen Kullanici', 'Geldigi / Gonderildigi Yer']],
-                    body: displayRows.map(row => [tr(row.sayi), tr(row.tarih), tr(row.konu), tr(row.kullanici), tr(row.yer)]),
-                    theme: 'grid', headStyles: { fillColor: [12, 65, 98] },
-                    alternateRowStyles: { fillColor: [245, 249, 252] },
-                    styles: { fontSize: 8, cellPadding: 2, overflow: 'linebreak' },
-                    columnStyles: { 0: { cellWidth: 30 }, 1: { cellWidth: 24 }, 2: { cellWidth: 90 }, 3: { cellWidth: 55 }, 4: { cellWidth: 70 } },
-                    margin: { left: 14, right: 14 }
+
+                doc.setFillColor(255, 255, 255); doc.setDrawColor(217, 226, 236);
+                doc.roundedRect(14, 67, 269, 116, 3, 3, 'FD');
+                doc.setFontSize(11); doc.setTextColor(11, 37, 69);
+                doc.text('PERSONEL BAZLI EVRAK YUKU', 22, 78);
+                doc.setFontSize(7.2); doc.setTextColor(101, 117, 139);
+                doc.text(tr(people.length + ' personel'), 22, 85);
+                labels.forEach((label, i) => {
+                    const x = 142 + i * 33;
+                    doc.setFillColor(...colors[i]); doc.roundedRect(x, 80.5, 4, 4, 1, 1, 'F');
+                    doc.setFontSize(6.2); doc.setTextColor(71, 85, 105);
+                    doc.text(label, x + 6, 84);
+                });
+                const columns = people.length > 22 ? 2 : 1;
+                const perColumn = Math.ceil(people.length / columns);
+                const rowGap = Math.min(10.2, 87 / Math.max(1, perColumn));
+                const barWidth = columns === 1 ? 180 : 82;
+                const fontSize = rowGap < 4 ? 5 : rowGap < 6 ? 5.8 : 6.8;
+                people.forEach((person, index) => {
+                    const column = Math.floor(index / perColumn);
+                    const rowIndex = index % perColumn;
+                    const baseX = column === 0 ? 22 : 154;
+                    const barX = baseX + (columns === 1 ? 53 : 42);
+                    const countX = barX + barWidth + 5;
+                    const y = 93 + rowIndex * rowGap;
+                    const barHeight = Math.min(4, Math.max(2, rowGap - 1));
+                    doc.setFontSize(fontSize); doc.setTextColor(36, 52, 71);
+                    doc.text(tr(person.name).substring(0, columns === 1 ? 30 : 23), baseX, y + 2.2);
+                    doc.setFillColor(231, 238, 245);
+                    doc.roundedRect(barX, y - 1.2, barWidth, barHeight, 1, 1, 'F');
+                    let segmentX = barX;
+                    person.buckets.forEach((count, bucket) => {
+                        if (!count) return;
+                        const width = barWidth * count / maxCount;
+                        doc.setFillColor(...colors[bucket]); doc.rect(segmentX, y - 1.2, width, barHeight, 'F');
+                        if (width >= 7 && barHeight >= 2.5) {
+                            doc.setFontSize(6); doc.setTextColor(bucket === 1 ? 92 : 255, bucket === 1 ? 57 : 255, bucket === 1 ? 0 : 255);
+                            doc.text(String(count), segmentX + width / 2, y + 1.8, { align: 'center' });
+                        }
+                        segmentX += width;
+                    });
+                    doc.setFontSize(Math.max(6, fontSize)); doc.setTextColor(20, 108, 148);
+                    doc.text(String(person.rows.length), countX, y + 2.2);
+                });
+
+                people.forEach(person => {
+                    doc.addPage();
+                    doc.setFillColor(11, 37, 69); doc.rect(0, 0, 297, 30, 'F');
+                    doc.setFontSize(17); doc.setTextColor(255, 255, 255);
+                    doc.text('PERSONEL DETAYI', 14, 13);
+                    doc.setFontSize(8); doc.setTextColor(205, 220, 235);
+                    doc.text(tr(person.name + '  |  ' + periodLabel), 14, 21);
+                    doc.setFillColor(255, 255, 255); doc.setDrawColor(217, 226, 236);
+                    doc.roundedRect(14, 36, 269, 25, 3, 3, 'FD');
+                    doc.setFontSize(14); doc.setTextColor(11, 37, 69);
+                    doc.text(tr(person.name).substring(0, 43), 21, 48);
+                    doc.setFontSize(7); doc.setTextColor(101, 117, 139);
+                    doc.text('BEKLEYEN EVRAK', 181, 43);
+                    doc.setFontSize(12); doc.setTextColor(20, 108, 148);
+                    doc.text(String(person.rows.length), 181, 53);
+                    doc.setFontSize(7); doc.setTextColor(101, 117, 139);
+                    doc.text('EN ESKI EVRAK', 235, 43);
+                    const ages = person.rows.map(item => item.days).filter(day => day !== null);
+                    doc.setFontSize(12); doc.setTextColor(220, 38, 38);
+                    doc.text(ages.length ? Math.max(...ages) + ' gun' : '-', 235, 53);
+                    doc.autoTable({
+                        startY: 68,
+                        head: [['Sayi', 'Tarih', 'Konu', 'Geldigi / Gonderildigi Yer', 'Bekleme (Gun)']],
+                        body: person.rows.slice().sort((a, b) => (b.days == null ? -1 : b.days) - (a.days == null ? -1 : a.days))
+                            .map(item => [tr(item.row.sayi), tr(item.row.tarih), tr(item.row.konu), tr(item.row.yer), item.days === null ? '-' : String(item.days)]),
+                        theme: 'striped',
+                        rowPageBreak: 'avoid',
+                        headStyles: { fillColor: [7, 89, 133] },
+                        alternateRowStyles: { fillColor: [245, 249, 252] },
+                        styles: { fontSize: 7.5, cellPadding: 1.5, overflow: 'linebreak' },
+                        columnStyles: { 0: { cellWidth: 34 }, 1: { cellWidth: 25 }, 2: { cellWidth: 105 }, 3: { cellWidth: 83 }, 4: { cellWidth: 22 } },
+                        margin: { left: 14, right: 14, bottom: 13 }
+                    });
                 });
                 const pages = doc.internal.getNumberOfPages();
                 for (let p = 1; p <= pages; p++) {
                     doc.setPage(p); doc.setFontSize(8); doc.setTextColor(100, 116, 139);
-                    doc.text(`${p} / ${pages}`, 282, 202, { align: 'right' });
+                    doc.text('EBYS Is Takip - Personel Raporu', 14, 202);
+                    doc.text(p + ' / ' + pages, 283, 202, { align: 'right' });
                 }
-                const filePeriod = periodMode === 'year' ? selectedYears.slice().sort((a,b) => a-b).join('-') : periodMode === 'range' ? `${startDate}_${endDate}` : 'Tum_Tarihler';
-                doc.save(`EBYS_Raporu_${filePeriod}.pdf`);
+                const filePeriod = periodMode === 'year' ? selectedYears.slice().sort((a,b) => a-b).join('-') : periodMode === 'range' ? startDate + '_' + endDate : 'Tum_Tarihler';
+                doc.save('EBYS_Personel_Raporu_' + filePeriod + '.pdf');
             };
 
             return (
