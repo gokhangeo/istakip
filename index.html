@@ -2168,7 +2168,7 @@
             const [fileNames, setFileNames] = useState([]);
             const [totalEbysDocs, setTotalEbysDocs] = useState(0);
             const [periodMode, setPeriodMode] = useState('all');
-            const [selectedYear, setSelectedYear] = useState('');
+            const [selectedYears, setSelectedYears] = useState([]);
             const [startDate, setStartDate] = useState('');
             const [endDate, setEndDate] = useState('');
             const ebysChartRef = useRef(null);
@@ -2207,15 +2207,15 @@
                     if (periodMode === 'all') return true;
                     const date = parseEbysDate(row[dateHeader]);
                     if (!date) return false;
-                    if (periodMode === 'year') return selectedYear !== '' && date.getFullYear() === Number(selectedYear);
+                    if (periodMode === 'year') return selectedYears.includes(date.getFullYear());
                     const iso = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
                     return (!startDate || iso >= startDate) && (!endDate || iso <= endDate);
                 });
-            }, [ebysData, selectedPersonnel, periodMode, selectedYear, startDate, endDate]);
-            const periodLabel = periodMode === 'year' ? `${selectedYear || 'Seçilmemiş'} yılı` :
+            }, [ebysData, selectedPersonnel, periodMode, selectedYears, startDate, endDate]);
+            const periodLabel = periodMode === 'year' ? (selectedYears.length ? `${selectedYears.slice().sort((a,b) => a-b).join(', ')} ${selectedYears.length === 1 ? 'yılı' : 'yılları'}` : 'Yıl seçilmemiş') :
                 periodMode === 'range' ? `${startDate || 'Başlangıç'} - ${endDate || 'Bitiş'}` : 'Tüm tarihler';
             const validatePeriod = () => {
-                if (periodMode === 'year' && !selectedYear) { alert('Lütfen bir yıl seçin.'); return false; }
+                if (periodMode === 'year' && selectedYears.length === 0) { alert('Lütfen bir yıl seçin.'); return false; }
                 if (periodMode === 'range' && (!startDate || !endDate || startDate > endDate)) { alert('Geçerli bir başlangıç ve bitiş tarihi seçin.'); return false; }
                 if (!filteredEbysData.length) { alert('Seçilen dönemde raporlanacak evrak bulunamadı.'); return false; }
                 return true;
@@ -2247,7 +2247,7 @@
                 } catch (err) { alert(`Hata: ${err.message}`); } finally { setIsLoading(false); if (inputElement) inputElement.value = null; }
             };
             
-            const clearEbysData = () => { setEbysData([]); setPersonnelOptions([]); setSelectedPersonnel([]); setFileNames([]); setTotalEbysDocs(0); setPeriodMode('all'); setSelectedYear(''); setStartDate(''); setEndDate(''); };
+            const clearEbysData = () => { setEbysData([]); setPersonnelOptions([]); setSelectedPersonnel([]); setFileNames([]); setTotalEbysDocs(0); setPeriodMode('all'); setSelectedYears([]); setStartDate(''); setEndDate(''); };
 
             const generateReport = (type) => {
                 if (type === 'personnel' && selectedPersonnel.length === 0) { alert("Lütfen en az bir personel seçin."); return; }
@@ -2354,7 +2354,7 @@
                 if (!validatePeriod()) return;
                 const dataToExport = displayRows.map(row => ({ 'Sayı': row.sayi, 'Tarih': row.tarih, 'Konu': row.konu, 'İşlemde Bekleyen Kullanıcı': row.kullanici, 'Geldiği Yer / Gönderildiği Yer': row.yer }));
                 const ws = XLSX.utils.json_to_sheet(dataToExport); ws['!cols'] = [{ wch: 15 }, { wch: 15 }, { wch: 50 }, { wch: 25 }, { wch: 40 }];
-                const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'EBYS_Evraklar'); XLSX.writeFile(wb, `EBYS_Evrak_Listesi_${periodMode === 'year' ? selectedYear : periodMode === 'range' ? startDate + '_' + endDate : 'Tum_Tarihler'}.xlsx`);
+                const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'EBYS_Evraklar'); XLSX.writeFile(wb, `EBYS_Evrak_Listesi_${periodMode === 'year' ? selectedYears.slice().sort((a,b) => a-b).join('-') : periodMode === 'range' ? startDate + '_' + endDate : 'Tum_Tarihler'}.xlsx`);
             };
 
             const handleExportEbysPdf = () => {
@@ -2400,7 +2400,7 @@
                     doc.setPage(p); doc.setFontSize(8); doc.setTextColor(100, 116, 139);
                     doc.text(`${p} / ${pages}`, 282, 202, { align: 'right' });
                 }
-                const filePeriod = periodMode === 'year' ? selectedYear : periodMode === 'range' ? `${startDate}_${endDate}` : 'Tum_Tarihler';
+                const filePeriod = periodMode === 'year' ? selectedYears.slice().sort((a,b) => a-b).join('-') : periodMode === 'range' ? `${startDate}_${endDate}` : 'Tum_Tarihler';
                 doc.save(`EBYS_Raporu_${filePeriod}.pdf`);
             };
 
@@ -2425,11 +2425,15 @@
                             </select>
                         </div>
                         {periodMode === 'year' && <div className="control-group">
-                            <label htmlFor="ebys-year">Yıl</label>
-                            <select id="ebys-year" value={selectedYear} onChange={e => setSelectedYear(e.target.value)}>
-                                <option value="">Yıl seçin</option>
-                                {yearOptions.map(year => <option key={year} value={year}>{year}</option>)}
-                            </select>
+                            <label>Yıllar (birden fazla seçebilirsiniz)</label>
+                            <div style={{display:'flex', flexWrap:'wrap', gap:'8px', alignItems:'center'}}>
+                                {yearOptions.map(year => <label key={year} style={{display:'inline-flex', alignItems:'center', gap:'6px', padding:'8px 12px', borderRadius:'10px', border:selectedYears.includes(year) ? '1px solid #0e7490' : '1px solid #cbd5e1', background:selectedYears.includes(year) ? '#e0f2fe' : '#fff', cursor:'pointer', fontWeight:600}}>
+                                    <input type="checkbox" checked={selectedYears.includes(year)} onChange={() => setSelectedYears(prev => prev.includes(year) ? prev.filter(y => y !== year) : prev.concat(year))} />
+                                    {year}
+                                </label>)}
+                                {yearOptions.length > 1 && <button type="button" className="export-btn" onClick={() => setSelectedYears(selectedYears.length === yearOptions.length ? [] : yearOptions.slice())}>{selectedYears.length === yearOptions.length ? 'Seçimi Temizle' : 'Tüm Yılları Seç'}</button>}
+                                {yearOptions.length === 0 && <span>Yıl bilgisi bulunamadı.</span>}
+                            </div>
                         </div>}
                         {periodMode === 'range' && <React.Fragment>
                             <div className="control-group"><label htmlFor="ebys-start-date">Başlangıç Tarihi</label><input id="ebys-start-date" type="date" value={startDate} max={endDate || undefined} onChange={e => setStartDate(e.target.value)} /></div>
