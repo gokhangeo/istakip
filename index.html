@@ -2167,14 +2167,58 @@
             const [reportReady, setReportReady] = useState(null);
             const [fileNames, setFileNames] = useState([]);
             const [totalEbysDocs, setTotalEbysDocs] = useState(0);
+            const [periodMode, setPeriodMode] = useState('all');
+            const [selectedYear, setSelectedYear] = useState('');
+            const [startDate, setStartDate] = useState('');
+            const [endDate, setEndDate] = useState('');
             const ebysChartRef = useRef(null);
             const ebysChartInstance = useRef(null);
             const [stackedChartData, setStackedChartData] = useState(null);
             
             const parseEbysDate = (val) => {
                 if (typeof val === 'number') { const date = XLSX.SSF.parse_date_code(val); if (!date) return null; const dateObj = new Date(date.y, date.m - 1, date.d); if (isNaN(dateObj.getTime())) return null; return dateObj; }
-                if (typeof val === 'string') { let match = val.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})/); if (match) { const day = String(match[1]).padStart(2, '0'); const month = String(match[2]).padStart(2, '0'); const year = match[3]; const dateObj = new Date(`${year}-${month}-${day}`); if (!isNaN(dateObj.getTime())) return dateObj; } }
+                if (val instanceof Date && !isNaN(val.getTime())) return new Date(val.getFullYear(), val.getMonth(), val.getDate());
+                if (typeof val === 'string') {
+                    const match = val.trim().match(/^(?:(\d{1,2})[.\/](\d{1,2})[.\/](\d{4})|(\d{4})-(\d{1,2})-(\d{1,2}))/);
+                    if (match) {
+                        const year = Number(match[3] || match[4]), month = Number(match[2] || match[5]), day = Number(match[1] || match[6]);
+                        const dateObj = new Date(year, month - 1, day);
+                        if (dateObj.getFullYear() === year && dateObj.getMonth() === month - 1 && dateObj.getDate() === day) return dateObj;
+                    }
+                }
                 return null;
+            };
+
+            const getEbysHeader = (rows, kind) => {
+                if (!rows.length) return '';
+                const keys = Object.keys(rows[0]);
+                return kind === 'date' ? keys.find(k => normalizeHeader(k) === 'tarih') || keys.find(k => normalizeHeader(k).includes('tarih')) || '' :
+                    keys.find(k => normalizeHeader(k).includes('bekleyen') && normalizeHeader(k).includes('kullanici')) || '';
+            };
+            const yearOptions = useMemo(() => {
+                const dateHeader = getEbysHeader(ebysData, 'date');
+                return [...new Set(ebysData.map(row => parseEbysDate(row[dateHeader])?.getFullYear()).filter(Boolean))].sort((a, b) => b - a);
+            }, [ebysData]);
+            const filteredEbysData = useMemo(() => {
+                const dateHeader = getEbysHeader(ebysData, 'date');
+                const personHeader = getEbysHeader(ebysData, 'personnel');
+                return ebysData.filter(row => {
+                    if (selectedPersonnel.length && !selectedPersonnel.includes(row[personHeader])) return false;
+                    if (periodMode === 'all') return true;
+                    const date = parseEbysDate(row[dateHeader]);
+                    if (!date) return false;
+                    if (periodMode === 'year') return selectedYear !== '' && date.getFullYear() === Number(selectedYear);
+                    const iso = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+                    return (!startDate || iso >= startDate) && (!endDate || iso <= endDate);
+                });
+            }, [ebysData, selectedPersonnel, periodMode, selectedYear, startDate, endDate]);
+            const periodLabel = periodMode === 'year' ? `${selectedYear || 'Seçilmemiş'} yılı` :
+                periodMode === 'range' ? `${startDate || 'Başlangıç'} - ${endDate || 'Bitiş'}` : 'Tüm tarihler';
+            const validatePeriod = () => {
+                if (periodMode === 'year' && !selectedYear) { alert('Lütfen bir yıl seçin.'); return false; }
+                if (periodMode === 'range' && (!startDate || !endDate || startDate > endDate)) { alert('Geçerli bir başlangıç ve bitiş tarihi seçin.'); return false; }
+                if (!filteredEbysData.length) { alert('Seçilen dönemde raporlanacak evrak bulunamadı.'); return false; }
+                return true;
             };
 
             const handleFileChange = async (e) => {
@@ -2203,29 +2247,29 @@
                 } catch (err) { alert(`Hata: ${err.message}`); } finally { setIsLoading(false); if (inputElement) inputElement.value = null; }
             };
             
-            const clearEbysData = () => { setEbysData([]); setPersonnelOptions([]); setSelectedPersonnel([]); setFileNames([]); setTotalEbysDocs(0); };
+            const clearEbysData = () => { setEbysData([]); setPersonnelOptions([]); setSelectedPersonnel([]); setFileNames([]); setTotalEbysDocs(0); setPeriodMode('all'); setSelectedYear(''); setStartDate(''); setEndDate(''); };
 
             const generateReport = (type) => {
                 if (type === 'personnel' && selectedPersonnel.length === 0) { alert("Lütfen en az bir personel seçin."); return; }
-                if (type === 'year' && ebysData.length === 0) { alert("Raporlanacak veri bulunamadı."); return; }
+                if (!validatePeriod()) return;
                 setReportReady(type);
             };
             
              useEffect(() => {
-                 if (reportReady && ebysData.length > 0) {
-                     const personnelHeader = Object.keys(ebysData[0]).find(h => normalizeHeader(h).includes('bekleyen') && (normalizeHeader(h).includes('kullanıcı') || normalizeHeader(h).includes('kullanici')));
-                     const dateHeader = Object.keys(ebysData[0]).find(h => normalizeHeader(h) === 'tarih');
+                 if (reportReady && filteredEbysData.length > 0) {
+                     const personnelHeader = getEbysHeader(filteredEbysData, 'personnel');
+                     const dateHeader = getEbysHeader(filteredEbysData, 'date');
                      const wb = XLSX.utils.book_new();
 
                      if (reportReady === 'personnel') {
                          const summaryData = [];
-                         const years = [...new Set(ebysData.map(row => { const date = parseEbysDate(row[dateHeader]); return date ? date.getFullYear() : null; }).filter(Boolean))].sort();
+                         const years = [...new Set(filteredEbysData.map(row => { const date = parseEbysDate(row[dateHeader]); return date ? date.getFullYear() : null; }).filter(Boolean))].sort();
 
                          const headers = ["Personel", "Toplam Bekleyen", ...years];
                          summaryData.push(headers);
                          
                          selectedPersonnel.forEach(personel => {
-                             const filteredData = ebysData.filter(row => row[personnelHeader] === personel);
+                             const filteredData = filteredEbysData.filter(row => row[personnelHeader] === personel);
                              const yearCounts = {}; years.forEach(y => yearCounts[y] = 0);
                              filteredData.forEach(row => { const date = parseEbysDate(row[dateHeader]); if (date) { const year = date.getFullYear(); if (yearCounts[year] !== undefined) yearCounts[year]++; } });
                              const rowData = [ personel, filteredData.length, ...years.map(y => yearCounts[y]) ];
@@ -2235,19 +2279,19 @@
                          const wsSummary = XLSX.utils.aoa_to_sheet(summaryData); wsSummary['!cols'] = [{ wch: 30 }, { wch: 15 }, ...years.map(() => ({ wch: 10 }))]; XLSX.utils.book_append_sheet(wb, wsSummary, "Özet");
 
                          selectedPersonnel.forEach(personel => {
-                             let filteredData = ebysData.filter(row => row[personnelHeader] === personel);
+                             let filteredData = filteredEbysData.filter(row => row[personnelHeader] === personel);
                              filteredData.sort((a, b) => { const dateA = parseEbysDate(a[dateHeader]); const dateB = parseEbysDate(b[dateHeader]); if (dateA && dateB) return dateA - dateB; if (dateA) return -1; if (dateB) return 1; return 0; });
                              const ws = XLSX.utils.json_to_sheet(filteredData); const sheetName = personel.replace(/[\\/*?:]/g, "").substring(0, 31); XLSX.utils.book_append_sheet(wb, ws, sheetName);
                          });
                          XLSX.writeFile(wb, "EBYS_Personel_Raporu.xlsx");
                      } else if (reportReady === 'year') {
-                         const years = [...new Set(ebysData.map(row => { const date = parseEbysDate(row[dateHeader]); return date ? date.getFullYear().toString() : "Tarihsiz"; }))].sort();
+                         const years = [...new Set(filteredEbysData.map(row => { const date = parseEbysDate(row[dateHeader]); return date ? date.getFullYear().toString() : "Tarihsiz"; }))].sort();
                          const summaryData = [["Yıl", "Toplam Bekleyen Evrak"]];
-                         years.forEach(year => { const count = ebysData.filter(row => { const d = parseEbysDate(row[dateHeader]); const y = d ? d.getFullYear().toString() : "Tarihsiz"; return y === year; }).length; summaryData.push([year, count]); });
+                         years.forEach(year => { const count = filteredEbysData.filter(row => { const d = parseEbysDate(row[dateHeader]); const y = d ? d.getFullYear().toString() : "Tarihsiz"; return y === year; }).length; summaryData.push([year, count]); });
                          const wsSummary = XLSX.utils.aoa_to_sheet(summaryData); wsSummary['!cols'] = [{ wch: 15 }, { wch: 25 }]; XLSX.utils.book_append_sheet(wb, wsSummary, "Yıllık Özet");
 
                          years.forEach(year => {
-                             let filteredData = ebysData.filter(row => { const d = parseEbysDate(row[dateHeader]); const y = d ? d.getFullYear().toString() : "Tarihsiz"; return y === year; });
+                             let filteredData = filteredEbysData.filter(row => { const d = parseEbysDate(row[dateHeader]); const y = d ? d.getFullYear().toString() : "Tarihsiz"; return y === year; });
                              filteredData.sort((a, b) => { const dateA = parseEbysDate(a[dateHeader]); const dateB = parseEbysDate(b[dateHeader]); if (dateA && dateB) return dateA - dateB; if (dateA) return -1; if (dateB) return 1; return 0; });
                              const ws = XLSX.utils.json_to_sheet(filteredData); const sheetName = year.substring(0, 31); XLSX.utils.book_append_sheet(wb, ws, sheetName);
                          });
@@ -2255,14 +2299,14 @@
                      }
                      setReportReady(null);
                  }
-             }, [reportReady, ebysData, selectedPersonnel]);
+             }, [reportReady, filteredEbysData, selectedPersonnel]);
 
              useEffect(() => {
-                 if (ebysData.length > 0) {
-                    const personnelHeader = Object.keys(ebysData[0]).find(h => normalizeHeader(h).includes('bekleyen') && (normalizeHeader(h).includes('kullanıcı') || normalizeHeader(h).includes('kullanici')));
-                    const dateHeader = Object.keys(ebysData[0]).find(h => normalizeHeader(h) === 'tarih');
+                 if (filteredEbysData.length > 0) {
+                    const personnelHeader = getEbysHeader(filteredEbysData, 'personnel');
+                    const dateHeader = getEbysHeader(filteredEbysData, 'date');
                     const pData = {};
-                    ebysData.forEach(row => {
+                    filteredEbysData.forEach(row => {
                         const p = row[personnelHeader];
                         if (p) {
                             if (!pData[p]) pData[p] = {};
@@ -2273,7 +2317,7 @@
                     });
                     setStackedChartData(pData);
                  } else { setStackedChartData(null); }
-             }, [ebysData]);
+             }, [filteredEbysData]);
 
              useEffect(() => {
                  if(stackedChartData && ebysChartRef.current){
@@ -2291,26 +2335,73 @@
              }, [stackedChartData]);
 
             const displayRows = React.useMemo(() => {
-                if (!ebysData || ebysData.length === 0) return [];
-                const keys = Object.keys(ebysData[0]);
+                if (!filteredEbysData.length) return [];
+                const keys = Object.keys(filteredEbysData[0]);
                 const keySayi = keys.find(k => normalizeHeader(k) === 'sayı') || keys.find(k => normalizeHeader(k).includes('sayı')) || 'Sayı';
                 const keyTarih = keys.find(k => normalizeHeader(k) === 'tarih') || keys.find(k => normalizeHeader(k).includes('tarih')) || 'Tarih';
                 const keyKonu = keys.find(k => normalizeHeader(k) === 'konu') || keys.find(k => normalizeHeader(k).includes('konu')) || 'Konu';
                 const keyKullanici = keys.find(k => normalizeHeader(k).includes('işlemde bekleyen') && (normalizeHeader(k).includes('kullanıcı') || normalizeHeader(k).includes('kullanici'))) || 'İşlemde Bekleyen Kullanıcı';
                 const keyYer = keys.find(k => normalizeHeader(k).includes('geldiği yer') || normalizeHeader(k).includes('gönderildiği yer')) || 'Geldiği Yer / Gönderildiği Yer';
 
-                let filtered = ebysData;
-                if (selectedPersonnel.length > 0) filtered = filtered.filter(row => selectedPersonnel.includes(row[keyKullanici]));
+                const filtered = filteredEbysData;
 
                 const formatDisplayDate = (val) => { const d = parseEbysDate(val); if (d) return `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}.${d.getFullYear()}`; return val || ''; };
 
                 return filtered.map(row => ({ sayi: row[keySayi], tarih: formatDisplayDate(row[keyTarih]), tarihRaw: parseEbysDate(row[keyTarih]), konu: row[keyKonu], kullanici: row[keyKullanici], yer: row[keyYer] })).sort((a, b) => { if (a.tarihRaw && b.tarihRaw) return a.tarihRaw - b.tarihRaw; if (a.tarihRaw) return -1; if (b.tarihRaw) return 1; return 0; });
-            }, [ebysData, selectedPersonnel]);
+            }, [filteredEbysData]);
 
             const handleExportEbysTable = () => {
+                if (!validatePeriod()) return;
                 const dataToExport = displayRows.map(row => ({ 'Sayı': row.sayi, 'Tarih': row.tarih, 'Konu': row.konu, 'İşlemde Bekleyen Kullanıcı': row.kullanici, 'Geldiği Yer / Gönderildiği Yer': row.yer }));
                 const ws = XLSX.utils.json_to_sheet(dataToExport); ws['!cols'] = [{ wch: 15 }, { wch: 15 }, { wch: 50 }, { wch: 25 }, { wch: 40 }];
-                const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'EBYS_Evraklar'); XLSX.writeFile(wb, 'EBYS_Evrak_Listesi.xlsx');
+                const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'EBYS_Evraklar'); XLSX.writeFile(wb, `EBYS_Evrak_Listesi_${periodMode === 'year' ? selectedYear : periodMode === 'range' ? startDate + '_' + endDate : 'Tum_Tarihler'}.xlsx`);
+            };
+
+            const handleExportEbysPdf = () => {
+                if (!validatePeriod()) return;
+                const doc = new window.jspdf.jsPDF('l');
+                const tr = value => String(value == null ? '' : value)
+                    .replace(/Ğ/g, 'G').replace(/ğ/g, 'g').replace(/Ü/g, 'U').replace(/ü/g, 'u')
+                    .replace(/Ş/g, 'S').replace(/ş/g, 's').replace(/İ/g, 'I').replace(/ı/g, 'i')
+                    .replace(/Ö/g, 'O').replace(/ö/g, 'o').replace(/Ç/g, 'C').replace(/ç/g, 'c');
+                const personnelSummary = {};
+                displayRows.forEach(row => {
+                    const name = String(row.kullanici || 'Belirtilmemis');
+                    personnelSummary[name] = (personnelSummary[name] || 0) + 1;
+                });
+                const personLabel = selectedPersonnel.length ? `${selectedPersonnel.length} kisi secili` : 'Tum personel';
+                doc.setFontSize(16); doc.setTextColor(12, 65, 98);
+                doc.text('EBYS Bekleyen Evrak Raporu', 14, 15);
+                doc.setFontSize(9); doc.setTextColor(71, 85, 105);
+                doc.text(tr(`Donem: ${periodLabel} | Personel: ${personLabel} | Toplam: ${displayRows.length} | Rapor: ${new Date().toLocaleString('tr-TR')}`), 14, 22, { maxWidth: 268 });
+                doc.autoTable({
+                    startY: 29,
+                    head: [['Personel', 'Bekleyen Evrak']],
+                    body: Object.entries(personnelSummary).sort((a, b) => b[1] - a[1]).map(([name, count]) => [tr(name), String(count)]),
+                    theme: 'grid', headStyles: { fillColor: [12, 65, 98] },
+                    styles: { fontSize: 8, cellPadding: 2 },
+                    margin: { left: 14, right: 14 }
+                });
+                doc.addPage();
+                doc.setFontSize(13); doc.setTextColor(12, 65, 98);
+                doc.text(tr(`EBYS Evrak Listesi - ${periodLabel} (${displayRows.length})`), 14, 15);
+                doc.autoTable({
+                    startY: 21,
+                    head: [['Sayi', 'Tarih', 'Konu', 'Bekleyen Kullanici', 'Geldigi / Gonderildigi Yer']],
+                    body: displayRows.map(row => [tr(row.sayi), tr(row.tarih), tr(row.konu), tr(row.kullanici), tr(row.yer)]),
+                    theme: 'grid', headStyles: { fillColor: [12, 65, 98] },
+                    alternateRowStyles: { fillColor: [245, 249, 252] },
+                    styles: { fontSize: 8, cellPadding: 2, overflow: 'linebreak' },
+                    columnStyles: { 0: { cellWidth: 30 }, 1: { cellWidth: 24 }, 2: { cellWidth: 90 }, 3: { cellWidth: 55 }, 4: { cellWidth: 70 } },
+                    margin: { left: 14, right: 14 }
+                });
+                const pages = doc.internal.getNumberOfPages();
+                for (let p = 1; p <= pages; p++) {
+                    doc.setPage(p); doc.setFontSize(8); doc.setTextColor(100, 116, 139);
+                    doc.text(`${p} / ${pages}`, 282, 202, { align: 'right' });
+                }
+                const filePeriod = periodMode === 'year' ? selectedYear : periodMode === 'range' ? `${startDate}_${endDate}` : 'Tum_Tarihler';
+                doc.save(`EBYS_Raporu_${filePeriod}.pdf`);
             };
 
             return (
@@ -2325,21 +2416,41 @@
                         {personnelOptions.length > 0 &&
                              <div className="control-group"><label>Personel Seç</label><button onClick={() => document.getElementById('ebys-personnel-modal').style.display = 'flex'}>{selectedPersonnel.length ? `${selectedPersonnel.length} personel seçili` : 'Personel Seç'}</button></div>
                         }
-                        <button onClick={() => generateReport('personnel')} disabled={isLoading || selectedPersonnel.length === 0}>Personel Raporu İndir</button>
-                        <button onClick={() => generateReport('year')} disabled={isLoading || ebysData.length === 0} style={{backgroundColor: '#8b5cf6'}}>Yıla Göre Rapor İndir</button>
+                        <div className="control-group">
+                            <label htmlFor="ebys-period-mode">Rapor Dönemi</label>
+                            <select id="ebys-period-mode" value={periodMode} onChange={e => setPeriodMode(e.target.value)}>
+                                <option value="all">Tüm Tarihler</option>
+                                <option value="year">Yıla Göre</option>
+                                <option value="range">Tarih Aralığı</option>
+                            </select>
+                        </div>
+                        {periodMode === 'year' && <div className="control-group">
+                            <label htmlFor="ebys-year">Yıl</label>
+                            <select id="ebys-year" value={selectedYear} onChange={e => setSelectedYear(e.target.value)}>
+                                <option value="">Yıl seçin</option>
+                                {yearOptions.map(year => <option key={year} value={year}>{year}</option>)}
+                            </select>
+                        </div>}
+                        {periodMode === 'range' && <>
+                            <div className="control-group"><label htmlFor="ebys-start-date">Başlangıç Tarihi</label><input id="ebys-start-date" type="date" value={startDate} max={endDate || undefined} onChange={e => setStartDate(e.target.value)} /></div>
+                            <div className="control-group"><label htmlFor="ebys-end-date">Bitiş Tarihi</label><input id="ebys-end-date" type="date" value={endDate} min={startDate || undefined} onChange={e => setEndDate(e.target.value)} /></div>
+                        </>}
+                        <button onClick={() => generateReport('personnel')} disabled={isLoading || selectedPersonnel.length === 0}>Personel Excel İndir</button>
+                        <button onClick={() => generateReport('year')} disabled={isLoading || ebysData.length === 0} style={{backgroundColor: '#8b5cf6'}}>Yıllık Excel İndir</button>
+                        <button onClick={handleExportEbysPdf} disabled={isLoading || ebysData.length === 0} style={{backgroundColor: '#0c4162', color: 'white'}}>PDF Rapor İndir</button>
                         <button onClick={clearEbysData} style={{backgroundColor: '#ef4444', color: 'white'}}>Verileri Temizle</button>
                     </div>
 
                     {stackedChartData && 
                         <div className="chart-card" style={{marginTop: '20px', minHeight: '400px'}}>
-                            <button className="zoom-btn" title="Büyüt" onClick={() => onZoom({ type: 'chart', data: stackedChartData, title: `EBYS Bekleyen Evrak Dağılımı (Toplam: ${totalEbysDocs})` })}>&#128269;</button>
+                            <button className="zoom-btn" title="Büyüt" onClick={() => onZoom({ type: 'chart', data: stackedChartData, title: `EBYS Bekleyen Evrak Dağılımı (Toplam: ${filteredEbysData.length})` })}>&#128269;</button>
                             <div className="ebys-chart-container"><canvas ref={ebysChartRef}></canvas></div>
                         </div>
                     }
 
                     {ebysData.length > 0 && (
                         <div className="warning-table-container" style={{ marginTop: '20px', borderColor: '#fdba74', backgroundColor: '#fff7ed' }}>
-                            <div className="warning-table-header"><h3 style={{ color: '#c2410c' }}>EBYS Evrak Listesi (Toplam: {displayRows.length})</h3><div className="button-group"><button onClick={handleExportEbysTable} className="export-btn" style={{backgroundColor: '#ea580c'}}>Excel İndir</button></div></div>
+                            <div className="warning-table-header"><h3 style={{ color: '#c2410c' }}>EBYS Evrak Listesi ({periodLabel}, Toplam: {displayRows.length})</h3><div className="button-group"><button onClick={handleExportEbysTable} className="export-btn" style={{backgroundColor: '#ea580c'}}>Excel İndir</button></div></div>
                             <div className="table-wrapper" style={{ maxHeight: '400px' }}>
                                 <table>
                                     <thead><tr><th style={{ whiteSpace: 'normal', wordBreak: 'break-word', minWidth: '100px' }}>Sayı</th><th style={{ minWidth: '100px' }}>Tarih</th><th style={{ whiteSpace: 'normal', wordBreak: 'break-word', minWidth: '250px' }}>Konu</th><th style={{ minWidth: '150px' }}>İşlemde Bekleyen Kullanıcı</th><th style={{ whiteSpace: 'normal', wordBreak: 'break-word', minWidth: '200px' }}>Geldiği Yer / Gönderildiği Yer</th></tr></thead>
