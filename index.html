@@ -2197,7 +2197,7 @@
             };
             const yearOptions = useMemo(() => {
                 const dateHeader = getEbysHeader(ebysData, 'date');
-                return [...new Set(ebysData.map(row => parseEbysDate(row[dateHeader])?.getFullYear()).filter(Boolean))].sort((a, b) => b - a);
+                return [...new Set(ebysData.map(row => (parseEbysDate(row[dateHeader]) && parseEbysDate(row[dateHeader]).getFullYear())).filter(Boolean))].sort((a, b) => b - a);
             }, [ebysData]);
             const filteredEbysData = useMemo(() => {
                 const dateHeader = getEbysHeader(ebysData, 'date');
