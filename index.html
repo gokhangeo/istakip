@@ -2431,10 +2431,10 @@
                                 {yearOptions.map(year => <option key={year} value={year}>{year}</option>)}
                             </select>
                         </div>}
-                        {periodMode === 'range' && <>
+                        {periodMode === 'range' && <React.Fragment>
                             <div className="control-group"><label htmlFor="ebys-start-date">Başlangıç Tarihi</label><input id="ebys-start-date" type="date" value={startDate} max={endDate || undefined} onChange={e => setStartDate(e.target.value)} /></div>
                             <div className="control-group"><label htmlFor="ebys-end-date">Bitiş Tarihi</label><input id="ebys-end-date" type="date" value={endDate} min={startDate || undefined} onChange={e => setEndDate(e.target.value)} /></div>
-                        </>}
+                        </React.Fragment>}
                         <button onClick={() => generateReport('personnel')} disabled={isLoading || selectedPersonnel.length === 0}>Personel Excel İndir</button>
                         <button onClick={() => generateReport('year')} disabled={isLoading || ebysData.length === 0} style={{backgroundColor: '#8b5cf6'}}>Yıllık Excel İndir</button>
                         <button onClick={handleExportEbysPdf} disabled={isLoading || ebysData.length === 0} style={{backgroundColor: '#0c4162', color: 'white'}}>PDF Rapor İndir</button>
