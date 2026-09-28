@@ -2165,6 +2165,7 @@
             const [selectedPersonnel, setSelectedPersonnel] = useState([]);
             const [isLoading, setIsLoading] = useState(false);
             const [reportReady, setReportReady] = useState(null);
+            const [districtExportFormat, setDistrictExportFormat] = useState('excel');
             const [fileNames, setFileNames] = useState([]);
             const [totalEbysDocs, setTotalEbysDocs] = useState(0);
             const [periodMode, setPeriodMode] = useState('all');
@@ -2194,6 +2195,34 @@
                 const keys = Object.keys(rows[0]);
                 return kind === 'date' ? keys.find(k => normalizeHeader(k) === 'tarih') || keys.find(k => normalizeHeader(k).includes('tarih')) || '' :
                     keys.find(k => normalizeHeader(k).includes('bekleyen') && normalizeHeader(k).includes('kullanici')) || '';
+            };
+            const ebysDistrictNames = ['Akdeniz', 'Anamur', 'Aydıncık', 'Bozyazı', 'Çamlıyayla', 'Erdemli', 'Gülnar', 'Mezitli', 'Mut', 'Silifke', 'Tarsus', 'Toroslar', 'Yenişehir'];
+            const ebysDistrictGroups = {
+                'Merkez İlçeler': ['Akdeniz', 'Mezitli', 'Yenişehir', 'Toroslar'],
+                'Tarsus-Çamlıyayla': ['Tarsus', 'Çamlıyayla'],
+                'Silifke-Aydıncık-Gülnar': ['Silifke', 'Aydıncık', 'Gülnar'],
+                'Anamur-Bozyazı': ['Anamur', 'Bozyazı']
+            };
+            const getEbysDistrict = row => {
+                const keys = Object.keys(row);
+                const directKey = keys.find(key => normalizeHeader(key) === 'ilce' || normalizeHeader(key) === 'ilgili ilce');
+                const directValue = directKey ? String(row[directKey] || '').trim() : '';
+                const keysToSearch = keys.filter(key => {
+                    const header = normalizeHeader(key);
+                    return header === 'konu' || header.includes('geldigi yer') || header.includes('gonderildigi yer');
+                });
+                const source = directValue || keysToSearch.map(key => row[key] || '').join(' ');
+                const normalized = normalizeHeader(source);
+                const matches = ebysDistrictNames.filter(name => {
+                    const district = normalizeHeader(name);
+                    return new RegExp('(^|[^a-z])' + district + '($|[^a-z])').test(normalized);
+                });
+                return matches.length === 1 ? matches[0] : 'İlçe belirlenemedi';
+            };
+            const getEbysDistrictGroup = row => {
+                const district = getEbysDistrict(row);
+                const group = Object.keys(ebysDistrictGroups).find(name => ebysDistrictGroups[name].includes(district));
+                return group || district;
             };
             const yearOptions = useMemo(() => {
                 const dateHeader = getEbysHeader(ebysData, 'date');
@@ -2247,12 +2276,17 @@
                 } catch (err) { alert(`Hata: ${err.message}`); } finally { setIsLoading(false); if (inputElement) inputElement.value = null; }
             };
             
-            const clearEbysData = () => { setEbysData([]); setPersonnelOptions([]); setSelectedPersonnel([]); setFileNames([]); setTotalEbysDocs(0); setPeriodMode('all'); setSelectedYears([]); setStartDate(''); setEndDate(''); };
+            const clearEbysData = () => { setDistrictExportFormat('excel'); setEbysData([]); setPersonnelOptions([]); setSelectedPersonnel([]); setFileNames([]); setTotalEbysDocs(0); setPeriodMode('all'); setSelectedYears([]); setStartDate(''); setEndDate(''); };
 
             const generateReport = (type) => {
                 if (type === 'personnel' && selectedPersonnel.length === 0) { alert("Lütfen en az bir personel seçin."); return; }
                 if (!validatePeriod()) return;
                 setReportReady(type);
+            };
+            const handleDistrictReport = () => {
+                if (!validatePeriod()) return;
+                if (districtExportFormat === 'pdf') handleExportEbysPdf('district');
+                else setReportReady('district');
             };
             
              useEffect(() => {
@@ -2284,6 +2318,33 @@
                              const ws = XLSX.utils.json_to_sheet(filteredData); const sheetName = personel.replace(/[\\/*?:]/g, "").substring(0, 31); XLSX.utils.book_append_sheet(wb, ws, sheetName);
                          });
                          XLSX.writeFile(wb, "EBYS_Personel_Raporu.xlsx");
+                     } else if (reportReady === 'district') {
+                         const groups = {};
+                         filteredEbysData.forEach(row => {
+                             const name = getEbysDistrictGroup(row);
+                             if (!groups[name]) groups[name] = [];
+                             groups[name].push(row);
+                         });
+                         const names = Object.keys(groups).sort((a, b) => a.localeCompare(b, 'tr'));
+                         const summary = [['Bölge/İlçe', 'Toplam Bekleyen Evrak', 'İlçe Kırılımı']];
+                         names.forEach(name => {
+                             const counts = {};
+                             groups[name].forEach(row => { const district = getEbysDistrict(row); counts[district] = (counts[district] || 0) + 1; });
+                             summary.push([name, groups[name].length, Object.keys(counts).sort((a,b) => a.localeCompare(b,'tr')).map(d => d + ': ' + counts[d]).join(' | ')]);
+                         });
+                         const wsSummary = XLSX.utils.aoa_to_sheet(summary);
+                         wsSummary['!cols'] = [{ wch: 30 }, { wch: 24 }, { wch: 65 }];
+                         XLSX.utils.book_append_sheet(wb, wsSummary, 'İlçe Özeti');
+                         names.forEach((name, index) => {
+                             const rows = groups[name].slice().sort((a, b) => {
+                                 const dateA = parseEbysDate(a[dateHeader]), dateB = parseEbysDate(b[dateHeader]);
+                                 return (dateA ? dateA.getTime() : 0) - (dateB ? dateB.getTime() : 0);
+                             }).map(row => Object.assign({ 'İlçe': getEbysDistrict(row) }, row));
+                             const ws = XLSX.utils.json_to_sheet(rows);
+                             const sheetName = (index + 1 + '_' + name).replace(/[\\/*?:\[\]]/g, '').substring(0, 31);
+                             XLSX.utils.book_append_sheet(wb, ws, sheetName);
+                         });
+                         XLSX.writeFile(wb, 'EBYS_Ilce_Bazli_Rapor.xlsx');
                      } else if (reportReady === 'year') {
                          const years = [...new Set(filteredEbysData.map(row => { const date = parseEbysDate(row[dateHeader]); return date ? date.getFullYear().toString() : "Tarihsiz"; }))].sort();
                          const summaryData = [["Yıl", "Toplam Bekleyen Evrak"]];
@@ -2347,7 +2408,7 @@
 
                 const formatDisplayDate = (val) => { const d = parseEbysDate(val); if (d) return `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}.${d.getFullYear()}`; return val || ''; };
 
-                return filtered.map(row => ({ sayi: row[keySayi], tarih: formatDisplayDate(row[keyTarih]), tarihRaw: parseEbysDate(row[keyTarih]), konu: row[keyKonu], kullanici: row[keyKullanici], yer: row[keyYer] })).sort((a, b) => { if (a.tarihRaw && b.tarihRaw) return a.tarihRaw - b.tarihRaw; if (a.tarihRaw) return -1; if (b.tarihRaw) return 1; return 0; });
+                return filtered.map(row => ({ sayi: row[keySayi], tarih: formatDisplayDate(row[keyTarih]), tarihRaw: parseEbysDate(row[keyTarih]), source: row, konu: row[keyKonu], kullanici: row[keyKullanici], yer: row[keyYer] })).sort((a, b) => { if (a.tarihRaw && b.tarihRaw) return a.tarihRaw - b.tarihRaw; if (a.tarihRaw) return -1; if (b.tarihRaw) return 1; return 0; });
             }, [filteredEbysData]);
 
             const handleExportEbysTable = () => {
@@ -2357,7 +2418,8 @@
                 const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'EBYS_Evraklar'); XLSX.writeFile(wb, `EBYS_Evrak_Listesi_${periodMode === 'year' ? selectedYears.slice().sort((a,b) => a-b).join('-') : periodMode === 'range' ? startDate + '_' + endDate : 'Tum_Tarihler'}.xlsx`);
             };
 
-            const handleExportEbysPdf = () => {
+            const handleExportEbysPdf = (groupBy) => {
+                const byDistrict = groupBy === 'district';
                 if (!validatePeriod()) return;
                 if (!displayRows.length) { alert('Seçilen dönemde raporlanacak evrak bulunamadı.'); return; }
                 const doc = new window.jspdf.jsPDF('l');
@@ -2371,7 +2433,7 @@
                 const buckets = [0, 0, 0, 0];
                 const getBucket = days => days <= 7 ? 0 : days <= 15 ? 1 : days <= 30 ? 2 : 3;
                 displayRows.forEach(row => {
-                    const name = String(row.kullanici || 'Personel belirtilmemis').trim();
+                    const name = byDistrict ? getEbysDistrictGroup(row.source) : String(row.kullanici || 'Personel belirtilmemis').trim();
                     if (!groups[name]) groups[name] = { name: name, rows: [], buckets: [0, 0, 0, 0] };
                     const days = row.tarihRaw ? Math.max(0, Math.floor((todayDate - row.tarihRaw) / 86400000)) : null;
                     const entry = { row: row, days: days };
@@ -2386,7 +2448,7 @@
                 doc.setFillColor(11, 37, 69);
                 doc.rect(0, 0, 297, 30, 'F');
                 doc.setFontSize(17); doc.setTextColor(255, 255, 255);
-                doc.text('EBYS PERSONELDE BEKLEYEN EVRAKLAR', 14, 13);
+                doc.text(byDistrict ? 'EBYS ILCE BAZLI BEKLEYEN EVRAKLAR' : 'EBYS PERSONELDE BEKLEYEN EVRAKLAR', 14, 13);
                 doc.setFontSize(8); doc.setTextColor(205, 220, 235);
                 doc.text(tr('Donem: ' + periodLabel + '  |  Rapor: ' + today.toLocaleString('tr-TR')), 14, 21);
 
@@ -2406,9 +2468,9 @@
                 doc.setFillColor(255, 255, 255); doc.setDrawColor(217, 226, 236);
                 doc.roundedRect(14, 67, 269, 116, 3, 3, 'FD');
                 doc.setFontSize(11); doc.setTextColor(11, 37, 69);
-                doc.text('PERSONEL BAZLI EVRAK YUKU', 22, 78);
+                doc.text(byDistrict ? 'ILCE BAZLI EVRAK YUKU' : 'PERSONEL BAZLI EVRAK YUKU', 22, 78);
                 doc.setFontSize(7.2); doc.setTextColor(101, 117, 139);
-                doc.text(tr(people.length + ' personel'), 22, 85);
+                doc.text(tr(people.length + (byDistrict ? ' bolge/ilce' : ' personel')), 22, 85);
                 labels.forEach((label, i) => {
                     const x = 142 + i * 33;
                     doc.setFillColor(...colors[i]); doc.roundedRect(x, 80.5, 4, 4, 1, 1, 'F');
@@ -2451,7 +2513,7 @@
                     doc.addPage();
                     doc.setFillColor(11, 37, 69); doc.rect(0, 0, 297, 30, 'F');
                     doc.setFontSize(17); doc.setTextColor(255, 255, 255);
-                    doc.text('PERSONEL DETAYI', 14, 13);
+                    doc.text(byDistrict ? 'ILCE DETAYI' : 'PERSONEL DETAYI', 14, 13);
                     doc.setFontSize(8); doc.setTextColor(205, 220, 235);
                     doc.text(tr(person.name + '  |  ' + periodLabel), 14, 21);
                     doc.setFillColor(255, 255, 255); doc.setDrawColor(217, 226, 236);
@@ -2469,26 +2531,26 @@
                     doc.text(ages.length ? Math.max(...ages) + ' gun' : '-', 235, 53);
                     doc.autoTable({
                         startY: 68,
-                        head: [['Sayi', 'Tarih', 'Konu', 'Geldigi / Gonderildigi Yer', 'Bekleme (Gun)']],
+                        head: byDistrict ? [['Ilce', 'Sayi', 'Tarih', 'Konu', 'Bekleyen Kullanici', 'Bekleme (Gun)']] : [['Sayi', 'Tarih', 'Konu', 'Geldigi / Gonderildigi Yer', 'Bekleme (Gun)']],
                         body: person.rows.slice().sort((a, b) => (b.days == null ? -1 : b.days) - (a.days == null ? -1 : a.days))
-                            .map(item => [tr(item.row.sayi), tr(item.row.tarih), tr(item.row.konu), tr(item.row.yer), item.days === null ? '-' : String(item.days)]),
+                            .map(item => byDistrict ? [tr(getEbysDistrict(item.row.source)), tr(item.row.sayi), tr(item.row.tarih), tr(item.row.konu), tr(item.row.kullanici), item.days === null ? '-' : String(item.days)] : [tr(item.row.sayi), tr(item.row.tarih), tr(item.row.konu), tr(item.row.yer), item.days === null ? '-' : String(item.days)]),
                         theme: 'striped',
                         rowPageBreak: 'avoid',
                         headStyles: { fillColor: [7, 89, 133] },
                         alternateRowStyles: { fillColor: [245, 249, 252] },
                         styles: { fontSize: 7.5, cellPadding: 1.5, overflow: 'linebreak' },
-                        columnStyles: { 0: { cellWidth: 34 }, 1: { cellWidth: 25 }, 2: { cellWidth: 105 }, 3: { cellWidth: 83 }, 4: { cellWidth: 22 } },
+                        columnStyles: byDistrict ? { 0: { cellWidth: 29 }, 1: { cellWidth: 29 }, 2: { cellWidth: 23 }, 3: { cellWidth: 102 }, 4: { cellWidth: 64 }, 5: { cellWidth: 22 } } : { 0: { cellWidth: 34 }, 1: { cellWidth: 25 }, 2: { cellWidth: 105 }, 3: { cellWidth: 83 }, 4: { cellWidth: 22 } },
                         margin: { left: 14, right: 14, bottom: 13 }
                     });
                 });
                 const pages = doc.internal.getNumberOfPages();
                 for (let p = 1; p <= pages; p++) {
                     doc.setPage(p); doc.setFontSize(8); doc.setTextColor(100, 116, 139);
-                    doc.text('EBYS Is Takip - Personel Raporu', 14, 202);
+                    doc.text(byDistrict ? 'EBYS Is Takip - Ilce Raporu' : 'EBYS Is Takip - Personel Raporu', 14, 202);
                     doc.text(p + ' / ' + pages, 283, 202, { align: 'right' });
                 }
                 const filePeriod = periodMode === 'year' ? selectedYears.slice().sort((a,b) => a-b).join('-') : periodMode === 'range' ? startDate + '_' + endDate : 'Tum_Tarihler';
-                doc.save('EBYS_Personel_Raporu_' + filePeriod + '.pdf');
+                doc.save('EBYS_' + (byDistrict ? 'Ilce' : 'Personel') + '_Raporu_' + filePeriod + '.pdf');
             };
 
             return (
@@ -2528,7 +2590,14 @@
                         </React.Fragment>}
                         <button onClick={() => generateReport('personnel')} disabled={isLoading || selectedPersonnel.length === 0}>Personel Excel İndir</button>
                         <button onClick={() => generateReport('year')} disabled={isLoading || ebysData.length === 0} style={{backgroundColor: '#8b5cf6'}}>Yıllık Excel İndir</button>
-                        <button onClick={handleExportEbysPdf} disabled={isLoading || ebysData.length === 0} style={{backgroundColor: '#0c4162', color: 'white'}}>PDF Rapor İndir</button>
+                        <div className="control-group">
+                            <label htmlFor="ebys-district-format">İlçe Bazlı Rapor Biçimi</label>
+                            <select id="ebys-district-format" value={districtExportFormat} onChange={e => setDistrictExportFormat(e.target.value)}>
+                                <option value="excel">Excel</option><option value="pdf">PDF</option>
+                            </select>
+                        </div>
+                        <button onClick={handleDistrictReport} disabled={isLoading || ebysData.length === 0} style={{backgroundColor:'#6366f1'}}>İlçe Bazlı Rapor Al</button>
+                        <button onClick={() => handleExportEbysPdf('personnel')} disabled={isLoading || ebysData.length === 0} style={{backgroundColor: '#0c4162', color: 'white'}}>PDF Rapor İndir</button>
                         <button onClick={clearEbysData} style={{backgroundColor: '#ef4444', color: 'white'}}>Verileri Temizle</button>
                     </div>
 
