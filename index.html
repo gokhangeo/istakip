@@ -2206,6 +2206,7 @@
             const getEbysDistrictFromFileName = fileName => {
                 const baseName = String(fileName || '').replace(/\.(xlsx|xls)$/i, '');
                 const normalized = normalizeHeader(baseName);
+                if (/(^|[^a-z])merkez($|[^a-z])/.test(normalized)) return 'Merkez';
                 const matches = ebysDistrictNames.filter(name => {
                     const district = normalizeHeader(name);
                     return new RegExp('(^|[^a-z])' + district + '($|[^a-z])').test(normalized);
