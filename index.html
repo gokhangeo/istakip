@@ -2674,9 +2674,7 @@
             const [warningThreshold, setWarningThreshold] = useState(0);
             const [hideEkOdemeGonderildi, setHideEkOdemeGonderildi] = useState(false);
             const [megsisData, setMegsisData] = useState([]);
-            const [jevLoading, setJevLoading] = useState(false);
-            const [showJevModal, setShowJevModal] = useState(false);
-            const [jevAnswer, setJevAnswer] = useState('');
+            const [showManagerSummaryModal, setShowManagerSummaryModal] = useState(false);
             const [managerSummary, setManagerSummary] = useState(null);
 
             const modalContentRef = useRef(null);
@@ -2886,40 +2884,7 @@
                     changes.sort((a,b)=>Math.abs(b.diff)+Math.abs(b.d30diff)-Math.abs(a.diff)-Math.abs(a.d30diff));
                 }
                 setManagerSummary({ snap, prev, changes:changes.slice(0,12), historyCount:history.length });
-                setJevAnswer('');
-                setShowJevModal(true);
-            };
-
-            const runSmartQuestion = (type) => {
-                const saved = saveDailySnapshot(data);
-                if (!saved) return;
-                const { snap, history } = saved;
-                const prev = history.length > 1 ? history[history.length - 2] : null;
-                const ago7 = history.length ? [...history].reverse().find(h => {
-                    const days = (new Date(snap.date) - new Date(h.date)) / 86400000;
-                    return days >= 7;
-                }) : null;
-                const diffText = (a,b) => (a-b >= 0 ? '+' : '') + (a-b);
-                if (type === 'today') {
-                    setJevAnswer(prev ? `Önceki kayda göre toplam bekleyen iş ${diffText(snap.total,prev.total)}, 16-30 günlük iş ${diffText(snap.d16_30,prev.d16_30)}, 30+ günlük iş ${diffText(snap.d30,prev.d30)} değişti.` : 'Henüz karşılaştırılacak önceki günlük kayıt yok.');
-                } else if (type === 'week') {
-                    setJevAnswer(ago7 ? `Yaklaşık 7 gün önceki kayda göre toplam bekleyen iş ${diffText(snap.total,ago7.total)}, 16-30 günlük iş ${diffText(snap.d16_30,ago7.d16_30)}, 30+ günlük iş ${diffText(snap.d30,ago7.d30)} değişti.` : '7 günlük karşılaştırma için henüz yeterli geçmiş kayıt yok.');
-                } else if (type === 'old') {
-                    setJevAnswer(prev ? `30+ günlük işler: ${prev.d30} → ${snap.d30} (${diffText(snap.d30,prev.d30)}).` : `Bugün 30+ günlük ${snap.d30} iş var. Karşılaştırma için önceki kayıt henüz yok.`);
-                } else if (type === 'personnel') {
-                    if (!prev) { setJevAnswer('Personel değişimini göstermek için önceki günlük kayıt henüz yok.'); return; }
-                    const names=new Set([...Object.keys(prev.personnel||{}),...Object.keys(snap.personnel||{})]);
-                    const changes=[...names].map(name=>{const a=(prev.personnel||{})[name]||{total:0,d30:0},b=(snap.personnel||{})[name]||{total:0,d30:0};return{name,d:b.total-a.total,d30:b.d30-a.d30,now:b.total};}).filter(x=>x.d||x.d30).sort((a,b)=>Math.abs(b.d)+Math.abs(b.d30)-Math.abs(a.d)-Math.abs(a.d30)).slice(0,10);
-                    setJevAnswer(changes.length ? changes.map(x=>`${x.name}: toplam ${x.d>=0?'+':''}${x.d}, 30+ ${x.d30>=0?'+':''}${x.d30} (şimdi ${x.now})`).join('\n') : 'Personel bazında belirgin bir değişiklik yok.');
-                } else if (type === 'unusual') {
-                    if (!prev) { setJevAnswer('Olağandışı değişiklik analizi için önceki kayıt henüz yok.'); return; }
-                    const totalPct=prev.total ? Math.round((snap.total-prev.total)*100/prev.total) : 0;
-                    const oldPct=prev.d30 ? Math.round((snap.d30-prev.d30)*100/prev.d30) : 0;
-                    const flags=[];
-                    if(Math.abs(totalPct)>=15) flags.push(`Toplam bekleyen işte %${Math.abs(totalPct)} ${totalPct>0?'artış':'azalış'} var.`);
-                    if(Math.abs(oldPct)>=15) flags.push(`30+ günlük işlerde %${Math.abs(oldPct)} ${oldPct>0?'artış':'azalış'} var.`);
-                    setJevAnswer(flags.length ? flags.join('\n') : 'Önceki kayda göre %15 ve üzeri olağandışı toplam değişim görünmüyor.');
-                }
+                setShowManagerSummaryModal(true);
             };
 
             const handleDownloadModalAsJpeg = () => {
@@ -3142,7 +3107,7 @@
                         <div className="control-group"><label>İlçe Filtresi</label><button onClick={()=>setShowIlceModal(true)} disabled={ilceOptions.length === 0}>{selectedIlce.length ? `${selectedIlce.length} ilçe seçili` : 'İlçe Seç'}</button></div>
                         <div className="control-group"><label>Personel Filtresi</label><button onClick={()=>setShowPersonelModal(true)} disabled={personnelOptions.length === 0}>{selectedPersonel.length ? `${selectedPersonel.length} personel seçili` : 'Personel Seç'}</button></div>
                         <div className="control-group"><label>İşlem Filtresi</label><button onClick={()=>setShowIslemModal(true)} disabled={islemOptions.length === 0}>{selectedIslem.length ? `${selectedIslem.length} işlem seçili` : 'İşlem Seç'}</button></div>
-                        <div className="control-group"><label>Yönetici Asistanı</label><button onClick={openManagerSummary} style={{backgroundColor:'#7c3aed', color:'white', border:'none'}}>🤖 Yönetici Özeti / Jev'e Sor</button></div>
+                        <div className="control-group"><label>Yönetici Asistanı</label><button onClick={openManagerSummary} style={{backgroundColor:'#7c3aed', color:'white', border:'none'}}>🤖 Yönetici Özeti</button></div>
                         <div className="control-group"><label>Karşılaştırma</label><button onClick={openChangeReport} style={{backgroundColor:'#0f766e', color:'white', border:'none'}}>🔄 Ne Değişti?</button></div>
                          <div className="control-group"><label>Veri Yönetimi</label><button onClick={() => { setData([]); setSelectedIl([]); setSelectedPersonel([]); setSelectedIlce([]); setSelectedIslem([]); setChartWarningFilter(null); setStartDate(''); setEndDate(''); setErrorMsg(""); }} style={{backgroundColor: '#ef4444', color: 'white'}}>Verileri Temizle</button></div>
                     </div>
@@ -3184,10 +3149,10 @@
                     </div>
                 )}
 
-                {showJevModal && (
-                    <div className="modal-overlay" onClick={() => setShowJevModal(false)}>
+                {showManagerSummaryModal && (
+                    <div className="modal-overlay" onClick={() => setShowManagerSummaryModal(false)}>
                         <div className="modal" style={{width:'900px'}} onClick={e => e.stopPropagation()}>
-                            <div className="modal-header"><h3>🤖 MEGSİS Yönetici Asistanı</h3><button className="close-btn" onClick={()=>setShowJevModal(false)}>×</button></div>
+                            <div className="modal-header"><h3>MEGSİS Yönetici Özeti</h3><button className="close-btn" onClick={()=>setShowManagerSummaryModal(false)}>×</button></div>
                             <div className="modal-content">
                                 {managerSummary && <div style={{background:'#f8fafc',border:'1px solid #e2e8f0',borderRadius:'10px',padding:'14px',marginBottom:'16px'}}>
                                     <h3 style={{margin:'0 0 10px'}}>📋 Günlük Yönetici Özeti</h3>
@@ -3202,20 +3167,9 @@
                                         {managerSummary.changes.length > 0 && <div><b>Dikkat çeken değişimler:</b> {managerSummary.changes.slice(0,6).map(x => x.name + ' (' + (x.diff>=0?'+':'') + x.diff + ' iş' + (x.d30diff ? ', 30+ ' + (x.d30diff>=0?'+':'') + x.d30diff : '') + ')').join(' • ')}</div>}
                                     </React.Fragment> : <p style={{marginBottom:0}}>İlk günlük kayıt oluşturuldu. Bir sonraki gün yeni Excel yüklendiğinde değişimler otomatik karşılaştırılacak.</p>}
                                 </div>}
-                                <div style={{background:'#faf5ff',border:'1px solid #e9d5ff',borderRadius:'10px',padding:'14px'}}>
-                                    <h3 style={{margin:'0 0 8px'}}>🔎 Akıllı Sorgular</h3>
-                                    <div style={{display:'flex',gap:'8px',flexWrap:'wrap'}}>
-                                        <button className="download-btn" style={{backgroundColor:'#7c3aed'}} onClick={()=>runSmartQuestion('today')}>Bugün Ne Değişti?</button>
-                                        <button className="download-btn" style={{backgroundColor:'#7c3aed'}} onClick={()=>runSmartQuestion('week')}>Son 7 Gün</button>
-                                        <button className="download-btn" style={{backgroundColor:'#7c3aed'}} onClick={()=>runSmartQuestion('old')}>30+ Günlük İşler</button>
-                                        <button className="download-btn" style={{backgroundColor:'#7c3aed'}} onClick={()=>runSmartQuestion('personnel')}>Personel Değişimleri</button>
-                                        <button className="download-btn" style={{backgroundColor:'#7c3aed'}} onClick={()=>runSmartQuestion('unusual')}>Olağandışı Değişim</button>
-                                    </div>
-                                    {jevAnswer && <div style={{marginTop:'12px',padding:'12px',background:'white',borderRadius:'8px',border:'1px solid #ddd',whiteSpace:'pre-wrap',lineHeight:'1.5'}}>{jevAnswer}</div>}
-                                    <p style={{fontSize:'0.82rem',color:'#64748b',marginBottom:0}}>Geçmiş özetleri bu tarayıcıda en fazla 30 gün tutulur. Sonuçlar kayıtlı günlük özetlerden hesaplanır.</p>
-                                </div>
+
                             </div>
-                            <div className="modal-footer"><button className="download-btn" onClick={()=>setShowJevModal(false)}>Kapat</button></div>
+                            <div className="modal-footer"><button className="download-btn" onClick={()=>setShowManagerSummaryModal(false)}>Kapat</button></div>
                         </div>
                     </div>
                 )}
