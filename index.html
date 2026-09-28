@@ -2203,22 +2203,16 @@
                 'Silifke-Aydıncık-Gülnar': ['Silifke', 'Aydıncık', 'Gülnar'],
                 'Anamur-Bozyazı': ['Anamur', 'Bozyazı']
             };
-            const getEbysDistrict = row => {
-                const keys = Object.keys(row);
-                const directKey = keys.find(key => normalizeHeader(key) === 'ilce' || normalizeHeader(key) === 'ilgili ilce');
-                const directValue = directKey ? String(row[directKey] || '').trim() : '';
-                const keysToSearch = keys.filter(key => {
-                    const header = normalizeHeader(key);
-                    return header === 'konu' || header.includes('geldigi yer') || header.includes('gonderildigi yer');
-                });
-                const source = directValue || keysToSearch.map(key => row[key] || '').join(' ');
-                const normalized = normalizeHeader(source);
+            const getEbysDistrictFromFileName = fileName => {
+                const baseName = String(fileName || '').replace(/\.(xlsx|xls)$/i, '');
+                const normalized = normalizeHeader(baseName);
                 const matches = ebysDistrictNames.filter(name => {
                     const district = normalizeHeader(name);
                     return new RegExp('(^|[^a-z])' + district + '($|[^a-z])').test(normalized);
                 });
                 return matches.length === 1 ? matches[0] : 'İlçe belirlenemedi';
             };
+            const getEbysDistrict = row => row._ebysDistrict || 'İlçe belirlenemedi';
             const getEbysDistrictGroup = row => {
                 const district = getEbysDistrict(row);
                 const group = Object.keys(ebysDistrictGroups).find(name => ebysDistrictGroups[name].includes(district));
@@ -2265,8 +2259,12 @@
                         if (!personnelHeader) throw new Error(`"${report.fileName}" dosyasında 'İşlemde Bekleyen Kullanıcı' sütunu bulunamadı.`);
                         if (!newFileNames.includes(report.fileName)) newFileNames.push(report.fileName);
 
-                        report.rows.forEach(row => { const personnelName = row[personnelHeader]; if (personnelName) currentPersonnel.add(personnelName); });
-                        newRows.push(...report.rows);
+                        const district = getEbysDistrictFromFileName(report.fileName);
+                        report.rows.forEach(row => {
+                            const personnelName = row[personnelHeader];
+                            if (personnelName) currentPersonnel.add(personnelName);
+                            newRows.push(Object.assign({}, row, { _ebysDistrict: district }));
+                        });
                     });
                     
                     const uniquePersonnel = [...currentPersonnel].sort((a,b) => a.localeCompare(b,'tr'));
@@ -2339,7 +2337,11 @@
                              const rows = groups[name].slice().sort((a, b) => {
                                  const dateA = parseEbysDate(a[dateHeader]), dateB = parseEbysDate(b[dateHeader]);
                                  return (dateA ? dateA.getTime() : 0) - (dateB ? dateB.getTime() : 0);
-                             }).map(row => Object.assign({ 'İlçe': getEbysDistrict(row) }, row));
+                             }).map(row => {
+                                 const cleanRow = Object.assign({}, row);
+                                 delete cleanRow._ebysDistrict;
+                                 return Object.assign({ 'İlçe': getEbysDistrict(row) }, cleanRow);
+                             });
                              const ws = XLSX.utils.json_to_sheet(rows);
                              const sheetName = (index + 1 + '_' + name).replace(/[\\/*?:\[\]]/g, '').substring(0, 31);
                              XLSX.utils.book_append_sheet(wb, ws, sheetName);
@@ -2559,7 +2561,7 @@
                     <div className="ebys-controls">
                         <div className="control-group">
                             <label>EBYS Excel Raporu Yükle</label><input type="file" multiple onChange={handleFileChange} accept=".xlsx, .xls" />
-                             {fileNames.length > 0 && <span style={{marginTop: '5px', fontSize: '0.8rem'}}>Seçilenler: {fileNames.join(', ')}</span>}
+                             {fileNames.length > 0 && <span style={{marginTop: '5px', fontSize: '0.8rem'}}>Yüklenenler: {fileNames.map(name => name + ' → ' + getEbysDistrictFromFileName(name)).join(', ')}</span>}
                              {totalEbysDocs > 0 && <span style={{fontSize: '0.9rem', color: '#78716c', marginTop: '5px'}}>Toplam Bekleyen Evrak: {totalEbysDocs}</span>}
                         </div>
                         {personnelOptions.length > 0 &&
