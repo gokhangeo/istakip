@@ -2674,8 +2674,6 @@
             const [warningThreshold, setWarningThreshold] = useState(0);
             const [hideEkOdemeGonderildi, setHideEkOdemeGonderildi] = useState(false);
             const [megsisData, setMegsisData] = useState([]);
-            const [showManagerSummaryModal, setShowManagerSummaryModal] = useState(false);
-            const [managerSummary, setManagerSummary] = useState(null);
 
             const modalContentRef = useRef(null);
             const personnelChartCardRef = useRef(null);
@@ -2866,25 +2864,6 @@
                 history = history.slice(-30);
                 localStorage.setItem(userStorageKey('dailyHistory'), JSON.stringify(history));
                 return { snap, history };
-            };
-
-            const openManagerSummary = () => {
-                const saved = saveDailySnapshot(data);
-                if (!saved) return;
-                const { snap, history } = saved;
-                const prev = history.length > 1 ? history[history.length - 2] : null;
-                const changes = [];
-                if (prev) {
-                    const names = new Set([...Object.keys(prev.personnel || {}), ...Object.keys(snap.personnel || {})]);
-                    names.forEach(name => {
-                        const a=(prev.personnel||{})[name]||{total:0,d30:0}, b=(snap.personnel||{})[name]||{total:0,d30:0};
-                        const diff=b.total-a.total, d30diff=b.d30-a.d30;
-                        if (diff || d30diff) changes.push({name,diff,d30diff,now:b.total});
-                    });
-                    changes.sort((a,b)=>Math.abs(b.diff)+Math.abs(b.d30diff)-Math.abs(a.diff)-Math.abs(a.d30diff));
-                }
-                setManagerSummary({ snap, prev, changes:changes.slice(0,12), historyCount:history.length });
-                setShowManagerSummaryModal(true);
             };
 
             const handleDownloadModalAsJpeg = () => {
@@ -3107,7 +3086,6 @@
                         <div className="control-group"><label>İlçe Filtresi</label><button onClick={()=>setShowIlceModal(true)} disabled={ilceOptions.length === 0}>{selectedIlce.length ? `${selectedIlce.length} ilçe seçili` : 'İlçe Seç'}</button></div>
                         <div className="control-group"><label>Personel Filtresi</label><button onClick={()=>setShowPersonelModal(true)} disabled={personnelOptions.length === 0}>{selectedPersonel.length ? `${selectedPersonel.length} personel seçili` : 'Personel Seç'}</button></div>
                         <div className="control-group"><label>İşlem Filtresi</label><button onClick={()=>setShowIslemModal(true)} disabled={islemOptions.length === 0}>{selectedIslem.length ? `${selectedIslem.length} işlem seçili` : 'İşlem Seç'}</button></div>
-                        <div className="control-group"><label>Yönetici Asistanı</label><button onClick={openManagerSummary} style={{backgroundColor:'#7c3aed', color:'white', border:'none'}}>🤖 Yönetici Özeti</button></div>
                         <div className="control-group"><label>Karşılaştırma</label><button onClick={openChangeReport} style={{backgroundColor:'#0f766e', color:'white', border:'none'}}>🔄 Ne Değişti?</button></div>
                          <div className="control-group"><label>Veri Yönetimi</label><button onClick={() => { setData([]); setSelectedIl([]); setSelectedPersonel([]); setSelectedIlce([]); setSelectedIslem([]); setChartWarningFilter(null); setStartDate(''); setEndDate(''); setErrorMsg(""); }} style={{backgroundColor: '#ef4444', color: 'white'}}>Verileri Temizle</button></div>
                     </div>
@@ -3145,31 +3123,6 @@
                                 <button className="download-btn" onClick={toggleFullscreen}>{isFullscreen ? 'Tam Ekrandan Çık' : 'Tam Ekran'}</button>
                                 {zoomContent.type === 'waitingList' ? <button className="download-btn excel-download-btn" onClick={handleExportWaitingListExcel}>Excel İndir</button> : <button className="download-btn" onClick={handleDownloadModalAsJpeg}>JPEG İndir</button>}
                            </div>
-                        </div>
-                    </div>
-                )}
-
-                {showManagerSummaryModal && (
-                    <div className="modal-overlay" onClick={() => setShowManagerSummaryModal(false)}>
-                        <div className="modal" style={{width:'900px'}} onClick={e => e.stopPropagation()}>
-                            <div className="modal-header"><h3>MEGSİS Yönetici Özeti</h3><button className="close-btn" onClick={()=>setShowManagerSummaryModal(false)}>×</button></div>
-                            <div className="modal-content">
-                                {managerSummary && <div style={{background:'#f8fafc',border:'1px solid #e2e8f0',borderRadius:'10px',padding:'14px',marginBottom:'16px'}}>
-                                    <h3 style={{margin:'0 0 10px'}}>📋 Günlük Yönetici Özeti</h3>
-                                    <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(160px,1fr))',gap:'8px'}}>
-                                        <div><b>Bugün bekleyen:</b> {managerSummary.snap.total}</div>
-                                        <div><b>16-30 gün:</b> {managerSummary.snap.d16_30}</div>
-                                        <div><b>30+ gün:</b> {managerSummary.snap.d30}</div>
-                                        <div><b>Hafıza:</b> {managerSummary.historyCount}/30 gün</div>
-                                    </div>
-                                    {managerSummary.prev ? <React.Fragment>
-                                        <p style={{marginBottom:'6px'}}><b>Önceki kayıt ({formatToTR(managerSummary.prev.date)}) → Bugün:</b> toplam iş {managerSummary.snap.total-managerSummary.prev.total >= 0 ? '+' : ''}{managerSummary.snap.total-managerSummary.prev.total}, 30+ gün {managerSummary.snap.d30-managerSummary.prev.d30 >= 0 ? '+' : ''}{managerSummary.snap.d30-managerSummary.prev.d30}.</p>
-                                        {managerSummary.changes.length > 0 && <div><b>Dikkat çeken değişimler:</b> {managerSummary.changes.slice(0,6).map(x => x.name + ' (' + (x.diff>=0?'+':'') + x.diff + ' iş' + (x.d30diff ? ', 30+ ' + (x.d30diff>=0?'+':'') + x.d30diff : '') + ')').join(' • ')}</div>}
-                                    </React.Fragment> : <p style={{marginBottom:0}}>İlk günlük kayıt oluşturuldu. Bir sonraki gün yeni Excel yüklendiğinde değişimler otomatik karşılaştırılacak.</p>}
-                                </div>}
-
-                            </div>
-                            <div className="modal-footer"><button className="download-btn" onClick={()=>setShowManagerSummaryModal(false)}>Kapat</button></div>
                         </div>
                     </div>
                 )}
