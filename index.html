@@ -3195,8 +3195,8 @@
                     <div className="modal-overlay" onClick={() => setShowPersonelModal(false)}>
                         <div className="modal" onClick={e => e.stopPropagation()}>
                              <div className="modal-header"><h3>Personel Seç</h3><button className="close-btn" onClick={()=>setShowPersonelModal(false)}>×</button></div>
-                             <div className="modal-content"><div className="filter-list">{personnelOptions.map(p => <div className="filter-item" key={p}><label style={{color: isEngineer(p) ? 'red' : 'inherit'}}><input type="checkbox" checked={selectedPersonel.includes(p)} onChange={e=>{ if(e.target.checked) setSelectedPersonel([...selectedPersonel,p]); else setSelectedPersonel(selectedPersonel.filter(sp=>sp!==p)); }}/> {p} {isEngineer(p) ? '(Müh.)' : ''}</label></div>)}</div></div>
-                            <div className="modal-footer"><button className="download-btn" onClick={()=>{setSelectedPersonel([]); setShowPersonelModal(false);}}>Temizle & Kapat</button></div>
+                             <div className="modal-content"><div className="filter-list"><div className="filter-item"><label><input type="checkbox" checked={personnelOptions.length > 0 && personnelOptions.every(p => selectedPersonel.includes(p))} onChange={e => setSelectedPersonel(e.target.checked ? personnelOptions.slice() : [])} /> <b>Tümünü Seç/Bırak</b></label></div>{personnelOptions.map(p => <div className="filter-item" key={p}><label style={{color: isEngineer(p) ? 'red' : 'inherit'}}><input type="checkbox" checked={selectedPersonel.includes(p)} onChange={e=>{ if(e.target.checked) setSelectedPersonel([...selectedPersonel,p]); else setSelectedPersonel(selectedPersonel.filter(sp=>sp!==p)); }}/> {p} {isEngineer(p) ? '(Müh.)' : ''}</label></div>)}</div></div>
+                            <div className="modal-footer"><button className="download-btn" onClick={()=>{setSelectedPersonel([]); setShowPersonelModal(false);}}>Temizle & Kapat</button><button className="download-btn" style={{backgroundColor:'#16a34a'}} onClick={()=>setShowPersonelModal(false)}>Uygula</button></div>
                         </div>
                     </div>
                 )}
@@ -3204,8 +3204,8 @@
                     <div className="modal-overlay" onClick={() => setShowIslemModal(false)}>
                         <div className="modal" onClick={e => e.stopPropagation()}>
                             <div className="modal-header"><h3>İşlem Seç</h3><button className="close-btn" onClick={()=>setShowIslemModal(false)}>×</button></div>
-                            <div className="modal-content"><div className="filter-list">{islemOptions.map(islem => <div className="filter-item" key={islem}><label><input type="checkbox" checked={selectedIslem.includes(islem)} onChange={e=>{ if(e.target.checked) setSelectedIslem([...selectedIslem, islem]); else setSelectedIslem(selectedIslem.filter(i => i !== islem)); }}/> {islem}</label></div>)}</div></div>
-                            <div className="modal-footer"><button className="download-btn" onClick={()=>{setSelectedIslem([]); setShowIslemModal(false);}}>Temizle & Kapat</button></div>
+                            <div className="modal-content"><div className="filter-list"><div className="filter-item"><label><input type="checkbox" checked={islemOptions.length > 0 && islemOptions.every(islem => selectedIslem.includes(islem))} onChange={e => setSelectedIslem(e.target.checked ? islemOptions.slice() : [])} /> <b>Tümünü Seç/Bırak</b></label></div>{islemOptions.map(islem => <div className="filter-item" key={islem}><label><input type="checkbox" checked={selectedIslem.includes(islem)} onChange={e=>{ if(e.target.checked) setSelectedIslem([...selectedIslem, islem]); else setSelectedIslem(selectedIslem.filter(i => i !== islem)); }}/> {islem}</label></div>)}</div></div>
+                            <div className="modal-footer"><button className="download-btn" onClick={()=>{setSelectedIslem([]); setShowIslemModal(false);}}>Temizle & Kapat</button><button className="download-btn" style={{backgroundColor:'#16a34a'}} onClick={()=>setShowIslemModal(false)}>Uygula</button></div>
                         </div>
                     </div>
                 )}
