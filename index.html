@@ -1343,8 +1343,8 @@
                 let body = [];
 
                 if (isClosedMode) {
-                    head = [[tr('Personel'), tr('Fen Kayit Tar.'), tr('F.K. No'), tr('Ilce'), tr('Islem'), tr('Zemin'), tr('Durumu'), tr('Basvuru Aciklama'), tr(elapsedDaysLabel)]];
-                    body = displayedRows.map(row => [tr(getPersonnelTextForExport(row).replace(/\n/g, ', ')), row.fenKayitTarihi || '', row.fenKayitNo || '', tr(row.ilce), tr(row.islem), tr(formatZemin(row.zemin)), tr(row.basvuruDurumu), tr(row.kisaBasvuruAciklama), row.beklemeSuresi === null ? '—' : row.beklemeSuresi]);
+                    head = [[tr('Personel'), tr('Fen Kayit Tar.'), tr('F.K. No'), tr('Ilce'), tr('Islem'), tr('Zemin'), tr('Basvuru Aciklama'), tr(elapsedDaysLabel)]];
+                    body = displayedRows.map(row => [tr(getPersonnelTextForExport(row).replace(/\n/g, ', ')), row.fenKayitTarihi || '', row.fenKayitNo || '', tr(row.ilce), tr(row.islem), tr(formatZemin(row.zemin)), tr(row.kisaBasvuruAciklama), row.beklemeSuresi === null ? '—' : row.beklemeSuresi]);
                 } else if (sortField === 'fen_kayit_alinmayan' || sortField === 'harci_yatirilmayan' || sortField === 'iade edilen') {
                     head = [[tr("Personel"), tr("Basvuru Tar."), tr("Fen Kayit Tar."), tr("F.K. No"), tr("Ilce"), tr("Islem"), tr("Zemin"), tr("Durumu"), tr("Sure"), tr("Aciklama")]];
                     body = displayedRows.map(row => [
@@ -1377,7 +1377,7 @@
                     margin: { bottom: 10 },
                     styles: { fontSize: 7.5, cellPadding: 1.5, overflow: 'linebreak' },
                     headStyles: { fillColor: [220, 38, 38] }, // Kırmızı tema
-                    columnStyles: isClosedMode ? {0: {cellWidth: 29}, 5: {cellWidth: 28}, 7: {cellWidth: 72}, 8: {cellWidth: 20}} : {
+                    columnStyles: isClosedMode ? {0: {cellWidth: 29}, 5: {cellWidth: 28}, 6: {cellWidth: 72}, 7: {cellWidth: 20}} : {
                         0: { cellWidth: 35 }, 
                         5: { cellWidth: 40 }, // Zemin biraz daha geniş
                     },
@@ -1459,7 +1459,7 @@
                                     <th className="col-personel">Personel</th>
                                     {(isFenKayitAlinmayan || isHarciYatirilmayan || isIadeEdilen) && <th>Başvuru Tarihi</th>}
                                     <th>Fen Kayıt Tarihi {(isOnemliIslerMode || isUygunOlmayanIadeMode || isIadeEdilen) && ( <span onClick={toggleDateSort} style={{ cursor: 'pointer', userSelect: 'none', padding: '0 5px' }}>{dateSortOrder === 'asc' ? '\u{1F53C}' : '\u{1F53D}'}</span> )}</th>
-                                    <th className="col-fen-kayit-no">Fen Kayıt No</th><th className="col-ilce">İlçe</th><th className="col-islem">İşlem</th><th className="col-zemin">Zemin</th><th>Başvuru Durumu</th>
+                                    <th className="col-fen-kayit-no">Fen Kayıt No</th><th className="col-ilce">İlçe</th><th className="col-islem">İşlem</th><th className="col-zemin">Zemin</th>{!isClosedMode && <th>Başvuru Durumu</th>}
                                     {isClosedMode && <th>Başvuru Açıklama</th>}
                                     {(isUygunOlmayanIadeMode || isOnemliIslerMode || isFenKayitAlinmayan || isHarciYatirilmayan || isIadeEdilen) ? <th>Başvuru Açıklama</th> : <th className="col-bekleme-süresi-gün" title={isClosedMode ? 'Açıklamadaki işlem tarihinden bugüne geçen takvim günü. Tarih yoksa süre hesaplanmaz.' : undefined}>{elapsedDaysLabel}</th> }
                                 </tr> 
@@ -1476,7 +1476,7 @@
                                         {(isFenKayitAlinmayan || isHarciYatirilmayan || isIadeEdilen) && <td>{row.basvuruTarihi}</td>}
                                         <td>{row.fenKayitTarihi}</td><td className="col-fen-kayit-no">{row.fenKayitNo}</td><td className="col-ilce">{row.ilce}</td><td className="col-islem">{row.islem}</td>
                                         <td className="col-zemin" style={{whiteSpace: 'pre-line'}}>{formatZemin(row.zemin)}</td>
-                                        <td>{row.basvuruDurumu}</td>
+                                        {!isClosedMode && <td>{row.basvuruDurumu}</td>}
                                         {isClosedMode && <td title={row.basvuruAciklama} style={{minWidth: '220px', maxWidth: '360px', whiteSpace: 'normal', wordBreak: 'break-word'}}>{row.kisaBasvuruAciklama}</td>}
                                         {(isUygunOlmayanIadeMode || isOnemliIslerMode || isFenKayitAlinmayan || isHarciYatirilmayan || isIadeEdilen) ? <td style={{whiteSpace: 'pre-line', wordBreak: 'break-word'}}>{row.basvuruAciklama}</td> : <td className="col-bekleme-süresi-gün">{isClosedMode && row.beklemeSuresi === null ? '—' : row.beklemeSuresi}</td>}
                                     </tr> 
@@ -1746,7 +1746,9 @@
             );
         }
 
-        function MegsisReporter({ data, isEngineer, warningFilterLabel, reportSummary, hideEkOdemeGonderildi }) {
+        function MegsisReporter({ data, isEngineer, sortField, warningFilterLabel, reportSummary, hideEkOdemeGonderildi }) {
+            const isClosedMode = sortField === 'tescile_giden' || sortField === 'iptal_edilen';
+            const pdfDayLabel = sortField === 'tescile_giden' ? 'Tescilden Gecen Gun' : (sortField === 'iptal_edilen' ? 'Iptalden Gecen Gun' : 'Bekleme (Gun)');
             const [isLoading, setIsLoading] = useState(false);
             const [personnelOptions, setPersonnelOptions] = useState([]);
             const [selectedPersonnel, setSelectedPersonnel] = useState([]);
@@ -1877,7 +1879,7 @@
                             }
                             
                             const sheetName = item.name.replace(/[\\/*?:]/g, "").substring(0, 31);
-                            sheetsToAdd.push({ name: sheetName, ws: ws, rawData: dataToExport });
+                            sheetsToAdd.push({ name: sheetName, ws: ws, rawData: dataToExport, closedExplanations: isClosedMode ? filteredRows.map(row => row.kisaBasvuruAciklama || getClosedApplicationInfo(row['başvuru açıklama'] || row.basvuruAciklama, sortField).shortExplanation) : [] });
                         }
                     }
                     
@@ -2095,15 +2097,15 @@
                             doc.setTextColor(220, 38, 38);
                             doc.text(tr(`${personOldest} gun`), 236, 53);
 
-                            const head = [[tr("Personel"), tr("Fen Kayit Tarihi"), tr("Fen Kayit No"), tr("Ilce"), tr("Islem"), tr("Zemin"), tr("Basvuru Durumu"), tr("Bekleme (Gun)")]];
-                            const body = sheetData.rawData.map(r => [
+                            const head = [[tr("Personel"), tr("Fen Kayit Tarihi"), tr("Fen Kayit No"), tr("Ilce"), tr("Islem"), tr("Zemin"), tr(isClosedMode ? "Basvuru Aciklama" : "Basvuru Durumu"), tr(pdfDayLabel)]];
+                            const body = sheetData.rawData.map((r, rowIndex) => [
                                 tr(r['Personel'].replace(/\n/g, ', ')),
                                 r['Fen Kayıt Tarihi'] || '',
                                 r['Fen Kayıt No'] || '',
                                 tr(r['İlçe']),
                                 tr(r['İşlem']),
                                 tr(r['Zemin']),
-                                tr(r['Başvuru Durumu']),
+                                tr(isClosedMode ? sheetData.closedExplanations[rowIndex] : r['Başvuru Durumu']),
                                 r['Bekleme Süresi (Gün)'] !== '' ? r['Bekleme Süresi (Gün)'] : ''
                             ]);
 
@@ -2123,7 +2125,7 @@
                                     3: { cellWidth: 25 },
                                     4: { cellWidth: 35 },
                                     5: { cellWidth: 'auto' },
-                                    6: { cellWidth: 30 },
+                                    6: { cellWidth: isClosedMode ? 72 : 30 },
                                     7: { cellWidth: 20 }
                                 },
                                 didParseCell: function(data) {
@@ -2139,7 +2141,7 @@
                                                 data.cell.styles.fontStyle = 'bold';
                                             }
                                         }
-                                        if (headerText === 'Bekleme (Gun)') {
+                                        if (headerText === pdfDayLabel) {
                                             const day = Number(data.cell.raw) || 0;
                                             data.cell.styles.fontStyle = 'bold';
                                             if (day <= 7) {
@@ -3205,7 +3207,7 @@
                     <DataTable data={filteredData} sortField={sortField} isEngineer={isEngineer} personnelFilterType={personnelFilterType} onFilterChange={setPersonnelFilterType} />
                     
                     <ReportComparison engineers={engineers} isEngineer={isEngineer} />
-                    <MegsisReporter data={megsisData} isEngineer={isEngineer} warningFilterLabel={getWarningFilterLabel(sortField, warningThreshold)} reportSummary={warningReportSummary} hideEkOdemeGonderildi={hideEkOdemeGonderildi} />
+                    <MegsisReporter data={megsisData} isEngineer={isEngineer} sortField={sortField} warningFilterLabel={getWarningFilterLabel(sortField, warningThreshold)} reportSummary={warningReportSummary} hideEkOdemeGonderildi={hideEkOdemeGonderildi} />
                     <EbysReporter onZoom={setZoomContent} />
                 </React.Fragment>}
                 
