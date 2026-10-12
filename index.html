@@ -3054,6 +3054,8 @@
                 });
             }, [chartData, chartWarningFilter]);
 
+            const warningChartData = React.useMemo(() => megsisData.map(row => row.rawTask).filter(Boolean), [megsisData]);
+            const warningChartSummary = activeFilterSummary + (warningThreshold === 0 ? ' / Tüm süreler' : ' / ' + warningThreshold + '+ gün');
             const warningReportSummary = `${activeFilterSummary}${chartWarningFilter ? ` / Grafik filtresi: ${chartWarningFilter.label}` : ''}`;
              
             const LandingPage = ({onFileChange}) => (
@@ -3091,10 +3093,10 @@
                     </div>
                     {errorMsg && <p className="error-message" style={{padding: '10px', background: '#fee2e2', borderRadius: '8px', border: '1px solid #ef4444', textAlign: 'center'}}>{errorMsg}</p>}
                     
-                    <Dashboard data={data} filtered={filteredData} sortField={sortField} selectedPersonel={selectedPersonel} selectedIl={selectedIl} selectedIlce={selectedIlce} />
+                    <Dashboard data={warningChartData} filtered={warningChartData} sortField={sortField} selectedPersonel={selectedPersonel} selectedIl={selectedIl} selectedIlce={selectedIlce} />
                     
                     <div className="charts-below">
-                        <ChartsBelow data={chartFilteredWarningData} onZoom={setZoomContent} onChartFilter={applyChartWarningFilter} personnelChartCardRef={personnelChartCardRef} waitingChartCardRef={waitingChartCardRef} islemChartCardRef={islemChartCardRef} districtChartCardRef={districtChartCardRef} selectedIl={selectedIl} isEngineer={isEngineer} personnelFilterType={personnelFilterType} onFilterChange={setPersonnelFilterType} sortField={sortField} activeFilterSummary={activeFilterSummary} />
+                        <ChartsBelow data={warningChartData} onZoom={setZoomContent} onChartFilter={applyChartWarningFilter} personnelChartCardRef={personnelChartCardRef} waitingChartCardRef={waitingChartCardRef} islemChartCardRef={islemChartCardRef} districtChartCardRef={districtChartCardRef} selectedIl={selectedIl} isEngineer={isEngineer} personnelFilterType={personnelFilterType} onFilterChange={setPersonnelFilterType} sortField={sortField} activeFilterSummary={warningChartSummary} />
                     </div>
 
                     {chartWarningFilter && (
