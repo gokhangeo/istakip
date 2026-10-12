@@ -266,6 +266,8 @@
             if (sortField === 'fen_kayit_alinmayan') return `Fen Kayıt Alınmayan Başvurular - ${warningThreshold === 0 ? 'Tüm Süre' : '2+ Gün'}${total}`;
             if (sortField === 'harci_yatirilmayan') return `Harcı Yatırılmayan Başvurular${total}`;
             if (sortField === 'iade edilen') return `İade Edilen Başvurular${total}`;
+            if (sortField === 'tescile_giden') return `Tescil Edilen İşlemler${total}`;
+            if (sortField === 'iptal_edilen') return `İptal Edilen İşlemler${total}`;
             if (sortField === 'onemli_isler') return `Son 150 Gündeki Önemli İşler${total}`;
             if (sortField === 'uygun_olmayan_iade') return `Son 100 Gün İçindeki İadeler${total}`;
             if (sortField === 'eksiklik_tamamlandi') return `Eksiklik Tamamlanan İşlemler${total}`;
@@ -912,6 +914,7 @@
         };
 
         function WarningTable({ data, isEngineer, personnelFilterType, onFilterChange, sortField, onWarningRowsChange, warningThreshold, setWarningThreshold, reportSummary, hideEkOdemeGonderildi, setHideEkOdemeGonderildi }) {
+            const isCompletedMode = sortField === 'tescile_giden' || sortField === 'iptal_edilen';
             const [warningRows, setWarningRows] = useState([]); 
             const [dateSortOrder, setDateSortOrder] = useState('asc');
             const [warningPersonnelFilter, setWarningPersonnelFilter] = useState([]);
@@ -963,6 +966,25 @@
                         }
                     });
                     finalRows = Object.values(groupedTasks);
+                } else if (isCompletedMode) {
+                    const explanationTerm = sortField === 'tescile_giden' ? 'tescil edildi' : 'iptal';
+                    finalRows = warningEligibleData.filter(task => {
+                        const status = String(task['başvuru durumu'] || '').toLocaleLowerCase('tr');
+                        const explanation = String(task['başvuru açıklama'] || '').toLocaleLowerCase('tr');
+                        return status.includes('tescile gönderildi') && explanation.includes(explanationTerm);
+                    }).map(task => ({
+                        fenKayitNo: task['fen kayıt no'] || 'Yok',
+                        il: task._province || '',
+                        ilce: task['ilçe'] || '',
+                        islem: task['işlem'] || '',
+                        zemin: task['zemin'] || '',
+                        basvuruDurumu: task['başvuru durumu'] || '',
+                        basvuruAciklama: task['başvuru açıklama'] || '',
+                        personnelRaw: task['görevli personel'] || '',
+                        basvuruTarihi: task['başvuru tarihi'] || '',
+                        fenKayitTarihi: task['fen kayıt tarihi'] || '',
+                        rawTask: task
+                    }));
                 } else if (sortField === 'iade edilen') {
                     const groupedTasks = {};
                     warningEligibleData.forEach((task, index) => {
@@ -1053,7 +1075,7 @@
                     finalRows = Object.values(groupedTasks).sort((a, b) => b.beklemeSuresi - a.beklemeSuresi);
                 }
                 
-                if (sortField === 'onemli_isler' || sortField === 'uygun_olmayan_iade' || sortField === 'iade edilen') {
+                if (isCompletedMode || sortField === 'onemli_isler' || sortField === 'uygun_olmayan_iade' || sortField === 'iade edilen') {
                     finalRows.sort((a, b) => {
                         const dateA = a.fenKayitTarihi ? new Date(a.fenKayitTarihi) : null; const dateB = b.fenKayitTarihi ? new Date(b.fenKayitTarihi) : null;
                         if (!dateA) return 1; if (!dateB) return -1;
@@ -1065,7 +1087,7 @@
                 else if (personnelFilterType === 'other') finalRows = finalRows.filter(row => parsePersonnelWithStatus(row.personnelRaw).some(p => !isEngineer(p.name)));
 
                 setWarningRows(finalRows);
-            }, [warningEligibleData, isEngineer, personnelFilterType, sortField, dateSortOrder, warningThreshold]); 
+            }, [warningEligibleData, isEngineer, personnelFilterType, sortField, isCompletedMode, dateSortOrder, warningThreshold]); 
 
             const warningPersonnelOptions = React.useMemo(() => {
                 const names = new Set();
@@ -1091,13 +1113,13 @@
             const prevKeysRef = useRef("");
             useEffect(() => {
                 if (onWarningRowsChange) {
-                    const keys = displayedRows.map(r => r.fenKayitNo + r.ilce).join(',');
+                    const keys = JSON.stringify([sortField, displayedRows]);
                     if (prevKeysRef.current !== keys) {
                         prevKeysRef.current = keys;
                         onWarningRowsChange(displayedRows);
                     }
                 }
-            }, [displayedRows, onWarningRowsChange]);
+            }, [displayedRows, sortField, onWarningRowsChange]);
 
             const getPersonnelTextForExport = (row) => {
                 const personnelListWithStatus = parsePersonnelWithStatus(row.personnelRaw);
@@ -1160,8 +1182,10 @@
                 countBy(rows, row => row.ilce).slice(0, 15).forEach(([name, count]) => summaryRows.push([name, count]));
                 summaryRows.push([], ['İşlem Özeti', 'Adet']);
                 countBy(rows, row => row.islem).slice(0, 15).forEach(([name, count]) => summaryRows.push([name, count]));
-                summaryRows.push([], ['Bekleme Süresi Dağılımı', 'Adet']);
-                countBy(rows, row => getWaitingBucket(row.beklemeSuresi)).forEach(([name, count]) => summaryRows.push([name, count]));
+                if (!isCompletedMode) {
+                    summaryRows.push([], ['Bekleme Süresi Dağılımı', 'Adet']);
+                    countBy(rows, row => getWaitingBucket(row.beklemeSuresi)).forEach(([name, count]) => summaryRows.push([name, count]));
+                }
                 return summaryRows;
             };
 
@@ -1172,7 +1196,7 @@
                 if (sortField === 'fen_kayit_alinmayan' || sortField === 'harci_yatirilmayan' || sortField === 'iade edilen') {
                     dataToExport = rowsToExport.map(row => ({ 'Personel': getPersonnelTextForExport(row), 'Başvuru Tarihi': row.basvuruTarihi, 'Fen Kayıt Tarihi': row.fenKayitTarihi, 'Fen Kayıt No': row.fenKayitNo, 'İlçe': row.ilce, 'İşlem': row.islem, 'Zemin': formatZemin(row.zemin), 'Başvuru Durumu': row.basvuruDurumu, 'Bekleme Süresi (Gün)': row.beklemeSuresi, 'Başvuru Açıklama': row.basvuruAciklama }));
                     cols = [ { wch: 30 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 20 }, { wch: 40 }, { wch: 25 }, { wch: 20 }, { wch: 50 } ];
-                } else if (sortField === 'uygun_olmayan_iade' || sortField === 'onemli_isler') {
+                } else if (isCompletedMode || sortField === 'uygun_olmayan_iade' || sortField === 'onemli_isler') {
                     dataToExport = rowsToExport.map(row => ({ 'Personel': getPersonnelTextForExport(row), 'Fen Kayıt Tarihi': row.fenKayitTarihi, 'Fen Kayıt No': row.fenKayitNo, 'İlçe': row.ilce, 'İşlem': row.islem, 'Zemin': formatZemin(row.zemin), 'Başvuru Durumu': row.basvuruDurumu, 'Başvuru Açıklama': row.basvuruAciklama }));
                     cols = [ { wch: 30 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 20 }, { wch: 40 }, { wch: 25 }, { wch: 50 }];
                 } else {
@@ -1226,9 +1250,7 @@
 
                 doc.setFontSize(16);
                 
-                const isUygunOlmayanIadeMode = sortField === 'uygun_olmayan_iade'; const isOnemliIslerMode = sortField === 'onemli_isler'; const isEksiklikTamamlandiMode = sortField === 'eksiklik_tamamlandi'; const isGorevlendirmeYapilmayan = sortField === 'gorevlendirme_yapilmayan'; const isFenKayitAlinmayan = sortField === 'fen_kayit_alinmayan'; const isHarciYatirilmayan = sortField === 'harci_yatirilmayan'; const isIadeEdilen = sortField === 'iade edilen';
-                const generalWarningTitle = warningThreshold === 0 ? `Tum Bekleyen Islemler (Toplam: ${displayedRows.length})` : `${warningThreshold === 1 ? '1+' : warningThreshold + '+'} Gunden Fazla Bekleyen Islemler (Toplam: ${displayedRows.length})`;
-                const warningTitleForPdf = isOnemliIslerMode ? `Son 150 Gundeki Onemli Isler (Toplam: ${displayedRows.length})` : (isEksiklikTamamlandiMode ? `Eksiklik Tamamlanan Islemler (Toplam: ${displayedRows.length})` : (isUygunOlmayanIadeMode ? `Son 100 Gun Icindeki Iadeler (Toplam: ${displayedRows.length})` : (isFenKayitAlinmayan ? `Fen Kayit Alinmayan Basvurular (Toplam: ${displayedRows.length})` : (isHarciYatirilmayan ? `Harci Yatirilmayan Basvurular (Toplam: ${displayedRows.length})` : (isIadeEdilen ? `Iade Edilen Basvurular (Toplam: ${displayedRows.length})` : (sortField === 'plan_ornegi' ? `Plan Ornegi Bekleyen Islemler - Tum Sure (Toplam: ${displayedRows.length})` : (isGorevlendirmeYapilmayan ? `1+ Gundur Personel Atanmayan Isler (Toplam: ${displayedRows.length})` : generalWarningTitle)))))));
+                const warningTitleForPdf = getWarningFilterLabel(sortField, warningThreshold, displayedRows.length);
                 
                 doc.setTextColor(30, 58, 138);
                 doc.text(tr("MEGSIS Is Takip Raporu"), 14, 14);
@@ -1259,7 +1281,7 @@
                         row.basvuruTarihi || '', row.fenKayitTarihi || '', row.fenKayitNo || '',
                         tr(row.ilce), tr(row.islem), tr(formatZemin(row.zemin)), tr(row.basvuruDurumu), row.beklemeSuresi, tr(row.basvuruAciklama)
                     ]);
-                } else if (sortField === 'uygun_olmayan_iade' || sortField === 'onemli_isler') {
+                } else if (isCompletedMode || sortField === 'uygun_olmayan_iade' || sortField === 'onemli_isler') {
                     head = [[tr("Personel"), tr("Fen Kayit Tar."), tr("F.K. No"), tr("Ilce"), tr("Islem"), tr("Zemin"), tr("Durumu"), tr("Aciklama")]];
                     body = displayedRows.map(row => [
                         tr(getPersonnelTextForExport(row).replace(/\n/g, ', ')),
@@ -1318,8 +1340,7 @@
             if (warningRows.length === 0) { return null; } 
             
             const isUygunOlmayanIadeMode = sortField === 'uygun_olmayan_iade'; const isOnemliIslerMode = sortField === 'onemli_isler'; const isEksiklikTamamlandiMode = sortField === 'eksiklik_tamamlandi'; const isGorevlendirmeYapilmayan = sortField === 'gorevlendirme_yapilmayan'; const isFenKayitAlinmayan = sortField === 'fen_kayit_alinmayan'; const isHarciYatirilmayan = sortField === 'harci_yatirilmayan'; const isIadeEdilen = sortField === 'iade edilen';
-            const generalWarningTitle = warningThreshold === 0 ? `Tüm Bekleyen İşlemler (Toplam: ${displayedRows.length})` : `${warningThreshold === 1 ? '1+' : warningThreshold + '+'} Gunden Fazla Bekleyen İşlemler (Toplam: ${displayedRows.length})`;
-            const warningTitle = isOnemliIslerMode ? `Son 150 Gündeki Önemli İşler (Toplam: ${displayedRows.length})` : (isEksiklikTamamlandiMode ? `Eksiklik Tamamlanan İşlemler (Toplam: ${displayedRows.length})` : (isUygunOlmayanIadeMode ? `Son 100 Gün İçindeki İadeler (Toplam: ${displayedRows.length})` : (isFenKayitAlinmayan ? `Fen Kayıt Alınmayan Başvurular (Toplam: ${displayedRows.length})` : (isHarciYatirilmayan ? `Harcı Yatırılmayan Başvurular (Toplam: ${displayedRows.length})` : (isIadeEdilen ? `İade Edilen Başvurular (Toplam: ${displayedRows.length})` : (sortField === 'plan_ornegi' ? `Plan Örneği Bekleyen İşlemler - Tüm Süre (Toplam: ${displayedRows.length})` : (isGorevlendirmeYapilmayan ? `1+ Gündür Personel Atanmayan İşler (Toplam: ${displayedRows.length})` : generalWarningTitle)))))));
+            const warningTitle = getWarningFilterLabel(sortField, warningThreshold, displayedRows.length);
             
             return ( 
                 <div className="warning-table-container"> 
@@ -1332,7 +1353,7 @@
                                      Ek Ödeme Gönderildi olanları gizle
                                  </label>
                              </div>
-                             {(!isOnemliIslerMode && !isUygunOlmayanIadeMode && sortField !== 'plan_ornegi' && !isGorevlendirmeYapilmayan && !isHarciYatirilmayan && !isIadeEdilen) && (
+                             {(!isCompletedMode && !isOnemliIslerMode && !isUygunOlmayanIadeMode && sortField !== 'plan_ornegi' && !isGorevlendirmeYapilmayan && !isHarciYatirilmayan && !isIadeEdilen) && (
                                  <div style={{display: 'flex', alignItems: 'center', marginRight: '10px'}}>
                                      <label style={{fontSize: '0.9rem', fontWeight: 'bold', color: '#991b1b', marginRight: '5px'}}>Süre:</label>
                                      <select value={warningThreshold} onChange={(e) => setWarningThreshold(Number(e.target.value))} style={{padding: '6px', borderRadius: '4px', border: '1px solid #fecaca', fontSize: '0.9rem', color: '#991b1b'}}>
@@ -1365,9 +1386,9 @@
                                 <tr> 
                                     <th className="col-personel">Personel</th>
                                     {(isFenKayitAlinmayan || isHarciYatirilmayan || isIadeEdilen) && <th>Başvuru Tarihi</th>}
-                                    <th>Fen Kayıt Tarihi {(isOnemliIslerMode || isUygunOlmayanIadeMode || isIadeEdilen) && ( <span onClick={toggleDateSort} style={{ cursor: 'pointer', userSelect: 'none', padding: '0 5px' }}>{dateSortOrder === 'asc' ? '\u{1F53C}' : '\u{1F53D}'}</span> )}</th>
+                                    <th>Fen Kayıt Tarihi {(isCompletedMode || isOnemliIslerMode || isUygunOlmayanIadeMode || isIadeEdilen) && ( <span onClick={toggleDateSort} style={{ cursor: 'pointer', userSelect: 'none', padding: '0 5px' }}>{dateSortOrder === 'asc' ? '\u{1F53C}' : '\u{1F53D}'}</span> )}</th>
                                     <th className="col-fen-kayit-no">Fen Kayıt No</th><th className="col-ilce">İlçe</th><th className="col-islem">İşlem</th><th className="col-zemin">Zemin</th><th>Başvuru Durumu</th>
-                                    {(isUygunOlmayanIadeMode || isOnemliIslerMode || isFenKayitAlinmayan || isHarciYatirilmayan || isIadeEdilen) ? <th>Başvuru Açıklama</th> : <th className="col-bekleme-süresi-gün">Bekleme Süresi (Gün)</th> }
+                                    {(isCompletedMode || isUygunOlmayanIadeMode || isOnemliIslerMode || isFenKayitAlinmayan || isHarciYatirilmayan || isIadeEdilen) ? <th>Başvuru Açıklama</th> : <th className="col-bekleme-süresi-gün">Bekleme Süresi (Gün)</th> }
                                 </tr> 
                             </thead> 
                             <tbody> 
@@ -1383,7 +1404,7 @@
                                         <td>{row.fenKayitTarihi}</td><td className="col-fen-kayit-no">{row.fenKayitNo}</td><td className="col-ilce">{row.ilce}</td><td className="col-islem">{row.islem}</td>
                                         <td className="col-zemin" style={{whiteSpace: 'pre-line'}}>{formatZemin(row.zemin)}</td>
                                         <td>{row.basvuruDurumu}</td>
-                                        {(isUygunOlmayanIadeMode || isOnemliIslerMode || isFenKayitAlinmayan || isHarciYatirilmayan || isIadeEdilen) ? <td style={{whiteSpace: 'pre-line', wordBreak: 'break-word'}}>{row.basvuruAciklama}</td> : <td className="col-bekleme-süresi-gün">{row.beklemeSuresi}</td>}
+                                        {(isCompletedMode || isUygunOlmayanIadeMode || isOnemliIslerMode || isFenKayitAlinmayan || isHarciYatirilmayan || isIadeEdilen) ? <td style={{whiteSpace: 'pre-line', wordBreak: 'break-word'}}>{row.basvuruAciklama}</td> : <td className="col-bekleme-süresi-gün">{row.beklemeSuresi}</td>}
                                     </tr> 
                                 ))} 
                             </tbody> 
@@ -3244,3 +3265,4 @@
     </script>
 </body>
 </html>
+
