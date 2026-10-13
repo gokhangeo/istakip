@@ -396,6 +396,32 @@
             return null;
         }
 
+        const getTescilRequestInfo = (value, today = new Date()) => {
+            let year, month, day;
+            if (typeof value === 'number' && Number.isFinite(value) && value > 0) {
+                const parts = XLSX.SSF.parse_date_code(value);
+                if (parts) ({ y: year, m: month, d: day } = parts);
+            } else {
+                const match = String(value || '').match(/(?:^|[^\d])(?:(\d{4})[./-](\d{1,2})[./-](\d{1,2})|(\d{1,2})[./-](\d{1,2})[./-](\d{4}))(?!\d)/);
+                if (match) {
+                    year = Number(match[1] || match[6]);
+                    month = Number(match[2] || match[5]);
+                    day = Number(match[3] || match[4]);
+                }
+            }
+            const requestStart = Date.UTC(year, month - 1, day);
+            const date = new Date(requestStart);
+            if (year < 1900 || date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) {
+                return { requestDate: '', elapsedDays: null };
+            }
+            const todayParts = {};
+            new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Istanbul', year: 'numeric', month: '2-digit', day: '2-digit' })
+                .formatToParts(today).forEach(part => { todayParts[part.type] = part.value; });
+            const todayStart = Date.UTC(Number(todayParts.year), Number(todayParts.month) - 1, Number(todayParts.day));
+            const days = Math.round((todayStart - requestStart) / 86400000);
+            return { requestDate: `${day}.${month}.${year}`, elapsedDays: days >= 0 ? days : null };
+        };
+
         const detectProvinceAndDistrict = (rawKurumAd) => {
             if (!rawKurumAd) return { province: null, district: null };
             const normRaw = normalizeHeader(rawKurumAd);
@@ -993,7 +1019,7 @@
             const isTescilEdilen = sortField === 'tescile_giden';
             const isIptalEdilen = sortField === 'iptal_edilen';
             const isClosedMode = isTescilEdilen || isIptalEdilen;
-            const elapsedDaysLabel = isTescilEdilen ? 'Tescilden Geçen Gün' : (isIptalEdilen ? 'İptalden Geçen Gün' : 'Bekleme Süresi (Gün)');
+            const elapsedDaysLabel = isClosedMode ? 'Tescil Talebinden Geçen Gün' : 'Bekleme Süresi (Gün)';
             const [warningRows, setWarningRows] = useState([]); 
             const [dateSortOrder, setDateSortOrder] = useState('asc');
             const [warningPersonnelFilter, setWarningPersonnelFilter] = useState([]);
@@ -1083,11 +1109,13 @@
                 } else if (sortField === 'tescile_giden' || sortField === 'iptal_edilen') {
                     finalRows = warningEligibleData.filter(task => matchesClosedApplication(task, sortField)).map((task) => {
                         const closedInfo = getClosedApplicationInfo(task['başvuru açıklama'], sortField, today);
+                        const requestInfo = getTescilRequestInfo(task['tescil talep bilgisi'], today);
                         return { fenKayitNo: task['fen kayıt no'] || 'Yok', il: task._province || '',
                             ilce: task['ilçe'] || '', islem: task['işlem'] || '', zemin: task['zemin'] || '',
                             basvuruDurumu: task['başvuru durumu'] || '', basvuruAciklama: task['başvuru açıklama'] || '',
                             kisaBasvuruAciklama: closedInfo.shortExplanation, olayTarihi: closedInfo.eventDate,
-                            beklemeSuresi: closedInfo.elapsedDays, personnelRaw: task['görevli personel'] || '',
+                            tescilTalepTarihi: requestInfo.requestDate,
+                            beklemeSuresi: requestInfo.elapsedDays, personnelRaw: task['görevli personel'] || '',
                             basvuruTarihi: task['başvuru tarihi'] || '', fenKayitTarihi: task['fen kayıt tarihi'] || '',
                             rawTask: task };
                     }).filter(row => warningThreshold === 0 || (row.beklemeSuresi !== null && row.beklemeSuresi >= warningThreshold))
@@ -1185,7 +1213,7 @@
             const prevKeysRef = useRef("");
             useEffect(() => {
                 if (onWarningRowsChange) {
-                    const keys = JSON.stringify(displayedRows.map(r => [r.rawTask && r.rawTask['başvuru no'], r.fenKayitNo, r.ilce, r.beklemeSuresi, r.basvuruDurumu, r.personnelRaw, r.basvuruAciklama, r.olayTarihi]));
+                    const keys = JSON.stringify(displayedRows.map(r => [r.rawTask && r.rawTask['başvuru no'], r.fenKayitNo, r.ilce, r.beklemeSuresi, r.basvuruDurumu, r.personnelRaw, r.basvuruAciklama, r.olayTarihi, r.tescilTalepTarihi]));
                     if (prevKeysRef.current !== keys) {
                         prevKeysRef.current = keys;
                         onWarningRowsChange(displayedRows);
@@ -1265,7 +1293,7 @@
                 const rowsToExport = displayedRows;
 
                 if (isClosedMode) {
-                    dataToExport = rowsToExport.map(row => ({ 'Personel': getPersonnelTextForExport(row), 'Fen Kayıt Tarihi': row.fenKayitTarihi, 'Fen Kayıt No': row.fenKayitNo, 'İlçe': row.ilce, 'İşlem': row.islem, 'Zemin': formatZemin(row.zemin), 'Başvuru Durumu': row.basvuruDurumu, [isTescilEdilen ? 'Tescil Tarihi' : 'İptal Tarihi']: row.olayTarihi || '—', 'Başvuru Açıklama': row.kisaBasvuruAciklama, [elapsedDaysLabel]: row.beklemeSuresi === null ? '—' : row.beklemeSuresi }));
+                    dataToExport = rowsToExport.map(row => ({ 'Personel': getPersonnelTextForExport(row), 'Fen Kayıt Tarihi': row.fenKayitTarihi, 'Fen Kayıt No': row.fenKayitNo, 'İlçe': row.ilce, 'İşlem': row.islem, 'Zemin': formatZemin(row.zemin), 'Başvuru Durumu': row.basvuruDurumu, 'Tescil Talep Tarihi': row.tescilTalepTarihi || '—', 'Başvuru Açıklama': row.kisaBasvuruAciklama, [elapsedDaysLabel]: row.beklemeSuresi === null ? '—' : row.beklemeSuresi }));
                     cols = [{ wch: 30 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 20 }, { wch: 40 }, { wch: 25 }, { wch: 15 }, { wch: 60 }, { wch: 24 }];
                 } else if (sortField === 'fen_kayit_alinmayan' || sortField === 'harci_yatirilmayan' || sortField === 'iade edilen') {
                     dataToExport = rowsToExport.map(row => ({ 'Personel': getPersonnelTextForExport(row), 'Başvuru Tarihi': row.basvuruTarihi, 'Fen Kayıt Tarihi': row.fenKayitTarihi, 'Fen Kayıt No': row.fenKayitNo, 'İlçe': row.ilce, 'İşlem': row.islem, 'Zemin': formatZemin(row.zemin), 'Başvuru Durumu': row.basvuruDurumu, 'Bekleme Süresi (Gün)': row.beklemeSuresi, 'Başvuru Açıklama': row.basvuruAciklama }));
@@ -1469,7 +1497,7 @@
                                     <th>Fen Kayıt Tarihi {(isOnemliIslerMode || isUygunOlmayanIadeMode || isIadeEdilen) && ( <span onClick={toggleDateSort} style={{ cursor: 'pointer', userSelect: 'none', padding: '0 5px' }}>{dateSortOrder === 'asc' ? '\u{1F53C}' : '\u{1F53D}'}</span> )}</th>
                                     <th className="col-fen-kayit-no">Fen Kayıt No</th><th className="col-ilce">İlçe</th><th className="col-islem">İşlem</th><th className="col-zemin">Zemin</th>{!isClosedMode && <th>Başvuru Durumu</th>}
                                     {isClosedMode && <th>Başvuru Açıklama</th>}
-                                    {(isUygunOlmayanIadeMode || isOnemliIslerMode || isFenKayitAlinmayan || isHarciYatirilmayan || isIadeEdilen) ? <th>Başvuru Açıklama</th> : <th className="col-bekleme-süresi-gün" title={isClosedMode ? 'Açıklamadaki işlem tarihinden bugüne geçen takvim günü. Tarih yoksa süre hesaplanmaz.' : undefined}>{elapsedDaysLabel}</th> }
+                                    {(isUygunOlmayanIadeMode || isOnemliIslerMode || isFenKayitAlinmayan || isHarciYatirilmayan || isIadeEdilen) ? <th>Başvuru Açıklama</th> : <th className="col-bekleme-süresi-gün" title={isClosedMode ? 'Tescil Talep Bilgisi sütunundaki tarihten bugüne geçen takvim günü. Tarih yoksa süre hesaplanmaz.' : undefined}>{elapsedDaysLabel}</th> }
                                 </tr> 
                             </thead> 
                             <tbody> 
@@ -1756,7 +1784,7 @@
 
         function MegsisReporter({ data, isEngineer, sortField, warningFilterLabel, reportSummary, hideEkOdemeGonderildi }) {
             const isClosedMode = sortField === 'tescile_giden' || sortField === 'iptal_edilen';
-            const pdfDayLabel = sortField === 'tescile_giden' ? 'Tescilden Gecen Gun' : (sortField === 'iptal_edilen' ? 'Iptalden Gecen Gun' : 'Bekleme (Gun)');
+            const pdfDayLabel = isClosedMode ? 'Tescil Talebinden Gecen Gun' : 'Bekleme (Gun)';
             const [isLoading, setIsLoading] = useState(false);
             const [personnelOptions, setPersonnelOptions] = useState([]);
             const [selectedPersonnel, setSelectedPersonnel] = useState([]);
@@ -1838,13 +1866,14 @@
                                 const status = String(row['başvuru durumu'] || row.basvuruDurumu || '').toLocaleLowerCase('tr');
                                 const isClosed = status.includes('eksiklikten iade edildi') || status.includes('tescile gönderildi');
                                 const fStr = row['fen kayıt tarihi'] || row.fenKayitTarihi;
-                                let beklemeSuresi = typeof row.beklemeSuresi === 'number' ? row.beklemeSuresi : '';
+                                const requestInfo = isClosedMode ? getTescilRequestInfo(row['tescil talep bilgisi'] || (row.rawTask && row.rawTask['tescil talep bilgisi']), today) : null;
+                                let beklemeSuresi = isClosedMode ? (requestInfo.elapsedDays === null ? '' : requestInfo.elapsedDays) : (typeof row.beklemeSuresi === 'number' ? row.beklemeSuresi : '');
                                 if (beklemeSuresi !== '') {
                                     pendingCount++;
                                     daysCount[beklemeSuresi] = (daysCount[beklemeSuresi] || 0) + 1;
                                 }
                                 
-                                if (beklemeSuresi === '' && fStr && !isClosed) {
+                                if (!isClosedMode && beklemeSuresi === '' && fStr && !isClosed) {
                                     const fenKayitDate = new Date(fStr);
                                     if (!isNaN(fenKayitDate) && fenKayitDate.getFullYear() > 1900) {
                                         const diffDays = Math.floor((today - fenKayitDate) / (1000 * 60 * 60 * 24));
@@ -2114,7 +2143,7 @@
                                 tr(r['İşlem']),
                                 tr(r['Zemin']),
                                 tr(isClosedMode ? sheetData.closedExplanations[rowIndex] : r['Başvuru Durumu']),
-                                r['Bekleme Süresi (Gün)'] !== '' ? r['Bekleme Süresi (Gün)'] : ''
+                                r['Bekleme Süresi (Gün)'] !== '' ? r['Bekleme Süresi (Gün)'] : (isClosedMode ? '—' : '')
                             ]);
 
                             doc.autoTable({

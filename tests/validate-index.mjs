@@ -68,6 +68,22 @@ const sourceOf = name => {
   return scriptMatch[1].slice(node.start, node.end);
 };
 const classificationSource = ['normalizeHeader', 'matchesClosedApplication'].map(sourceOf).join('\n');
+const requestInfo = runInNewContext(sourceOf('getTescilRequestInfo') + '\ngetTescilRequestInfo;', {
+  XLSX: { SSF: { parse_date_code: serial => serial === 46303 ? { y: 2026, m: 10, d: 8 } : null } }
+});
+for (const value of ['8.10.2026 15:17:10 / 1234', '08/10/2026 / 1234', '08-10-2026', '2026-10-08T12:00:00', 'Tescil talep tarihi: 8.10.2026', 46303]) {
+  assert.equal(requestInfo(value, today).requestDate, '8.10.2026');
+  assert.equal(requestInfo(value, today).elapsedDays, 4);
+}
+assert.equal(requestInfo('12.10.2026 23:59:59', today).elapsedDays, 0);
+assert.equal(requestInfo('8.10.2026', new Date('2026-10-12T21:30:00Z')).elapsedDays, 5);
+for (const value of ['', null, undefined, 'Talep bilgisi yok', '31.02.2026', '29.02.2025', '130.04.2026', 0, -1]) {
+  assert.equal(requestInfo(value, today).elapsedDays, null);
+  assert.equal(requestInfo(value, today).requestDate, '');
+}
+assert.equal(requestInfo('13.10.2026', today).elapsedDays, null);
+assert(requestInfo('29.02.2024', today).elapsedDays > 0);
+console.log('Tescil talep tarihleri, geçersiz/eksik tarihler ve Türkiye takvim günü hesabı doğrulandı.');
 const matchesClosed = runInNewContext(classificationSource + '\nmatchesClosedApplication;');
 const sent = { 'başvuru durumu': 'Tescile Gönderildi' };
 const cases = [
@@ -141,4 +157,25 @@ for (const [sortField, expected] of [['tescile_giden', ['registered', 'contradic
   assert.deepEqual(Array.from(rows, row => row.id), expected);
 }
 console.log('Excel Tescil Durum sütunu, açıklamadan bağımsız sınıflandırma, sayaçlar ve liste filtreleri doğrulandı.');
+
+const warningTableNode = ast.program.body.find(node => node.type === 'FunctionDeclaration' && node.id.name === 'WarningTable');
+const warningEffect = findNode(warningTableNode, node => node.type === 'CallExpression' && node.callee.name === 'useEffect' &&
+  scriptMatch[1].slice(node.arguments[0].start, node.arguments[0].end).includes('setWarningRows(finalRows)'));
+const effectCallback = warningEffect.arguments[0];
+for (const [sortField, registrationStatus, explanation] of [['tescile_giden', 'Başvuru Tamamlandı', registered], ['iptal_edilen', 'Başvuru Red Edildi', cancelled]]) {
+  for (const [requestValue, expectedDate, expectedDays] of [['8.10.2026 / 1234', '8.10.2026', 4], ['', '', null], ['31.02.2026', '', null]]) {
+    let rows;
+    runInNewContext(classificationSource + '\n' + sourceOf('getClosedApplicationInfo') + '\n' + sourceOf('getTescilRequestInfo') +
+      '\n(' + scriptMatch[1].slice(effectCallback.start, effectCallback.end) + ')();', {
+      Date: class extends Date { constructor(...args) { super(...(args.length ? args : [today])); } },
+      sortField, warningEligibleData: [{ ...sent, 'tescil durum': registrationStatus, 'tescil talep bilgisi': requestValue, 'başvuru açıklama': explanation }],
+      warningThreshold: 0, personnelFilterType: 'all', setWarningRows: value => { rows = value; }
+    });
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0].beklemeSuresi, expectedDays);
+    assert.equal(rows[0].tescilTalepTarihi, expectedDate);
+    assert.equal(rows[0].kisaBasvuruAciklama, closedInfo(explanation, sortField, today).shortExplanation);
+  }
+}
+console.log('Tescil ve iptal uyarı tablolarının süresi yalnızca Tescil Talep Bilgisi tarihine dayanıyor.');
 
