@@ -427,6 +427,16 @@
         
         const normalizeName = (name) => { if (!name) return ""; return name.toString().trim().toLocaleLowerCase('tr').replace(/\s*\(müh\.\)\s*/g, '').replace(/\s+/g, '').replace(/ı/g, 'i').replace(/ö/g, 'o').replace(/ü/g, 'u').replace(/ş/g, 's').replace(/ç/g, 'c').replace(/ğ/g, 'g');}
 
+        const matchesClosedApplication = (row, sortField) => {
+            // Tescilden geldi/iade olarak işlenen kayıtlar bu takip listelerine dahil edilmez.
+            const applicationStatus = normalizeHeader(row['başvuru durumu']);
+            if (!applicationStatus.includes('tescile gonderildi')) return false;
+            const registrationStatus = normalizeHeader(row['tescil durum'] || row['tescil durumu']);
+            if (sortField === 'tescile_giden') return registrationStatus === 'basvuru tamamlandi';
+            if (sortField === 'iptal_edilen') return registrationStatus === 'basvuru red edildi';
+            return false;
+        };
+
         const readExcelPromise = (file, isComparison = false) => {
             return new Promise((resolve, reject) => {
                 if (!file) { reject(new Error("Dosya yüklenmedi.")); return; }
@@ -451,8 +461,8 @@
 
                         const headersNorm = rawHeaders.map(h => normalizeHeader(h));
                         const colIndexes = {};
-                        const allAllowedCols = [...ALLOWED_COLS, "personel", "bekleme süresi (gün)"];
-                        const allHeaderKeywords = {...HEADER_KEYWORDS, "personel": ["personel"], "bekleme süresi (gün)": ["bekleme", "süre"]};
+                        const allAllowedCols = [...ALLOWED_COLS, "tescil durum", "personel", "bekleme süresi (gün)"];
+                        const allHeaderKeywords = {...HEADER_KEYWORDS, "tescil durum": ["tescil", "durum"], "personel": ["personel"], "bekleme süresi (gün)": ["bekleme", "süre"]};
 
                         allAllowedCols.forEach(col => { colIndexes[col] = -1; });
                         
@@ -525,7 +535,6 @@
                 const bStr = d['başvuru tarihi'];
                 const fStr = d['fen kayıt tarihi'];
                 const fenKayitNo = d['fen kayıt no'];
-                const aciklama = String(d['başvuru açıklama'] || '').toLocaleLowerCase('tr');
                 const status = String(d['başvuru durumu'] || '').toLocaleLowerCase('tr');
                 const odeme = String(d['ödeme'] || '').toLocaleLowerCase('tr');
                 const tescilTalepBilgisi = d['tescil talep bilgisi'];
@@ -582,9 +591,9 @@
 
                 if (status.includes('tescile gönderildi')) {
                     tescileGiden++;
-                    if (aciklama.includes('tescil edildi')) tescilEdilen++;
-                    if (aciklama.includes('iptal')) iptal++;
                 }
+                if (matchesClosedApplication(d, 'tescile_giden')) tescilEdilen++;
+                if (matchesClosedApplication(d, 'iptal_edilen')) iptal++;
                 if (status.includes('eksiklikten iade edildi')) iade++;
                 if (odeme.includes('ödendi') && !odeme.includes('ödenmedi') && !hasValidFenKayitNo) fenKayitAlinmayan++;
             });
@@ -745,7 +754,6 @@
                     if (personnel.length > 0) { personnel.forEach(p => { if (p) totalsMap[p] = (totalsMap[p] || 0) + 1; }); }
                     
                     const status = String(r['başvuru durumu'] || '').toLocaleLowerCase('tr');
-                    const aciklama = String(r['başvuru açıklama'] || '').toLocaleLowerCase('tr');
                     const odeme = String(r['ödeme'] || '').toLocaleLowerCase('tr');
                     const islem = String(r['işlem'] || '').trim(); const islemLower = islem.toLowerCase();
                     const district = r._district; const fenKayitNo = r['fen kayıt no'];
@@ -771,8 +779,8 @@
                     let conditionMet = false;
                     switch(sortField) {
                         case 'iade edilen': if(status.includes('eksiklikten iade edildi')) conditionMet = true; break;
-                        case 'tescile_giden': if(status.includes('tescile gönderildi') && aciklama.includes('tescil edildi')) conditionMet = true; break;
-                        case 'iptal_edilen': if(status.includes('tescile gönderildi') && aciklama.includes('iptal')) conditionMet = true; break;
+                        case 'tescile_giden': conditionMet = matchesClosedApplication(r, sortField); break;
+                        case 'iptal_edilen': conditionMet = matchesClosedApplication(r, sortField); break;
                         case 'fen_kayit_alinmayan': if(odeme.includes('ödendi') && !odeme.includes('ödenmedi') && (fenKayitNo === 0 || fenKayitNo == null)) conditionMet = true; break;
                         case 'harci_yatirilmayan': if(odeme.includes('ödenmedi')) conditionMet = true; break;
                         case 'plan_ornegi':
@@ -1073,7 +1081,7 @@
                     });
                     finalRows = Object.values(groupedTasks).sort((a, b) => b.beklemeSuresi - a.beklemeSuresi);
                 } else if (sortField === 'tescile_giden' || sortField === 'iptal_edilen') {
-                    finalRows = warningEligibleData.map((task) => {
+                    finalRows = warningEligibleData.filter(task => matchesClosedApplication(task, sortField)).map((task) => {
                         const closedInfo = getClosedApplicationInfo(task['başvuru açıklama'], sortField, today);
                         return { fenKayitNo: task['fen kayıt no'] || 'Yok', il: task._province || '',
                             ilce: task['ilçe'] || '', islem: task['işlem'] || '', zemin: task['zemin'] || '',
@@ -3101,9 +3109,9 @@
                 if(selectedIslem.length > 0) arr = arr.filter(d => selectedIslem.includes(d['işlem'])); 
                 
                 if(sortField==='iade edilen') { arr=arr.filter(d=>String(d['başvuru durumu']||'').toLocaleLowerCase('tr').includes('eksiklikten iade edildi')); }
-                else if (sortField === 'tescile_giden') { arr = arr.filter(d => { const status = String(d['başvuru durumu'] || '').toLocaleLowerCase('tr'); const aciklama = String(d['başvuru açıklama'] || '').toLocaleLowerCase('tr'); return status.includes('tescile gönderildi') && aciklama.includes('tescil edildi'); }); }
+                else if (sortField === 'tescile_giden') { arr = arr.filter(d => matchesClosedApplication(d, sortField)); }
                 else if (sortField === 'tescilden_geldi') { arr = arr.filter(d => String(d['başvuru durumu'] || '').toLocaleLowerCase('tr') === 'tescilden geldi'); }
-                else if (sortField === 'iptal_edilen') { arr = arr.filter(d => { const status = String(d['başvuru durumu'] || '').toLocaleLowerCase('tr'); const aciklama = String(d['başvuru açıklama'] || '').toLocaleLowerCase('tr'); return status.includes('tescile gönderildi') && aciklama.includes('iptal'); }); }
+                else if (sortField === 'iptal_edilen') { arr = arr.filter(d => matchesClosedApplication(d, sortField)); }
                 else if (sortField === 'fen_kayit_alinmayan') { arr = arr.filter(d => { const odeme = String(d['ödeme'] || '').toLocaleLowerCase('tr'); return odeme.includes('ödendi') && !odeme.includes('ödenmedi') && (d['fen kayıt no'] === 0 || d['fen kayıt no'] == null); }); }
                 else if (sortField === 'plan_ornegi') { arr = arr.filter(d => { const islem = String(d['işlem'] || '').toLocaleLowerCase('tr'); return ['plan örneği', 'mahkeme plan örneği', 'teknik bilgi ve belge örnekleri'].includes(islem); }); }
                 else if (sortField === 'eksiklik_tamamlandi') { arr = arr.filter(d => String(d['başvuru durumu'] || '').toLocaleLowerCase('tr').includes('eksiklik tamamlandı')); }
