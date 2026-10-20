@@ -1033,6 +1033,7 @@
             const [dateSortOrder, setDateSortOrder] = useState('asc');
             const [warningPersonnelFilter, setWarningPersonnelFilter] = useState([]);
             const [showWarningPersonnelModal, setShowWarningPersonnelModal] = useState(false);
+            const [iadeIptalFilter, setIadeIptalFilter] = useState('all');
             const tableData = React.useMemo(() => Array.isArray(data) ? data : [], [data]);
             const warningEligibleData = React.useMemo(() => {
                 if (!hideEkOdemeGonderildi) return tableData;
@@ -1212,12 +1213,17 @@
             }, [warningRows, personnelFilterType, isEngineer]);
 
             const displayedRows = React.useMemo(() => {
-                if (warningPersonnelFilter.length === 0) return warningRows;
-                return warningRows.filter(row => {
+                let rows = warningRows;
+                if (iadeIptalFilter !== 'all' && !isClosedMode) {
+                    const wantReturned = iadeIptalFilter === 'only';
+                    rows = rows.filter(row => getLastApplicationNote(row.basvuruAciklama || (row.rawTask && row.rawTask['başvuru açıklama'])).isReturned === wantReturned);
+                }
+                if (warningPersonnelFilter.length === 0) return rows;
+                return rows.filter(row => {
                      const pList = parsePersonnelWithStatus(row.personnelRaw);
                      return pList.some(p => warningPersonnelFilter.includes(p.name));
                 });
-            }, [warningRows, warningPersonnelFilter]);
+            }, [warningRows, warningPersonnelFilter, iadeIptalFilter, isClosedMode]);
 
             const prevKeysRef = useRef("");
             useEffect(() => {
@@ -1470,6 +1476,15 @@
                                      Ek Ödeme Gönderildi olanları gizle
                                  </label>
                              </div>
+                             {!isClosedMode && (
+                                 <div style={{display: 'flex', alignItems: 'center', marginRight: '10px'}}>
+                                     <select value={iadeIptalFilter} onChange={(e) => setIadeIptalFilter(e.target.value)} title="Son başvuru açıklamasında iade/iptal/red ifadesi geçen işlemleri ayırır" style={{fontSize: '0.9rem', padding: '4px', borderRadius: '4px', border: '1px solid #dc2626', color: '#991b1b', fontWeight: 'bold'}}>
+                                         <option value="all">İade/İptal: Tümü</option>
+                                         <option value="only">⚠ Sadece İade/İptal</option>
+                                         <option value="hide">İade/İptal olanları gizle</option>
+                                     </select>
+                                 </div>
+                             )}
                              {(!isOnemliIslerMode && !isUygunOlmayanIadeMode && sortField !== 'plan_ornegi' && !isGorevlendirmeYapilmayan && !isHarciYatirilmayan && !isIadeEdilen) && (
                                  <div style={{display: 'flex', alignItems: 'center', marginRight: '10px'}}>
                                      <label style={{fontSize: '0.9rem', fontWeight: 'bold', color: '#991b1b', marginRight: '5px'}}>Süre:</label>
