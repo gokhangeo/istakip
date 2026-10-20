@@ -314,6 +314,15 @@
             return lines.join('\n');
         };
 
+        // Bekleyen işlemler tablosu için başvuru açıklamasındaki en son notu ve iade/iptal durumunu bulur (yalnızca ekranda gösterilir, PDF/Excel'e yansımaz).
+        const getLastApplicationNote = (value) => {
+            const text = String(value || '').trim();
+            if (!text || text === '-') return { note: '', isReturned: false };
+            const entries = text.split(/\n\s*-\s+/).map(e => e.replace(/^\s*-\s*/, '').trim()).filter(Boolean);
+            const note = (entries[0] || '').replace(/-\s*\d{1,2}\.\d{1,2}\.\d{4}\s*\([^)]*\)\s*$/, '').trim();
+            const isReturned = /iptal|red edil|reddedil|geri alın|iade edil/.test(note.toLocaleLowerCase('tr'));
+            return { note, isReturned };
+        };
         const getClosedApplicationInfo = (value, sortField, today = new Date()) => {
             const raw = String(value || '').trim();
             const normalized = raw.toLocaleLowerCase('tr').replace(/ı/g, 'i');
@@ -1513,7 +1522,12 @@
                                         {(isFenKayitAlinmayan || isHarciYatirilmayan || isIadeEdilen) && <td>{row.basvuruTarihi}</td>}
                                         <td>{row.fenKayitTarihi}</td><td className="col-fen-kayit-no">{row.fenKayitNo}</td><td className="col-ilce">{row.ilce}</td><td className="col-islem">{row.islem}</td>
                                         <td className="col-zemin" style={{whiteSpace: 'pre-line'}}>{formatZemin(row.zemin)}</td>
-                                        {!isClosedMode && <td>{row.basvuruDurumu}</td>}
+                                        {!isClosedMode && (() => { const last = getLastApplicationNote(row.basvuruAciklama || (row.rawTask && row.rawTask['başvuru açıklama'])); return (
+                                            <td>
+                                                {row.basvuruDurumu}
+                                                {last.isReturned && <span title="Son açıklamada iade/iptal/red ifadesi var" style={{marginLeft: '4px', background: '#dc2626', color: '#fff', borderRadius: '4px', padding: '0 5px', fontSize: '11px', whiteSpace: 'nowrap'}}>⚠ İade/İptal</span>}
+                                                {last.note && <div title={last.note} style={{fontSize: '11px', color: last.isReturned ? '#b91c1c' : '#6b7280', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '220px', cursor: 'help'}}>{last.note}</div>}
+                                            </td>); })()}
                                         {isClosedMode && <td title={row.basvuruAciklama} style={{minWidth: '220px', maxWidth: '360px', whiteSpace: 'normal', wordBreak: 'break-word'}}>{row.kisaBasvuruAciklama}</td>}
                                         {(isUygunOlmayanIadeMode || isOnemliIslerMode || isFenKayitAlinmayan || isHarciYatirilmayan || isIadeEdilen) ? <td style={{whiteSpace: 'pre-line', wordBreak: 'break-word'}}>{row.basvuruAciklama}</td> : <td className="col-bekleme-süresi-gün">{isClosedMode && row.beklemeSuresi === null ? '—' : row.beklemeSuresi}</td>}
                                     </tr> 
